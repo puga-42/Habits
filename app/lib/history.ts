@@ -348,6 +348,32 @@ function applyTimePatch(occ: Date, hhmm: string): Date {
   return out;
 }
 
+// ─── Density (GitHub-style) ───────────────────────────────────────────────
+
+// Per-day completion count, derived from already-shaped day groups so the
+// active filter is automatically respected. Only counts rows of kind
+// 'completion' (not skips or scheduled-but-not-yet rows).
+export function completionCountByDate(groups: DayGroup[]): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const g of groups) {
+    let count = 0;
+    for (const row of g.rows) {
+      if (row.kind === 'completion') count++;
+    }
+    if (count > 0) out.set(g.date, count);
+  }
+  return out;
+}
+
+// 5-level bucket scale matching the GitHub contributions graph: 0, 1, 2, 3, 4+.
+export function densityBucket(count: number): 0 | 1 | 2 | 3 | 4 {
+  if (count <= 0) return 0;
+  if (count === 1) return 1;
+  if (count === 2) return 2;
+  if (count === 3) return 3;
+  return 4;
+}
+
 // ─── Query ────────────────────────────────────────────────────────────────
 
 // Fetch one month of completions + overrides for the current user.

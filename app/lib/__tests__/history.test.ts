@@ -2,11 +2,15 @@ import {
   agendaDatesForMonth,
   buildDayGroups,
   buildMonthGrid,
+  completionCountByDate,
+  densityBucket,
   expandHabit,
   monthLabel,
   nextMonth,
   prevMonth,
+  type AgendaRow,
   type CompletionWithHabit,
+  type DayGroup,
 } from '../history';
 import { isoDate, type Habit, type HabitOverride } from '../habits';
 
@@ -435,5 +439,92 @@ describe('buildDayGroups (today + future)', () => {
     const groups = buildDayGroups([todayIso], [gym], [completion], [], TODAY);
     expect(groups[0].rows).toHaveLength(1);
     expect(groups[0].rows[0].kind).toBe('completion');
+  });
+});
+
+// ─── completionCountByDate ─────────────────────────────────────────────────
+
+describe('completionCountByDate', () => {
+  const fakeAgendaHabit = { id: 'h', title: 'H', icon: null, color: null };
+
+  function completionRow(id: string): AgendaRow {
+    return {
+      kind: 'completion',
+      id,
+      habit: fakeAgendaHabit,
+      time: null,
+      isFlex: false,
+    };
+  }
+  function skipRow(): AgendaRow {
+    return { kind: 'skip', habitId: 'h', habit: fakeAgendaHabit, time: null };
+  }
+  function scheduledRow(): AgendaRow {
+    return { kind: 'scheduled', habitId: 'h', habit: fakeAgendaHabit, time: null };
+  }
+  function group(date: string, rows: AgendaRow[]): DayGroup {
+    return { date, rows };
+  }
+
+  it('returns empty for empty input', () => {
+    expect(completionCountByDate([]).size).toBe(0);
+  });
+
+  it('counts only completion rows, ignoring skip and scheduled', () => {
+    const map = completionCountByDate([
+      group('2026-05-13', [completionRow('c1'), skipRow(), scheduledRow()]),
+    ]);
+    expect(map.get('2026-05-13')).toBe(1);
+  });
+
+  it('sums multiple completions on the same day', () => {
+    const map = completionCountByDate([
+      group('2026-05-13', [completionRow('c1'), completionRow('c2')]),
+    ]);
+    expect(map.get('2026-05-13')).toBe(2);
+  });
+
+  it('omits days with zero completions from the map', () => {
+    const map = completionCountByDate([group('2026-05-13', [skipRow()])]);
+    expect(map.has('2026-05-13')).toBe(false);
+  });
+
+  it('handles multiple days independently', () => {
+    const map = completionCountByDate([
+      group('2026-05-12', [completionRow('c1')]),
+      group('2026-05-13', [completionRow('c2'), completionRow('c3')]),
+      group('2026-05-14', []),
+    ]);
+    expect(map.get('2026-05-12')).toBe(1);
+    expect(map.get('2026-05-13')).toBe(2);
+    expect(map.has('2026-05-14')).toBe(false);
+  });
+});
+
+// ─── densityBucket ─────────────────────────────────────────────────────────
+
+describe('densityBucket', () => {
+  it('maps 0 to bucket 0', () => {
+    expect(densityBucket(0)).toBe(0);
+  });
+  it('maps 1 to bucket 1', () => {
+    expect(densityBucket(1)).toBe(1);
+  });
+  it('maps 2 to bucket 2', () => {
+    expect(densityBucket(2)).toBe(2);
+  });
+  it('maps 3 to bucket 3', () => {
+    expect(densityBucket(3)).toBe(3);
+  });
+  it('maps 4 to bucket 4', () => {
+    expect(densityBucket(4)).toBe(4);
+  });
+  it('caps 5+ at bucket 4', () => {
+    expect(densityBucket(5)).toBe(4);
+    expect(densityBucket(10)).toBe(4);
+    expect(densityBucket(100)).toBe(4);
+  });
+  it('treats negative counts as 0', () => {
+    expect(densityBucket(-1)).toBe(0);
   });
 });

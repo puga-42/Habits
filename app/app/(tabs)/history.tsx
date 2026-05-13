@@ -24,6 +24,7 @@ import {
   agendaDatesForMonth,
   buildDayGroups,
   buildMonthGrid,
+  completionCountByDate,
   fetchMonth,
   monthLabel,
   nextMonth,
@@ -132,15 +133,9 @@ export default function HistoryScreen() {
     [agendaDates, filteredHabits, filteredCompletions, filteredOverrides, today],
   );
 
-  // Calendar dots = any day with at least one rendered row (completion,
-  // scheduled, or skip). Derived from dayGroups for a single source of truth.
-  const activityDates = useMemo(() => {
-    const s = new Set<string>();
-    for (const g of dayGroups) {
-      if (g.rows.length > 0) s.add(g.date);
-    }
-    return s;
-  }, [dayGroups]);
+  // Per-day completion count for the calendar's density fill. Derived from
+  // dayGroups so it automatically honors the active habit filter.
+  const countByDate = useMemo(() => completionCountByDate(dayGroups), [dayGroups]);
 
   // The selected habit (for the filter chip label).
   const selectedHabit = filterHabitId ? habits.find((h) => h.id === filterHabitId) : null;
@@ -173,7 +168,7 @@ export default function HistoryScreen() {
         <View style={styles.calendarWrap}>
           <HistoryCalendar
             cells={cells}
-            activityDates={activityDates}
+            countByDate={countByDate}
             selectedIso={selectedIso}
             onSelectDay={setSelectedIso}
           />
