@@ -1,0 +1,288 @@
+// Shared form fields used by both the create (`/habit/new`) and edit
+// (`/habit/[id]`) screens. The screens own their own header + save logic.
+
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { useRouter } from 'expo-router';
+import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+
+import { ThemedText } from '@/components/themed-text';
+import { useHabitForm } from '@/lib/habit-form';
+import type { FlexPeriod, Visibility } from '@/lib/habits';
+import { describeRrule } from '@/lib/recurrence';
+
+const COLORS = ['#7c3aed', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#6b7280'];
+const ICONS = ['✨', '🧘', '🏋', '🚶', '📖', '💧', '🍎', '🌱', '✍️', '☀️', '😴', '🧹', '☕️', '🚲', '🦷', '💊'];
+const PERIODS: FlexPeriod[] = ['day', 'week', 'month'];
+const VISIBILITY_OPTIONS: Visibility[] = ['public', 'friends', 'private'];
+const VISIBILITY_LABELS: Record<Visibility, string> = {
+  public: 'Public — anyone can see',
+  friends: 'Friends — only your friends',
+  private: 'Private — only you',
+};
+
+type Props = {
+  lockKind?: boolean;
+};
+
+export function HabitFormFields({ lockKind = false }: Props) {
+  const router = useRouter();
+  const { draft, update } = useHabitForm();
+
+  return (
+    <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+      {/* Title */}
+      <View style={styles.section}>
+        <ThemedText style={styles.label}>Title</ThemedText>
+        <TextInput
+          value={draft.title}
+          onChangeText={(t) => update({ title: t })}
+          placeholder="e.g. Meditate"
+          placeholderTextColor="rgba(127,127,127,0.5)"
+          style={styles.input}
+          autoFocus={!draft.title}
+          returnKeyType="done"
+        />
+      </View>
+
+      {/* Kind */}
+      <View style={styles.section}>
+        <ThemedText style={styles.label}>Kind</ThemedText>
+        <View style={[styles.segment, lockKind && styles.disabled]}>
+          {(['scheduled', 'flex'] as const).map((k) => (
+            <Pressable
+              key={k}
+              disabled={lockKind}
+              onPress={() => update({ kind: k })}
+              style={[styles.segmentItem, draft.kind === k && styles.segmentItemActive]}>
+              <ThemedText
+                style={[
+                  styles.segmentText,
+                  draft.kind === k && styles.segmentTextActive,
+                ]}>
+                {k === 'scheduled' ? 'Scheduled' : 'Flex'}
+              </ThemedText>
+            </Pressable>
+          ))}
+        </View>
+      </View>
+
+      {draft.kind === 'scheduled' ? (
+        <>
+          <Row label="Time">
+            <DateTimePicker
+              value={draft.time}
+              mode="time"
+              display="compact"
+              onChange={(_e, date) => date && update({ time: date })}
+            />
+          </Row>
+          <Row label="Repeats" onPress={() => router.push('/habit/recurrence')}>
+            <ThemedText style={styles.rowValue}>{describeRrule(draft.recurrence)}</ThemedText>
+            <ThemedText style={styles.chevron}>›</ThemedText>
+          </Row>
+          <Row label="Starts">
+            <DateTimePicker
+              value={draft.startsOn}
+              mode="date"
+              display="compact"
+              onChange={(_e, date) => date && update({ startsOn: date })}
+            />
+          </Row>
+        </>
+      ) : (
+        <>
+          <View style={styles.section}>
+            <ThemedText style={styles.label}>Target</ThemedText>
+            <TextInput
+              value={String(draft.targetCount)}
+              onChangeText={(t) => {
+                const n = parseInt(t, 10);
+                update({ targetCount: isNaN(n) ? 0 : n });
+              }}
+              keyboardType="number-pad"
+              style={styles.input}
+            />
+          </View>
+          <View style={styles.section}>
+            <ThemedText style={styles.label}>Per</ThemedText>
+            <View style={styles.segment}>
+              {PERIODS.map((p) => (
+                <Pressable
+                  key={p}
+                  onPress={() => update({ targetPeriod: p })}
+                  style={[
+                    styles.segmentItem,
+                    draft.targetPeriod === p && styles.segmentItemActive,
+                  ]}>
+                  <ThemedText
+                    style={[
+                      styles.segmentText,
+                      draft.targetPeriod === p && styles.segmentTextActive,
+                    ]}>
+                    {p}
+                  </ThemedText>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        </>
+      )}
+
+      {/* Color */}
+      <View style={styles.section}>
+        <ThemedText style={styles.label}>Color</ThemedText>
+        <View style={styles.swatchRow}>
+          {COLORS.map((c) => (
+            <Pressable
+              key={c}
+              onPress={() => update({ color: c })}
+              style={[
+                styles.swatch,
+                { backgroundColor: c },
+                draft.color === c && styles.swatchSelected,
+              ]}
+            />
+          ))}
+        </View>
+      </View>
+
+      {/* Icon */}
+      <View style={styles.section}>
+        <ThemedText style={styles.label}>Icon</ThemedText>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.iconRow}>
+          {ICONS.map((i) => (
+            <Pressable
+              key={i}
+              onPress={() => update({ icon: i })}
+              style={[styles.iconItem, draft.icon === i && styles.iconItemSelected]}>
+              <ThemedText style={styles.iconEmoji}>{i}</ThemedText>
+            </Pressable>
+          ))}
+        </ScrollView>
+      </View>
+
+      {/* Visibility */}
+      <View style={styles.section}>
+        <ThemedText style={styles.label}>Visibility</ThemedText>
+        {VISIBILITY_OPTIONS.map((v) => (
+          <Pressable
+            key={v}
+            onPress={() => update({ visibility: v })}
+            style={styles.visibilityRow}>
+            <ThemedText style={styles.radio}>
+              {draft.visibility === v ? '●' : '○'}
+            </ThemedText>
+            <ThemedText style={styles.visibilityText}>
+              {VISIBILITY_LABELS[v]}
+            </ThemedText>
+          </Pressable>
+        ))}
+      </View>
+    </ScrollView>
+  );
+}
+
+function Row({
+  label,
+  onPress,
+  children,
+}: {
+  label: string;
+  onPress?: () => void;
+  children: React.ReactNode;
+}) {
+  const inner = (
+    <View style={styles.row}>
+      <ThemedText style={styles.rowLabel}>{label}</ThemedText>
+      <View style={styles.rowRight}>{children}</View>
+    </View>
+  );
+  return onPress ? <Pressable onPress={onPress}>{inner}</Pressable> : inner;
+}
+
+const styles = StyleSheet.create({
+  scroll: { padding: 20, paddingBottom: 80, gap: 18 },
+  section: { gap: 8 },
+  label: {
+    fontSize: 12,
+    opacity: 0.6,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  input: {
+    fontSize: 17,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(127,127,127,0.3)',
+    color: '#000',
+  },
+  segment: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(127,127,127,0.1)',
+    borderRadius: 8,
+    padding: 4,
+  },
+  segmentItem: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: 'center',
+    borderRadius: 6,
+  },
+  segmentItemActive: { backgroundColor: 'rgba(127,127,127,0.3)' },
+  segmentText: { fontSize: 15, opacity: 0.65 },
+  segmentTextActive: { opacity: 1, fontWeight: '600' },
+  disabled: { opacity: 0.5 },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(127,127,127,0.25)',
+  },
+  rowLabel: { fontSize: 16 },
+  rowRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  rowValue: { fontSize: 16, opacity: 0.65 },
+  chevron: { fontSize: 22, opacity: 0.4 },
+  swatchRow: { flexDirection: 'row', gap: 12 },
+  swatch: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  swatchSelected: {
+    borderColor: 'rgba(0,0,0,0.4)',
+    transform: [{ scale: 1.1 }],
+  },
+  iconRow: { paddingRight: 16 },
+  iconItem: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(127,127,127,0.2)',
+  },
+  iconItemSelected: {
+    borderColor: 'rgba(127,127,127,0.7)',
+    backgroundColor: 'rgba(127,127,127,0.12)',
+  },
+  iconEmoji: { fontSize: 22 },
+  visibilityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 8,
+  },
+  radio: { fontSize: 18, width: 24 },
+  visibilityText: { fontSize: 15, flex: 1 },
+});

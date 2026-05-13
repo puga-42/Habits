@@ -1,0 +1,2 @@
+-- Optional seed data applied after `supabase db reset` in local dev.
+-- Keep production secrets and real PII out of this file.
