@@ -3,7 +3,7 @@
 // strings, then store those strings on the habit. The full RRULE space stays
 // available for power-users via a future "custom" mode.
 
-export type Pattern = 'daily' | 'weekday' | 'weekly' | 'interval' | 'monthly';
+export type Pattern = 'oneoff' | 'daily' | 'weekday' | 'weekly' | 'interval' | 'monthly';
 
 export type WeekDay = 'SU' | 'MO' | 'TU' | 'WE' | 'TH' | 'FR' | 'SA';
 
@@ -37,6 +37,10 @@ export type RecurrenceState = {
 
 export function buildRrule(state: RecurrenceState): string {
   switch (state.pattern) {
+    case 'oneoff':
+      // A single occurrence on dtstart. rrule.js expands COUNT=1 to just that
+      // one date, which is exactly what we want for non-recurring habits.
+      return 'FREQ=DAILY;COUNT=1';
     case 'daily':
       return 'FREQ=DAILY';
     case 'weekday':
@@ -54,6 +58,8 @@ export function buildRrule(state: RecurrenceState): string {
 
 export function describeRrule(state: RecurrenceState): string {
   switch (state.pattern) {
+    case 'oneoff':
+      return "Doesn't repeat";
     case 'daily':
       return 'Every day';
     case 'weekday':
@@ -76,6 +82,9 @@ export function describeRrule(state: RecurrenceState): string {
 // Parse a stored RRULE back to a state for editing. Supports our presets.
 // Anything outside the preset shape falls back to daily.
 export function parseRrule(rrule: string): RecurrenceState {
+  if (rrule === 'FREQ=DAILY;COUNT=1')
+    return { pattern: 'oneoff', byDays: [], interval: 1 };
+
   if (!rrule || rrule === 'FREQ=DAILY')
     return { pattern: 'daily', byDays: [], interval: 1 };
 

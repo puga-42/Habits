@@ -110,8 +110,10 @@ export default function EditHabitScreen() {
       Alert.alert('Target required', 'Flex habits need at least 1 per period.');
       return;
     }
-    if (habit.kind === 'flex') {
-      // Flex habits don't have per-occurrence semantics.
+    // Flex habits and one-off scheduled habits have no per-occurrence semantics
+    // — there's only one row/state to update.
+    const isOneOff = habit.rrule === 'FREQ=DAILY;COUNT=1';
+    if (habit.kind === 'flex' || isOneOff) {
       apply('all');
       return;
     }

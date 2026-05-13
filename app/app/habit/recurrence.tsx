@@ -14,6 +14,7 @@ import {
 } from '@/lib/recurrence';
 
 const PATTERN_OPTIONS: Array<{ key: Pattern; label: string }> = [
+  { key: 'oneoff', label: "Doesn't repeat" },
   { key: 'daily', label: 'Daily' },
   { key: 'weekday', label: 'Every weekday' },
   { key: 'weekly', label: 'Specific days of the week' },
