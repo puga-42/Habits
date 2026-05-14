@@ -374,35 +374,63 @@ export function densityBucket(count: number): 0 | 1 | 2 | 3 | 4 {
   return 4;
 }
 
+// ─── Range helpers for calendar views ──────────────────────────────────────
+
+// n consecutive ISO dates starting at `anchor` (local midnight).
+export function nDayRange(anchor: Date, n: number): string[] {
+  const out: string[] = [];
+  const start = startOfLocalDay(anchor);
+  for (let i = 0; i < n; i++) {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    out.push(isoDate(d));
+  }
+  return out;
+}
+
+// 7 dates of the week containing `anchor`, given the user's weekStart day
+// (0 = Sunday, 1 = Monday, ..., 6 = Saturday).
+export function weekDatesFrom(anchor: Date, weekStart: number): string[] {
+  const aDow = anchor.getDay();
+  let shift = aDow - weekStart;
+  if (shift < 0) shift += 7;
+  const start = startOfLocalDay(anchor);
+  start.setDate(start.getDate() - shift);
+  return nDayRange(start, 7);
+}
+
+function startOfLocalDay(d: Date): Date {
+  const out = new Date(d);
+  out.setHours(0, 0, 0, 0);
+  return out;
+}
+
 // ─── Query ────────────────────────────────────────────────────────────────
 
-// Fetch one month of completions + overrides for the current user.
-// RLS scopes both queries to the user's own data.
-export async function fetchMonth(
+// Fetch all completions + overrides whose display date falls in [fromIso, toIso).
+// RLS scopes to the user's own data.
+export async function fetchRange(
   userId: string,
-  year: number,
-  month: number,
+  fromIso: string,
+  toIso: string,
 ): Promise<{
   completions: CompletionWithHabit[];
   overrides: HabitOverride[];
 }> {
-  const firstIso = isoDate(new Date(year, month - 1, 1));
-  const firstNextIso = isoDate(new Date(year, month, 1));
-
   const { data: completions, error: cErr } = await supabase
     .from('habit_completions')
     .select('*, habits!inner(id, title, icon, color, kind)')
     .eq('owner_id', userId)
     .or(
-      `and(occurrence_date.gte.${firstIso},occurrence_date.lt.${firstNextIso}),and(occurrence_date.is.null,completed_at.gte.${firstIso},completed_at.lt.${firstNextIso})`,
+      `and(occurrence_date.gte.${fromIso},occurrence_date.lt.${toIso}),and(occurrence_date.is.null,completed_at.gte.${fromIso},completed_at.lt.${toIso})`,
     );
   if (cErr) throw cErr;
 
   const { data: overrides, error: oErr } = await supabase
     .from('habit_overrides')
     .select('*')
-    .gte('occurrence_date', firstIso)
-    .lt('occurrence_date', firstNextIso);
+    .gte('occurrence_date', fromIso)
+    .lt('occurrence_date', toIso);
   if (oErr) throw oErr;
 
   return {

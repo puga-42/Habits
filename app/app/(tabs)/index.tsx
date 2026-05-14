@@ -1,59 +1,109 @@
+// Calendar tab — unified entry point that replaces the old Today + History tabs.
+// Phase B ships Day, Month, 3-day, Week, and Schedule views.
+
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  View,
-} from 'react-native';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Calendar3DayView } from '@/components/calendar-3day-view';
+import { CalendarDayView } from '@/components/calendar-day-view';
+import { CalendarFAB } from '@/components/calendar-fab';
+import {
+  CalendarMenuDrawer,
+  type ViewMode,
+} from '@/components/calendar-menu-drawer';
+import { CalendarMonthView } from '@/components/calendar-month-view';
+import { CalendarScheduleView } from '@/components/calendar-schedule-view';
+import { CalendarWeekView } from '@/components/calendar-week-view';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useAuth } from '@/lib/auth';
 import {
-  applyTimeToDate,
   fetchHabits,
-  fetchTodayCompletions,
-  fetchTodayOverrides,
   isoDate,
   markFlexCompleted,
   markScheduledCompleted,
-  todaysScheduledOccurrences,
   unmarkCompleted,
-  weekStart,
-  type Completion,
   type Habit,
   type HabitOverride,
-  type ScheduledOccurrence,
 } from '@/lib/habits';
+import {
+  buildDayGroups,
+  buildMonthGrid,
+  fetchRange,
+  monthLabel,
+  nDayRange,
+  weekDatesFrom,
+  type AgendaRow,
+  type CompletionWithHabit,
+  type DayGroup,
+} from '@/lib/history';
+import { fetchProfile, type Profile } from '@/lib/profile';
 
-export default function TodayScreen() {
+const AVAILABLE_VIEWS: ViewMode[] = ['day', '3day', 'week', 'month', 'schedule'];
+const SCHEDULE_INITIAL_HALF_WINDOW = 7; // days each direction
+const SCHEDULE_EXTEND_BY = 7;
+
+export default function CalendarScreen() {
   const router = useRouter();
   const { session } = useAuth();
   const userId = session?.user.id;
+
+  const today = useMemo(() => new Date(), []);
+  const [view, setView] = useState<ViewMode>('day');
+  const [previousView, setPreviousView] = useState<ViewMode | null>(null);
+  const [anchorDate, setAnchorDate] = useState(today);
+  const [filterHabitId, setFilterHabitId] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  // Schedule view tracks its own loaded window (today ± 7 days initially).
+  const [scheduleWindow, setScheduleWindow] = useState(() => {
+    const from = new Date(today);
+    from.setDate(from.getDate() - SCHEDULE_INITIAL_HALF_WINDOW);
+    const to = new Date(today);
+    to.setDate(to.getDate() + SCHEDULE_INITIAL_HALF_WINDOW + 1);
+    return { from: isoDate(from), to: isoDate(to) };
+  });
+
   const [habits, setHabits] = useState<Habit[]>([]);
-  const [completions, setCompletions] = useState<Completion[]>([]);
+  const [completions, setCompletions] = useState<CompletionWithHabit[]>([]);
   const [overrides, setOverrides] = useState<HabitOverride[]>([]);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const scheduleExtendingRef = useRef(false);
+
+  const anchorYear = anchorDate.getFullYear();
+  const anchorMonth = anchorDate.getMonth() + 1;
+  const weekStart = profile?.week_start ?? 0;
+
+  // Decide what date range to fetch from the server based on the active view.
+  const dataRange = useMemo(() => {
+    if (view === 'schedule') return scheduleWindow;
+    // Day / 3-day / Week / Month: the anchor month's 6-week grid covers the
+    // common case. Cross-month edges may briefly under-fetch — accepted in
+    // this phase.
+    const grid = buildMonthGrid(anchorYear, anchorMonth, today);
+    const from = grid[0].iso;
+    const last = new Date(grid[grid.length - 1].date);
+    last.setDate(last.getDate() + 1);
+    return { from, to: isoDate(last) };
+  }, [view, anchorYear, anchorMonth, scheduleWindow, today]);
 
   const load = useCallback(async () => {
     if (!userId) return;
-    const [h, c, o] = await Promise.all([
+    const [habitsRes, rangeRes, profileRes] = await Promise.all([
       fetchHabits(userId),
-      fetchTodayCompletions(userId),
-      fetchTodayOverrides(),
+      fetchRange(userId, dataRange.from, dataRange.to),
+      fetchProfile(userId).catch(() => null),
     ]);
-    setHabits(h);
-    setCompletions(c);
-    setOverrides(o);
-  }, [userId]);
+    setHabits(habitsRes);
+    setCompletions(rangeRes.completions);
+    setOverrides(rangeRes.overrides);
+    if (profileRes) setProfile(profileRes);
+    scheduleExtendingRef.current = false;
+  }, [userId, dataRange.from, dataRange.to]);
 
-  // Refetch every time Today gains focus (including after the editor modal
-  // dismisses), so newly created or edited habits appear immediately.
   useFocusEffect(
     useCallback(() => {
       if (!userId) return;
@@ -61,222 +111,390 @@ export default function TodayScreen() {
     }, [userId, load]),
   );
 
-  async function onRefresh() {
-    setRefreshing(true);
-    await load();
-    setRefreshing(false);
-  }
-
-  async function toggleScheduled(habit: Habit, occurrenceDate: string) {
-    if (!userId) return;
-    const existing = completions.find(
-      (c) => c.habit_id === habit.id && c.occurrence_date === occurrenceDate,
-    );
-    if (existing) await unmarkCompleted(existing.id);
-    else await markScheduledCompleted(habit.id, userId, occurrenceDate);
-    await load();
-  }
-
-  async function addFlexCompletion(habit: Habit) {
-    if (!userId) return;
-    await markFlexCompleted(habit.id, userId);
-    await load();
-  }
-
-  function onAddHabit() {
-    router.push('/habit/new');
-  }
-
-  function onEditScheduled(habit: Habit, occurrenceDate: string) {
-    router.push(`/habit/${habit.id}?occurrenceDate=${occurrenceDate}`);
-  }
-
-  function onEditFlex(habit: Habit) {
-    router.push(`/habit/${habit.id}`);
-  }
-
-  if (loading) {
-    return (
-      <ThemedView style={styles.root}>
-        <SafeAreaView edges={['top']} style={[styles.content, styles.centered]}>
-          <ActivityIndicator />
-        </SafeAreaView>
-      </ThemedView>
-    );
-  }
-
-  // Layer overrides onto the RRULE-expanded occurrences: drop skips, apply
-  // edit/reschedule patches.
-  const occurrences = todaysScheduledOccurrences(habits).reduce<ScheduledOccurrence[]>(
-    (acc, occ) => {
-      const override = overrides.find(
-        (o) => o.habit_id === occ.habit.id && o.occurrence_date === occ.occurrenceDate,
-      );
-      if (override?.kind === 'skip') return acc;
-      if (override && (override.kind === 'edit' || override.kind === 'reschedule')) {
-        const patch = override.patch ?? {};
-        acc.push({
-          habit: {
-            ...occ.habit,
-            title: patch.title ?? occ.habit.title,
-            icon: patch.icon ?? occ.habit.icon,
-            color: patch.color ?? occ.habit.color,
-          },
-          occurrenceDate: occ.occurrenceDate,
-          occurrenceTime: patch.time
-            ? applyTimeToDate(occ.occurrenceTime, patch.time)
-            : occ.occurrenceTime,
-        });
-        return acc;
-      }
-      acc.push(occ);
-      return acc;
-    },
-    [],
+  // Apply the habit filter across habits + completions + overrides.
+  const filteredHabits = useMemo(
+    () => (filterHabitId ? habits.filter((h) => h.id === filterHabitId) : habits),
+    [filterHabitId, habits],
+  );
+  const filteredCompletions = useMemo(
+    () =>
+      filterHabitId
+        ? completions.filter((c) => c.habit_id === filterHabitId)
+        : completions,
+    [filterHabitId, completions],
+  );
+  const filteredOverrides = useMemo(
+    () =>
+      filterHabitId
+        ? overrides.filter((o) => o.habit_id === filterHabitId)
+        : overrides,
+    [filterHabitId, overrides],
   );
 
-  const flexHabits = habits.filter((h) => h.kind === 'flex');
-  const wk = isoDate(weekStart(new Date()));
-  const isEmpty = occurrences.length === 0 && flexHabits.length === 0;
-  const today = new Date().toLocaleDateString(undefined, {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-  });
+  // The days the active view needs to render.
+  const daysInRange = useMemo(() => {
+    if (view === 'month') {
+      const grid = buildMonthGrid(anchorYear, anchorMonth, today);
+      return grid.map((c) => c.iso);
+    }
+    if (view === 'day') {
+      const prevDay = new Date(anchorDate);
+      prevDay.setDate(anchorDate.getDate() - 1);
+      return nDayRange(prevDay, 3);
+    }
+    if (view === '3day') {
+      // 9 days: previous triple + current + next
+      const start = new Date(anchorDate);
+      start.setDate(start.getDate() - 3);
+      return nDayRange(start, 9);
+    }
+    if (view === 'week') {
+      // 3 weeks of data: prev, current, next
+      const out: string[] = [];
+      for (const off of [-7, 0, 7]) {
+        const a = new Date(anchorDate);
+        a.setDate(a.getDate() + off);
+        out.push(...weekDatesFrom(a, weekStart));
+      }
+      return out;
+    }
+    if (view === 'schedule') {
+      const days: string[] = [];
+      const cursor = parseIsoLocal(scheduleWindow.from);
+      const end = parseIsoLocal(scheduleWindow.to);
+      while (cursor < end) {
+        days.push(isoDate(cursor));
+        cursor.setDate(cursor.getDate() + 1);
+      }
+      return days;
+    }
+    return [];
+  }, [view, anchorYear, anchorMonth, anchorDate, today, weekStart, scheduleWindow]);
+
+  const dayGroups = useMemo(
+    () =>
+      buildDayGroups(
+        daysInRange,
+        filteredHabits,
+        filteredCompletions,
+        filteredOverrides,
+        today,
+      ),
+    [daysInRange, filteredHabits, filteredCompletions, filteredOverrides, today],
+  );
+
+  const groupByIso = useMemo(() => {
+    const m = new Map<string, DayGroup>();
+    for (const g of dayGroups) m.set(g.date, g);
+    return m;
+  }, [dayGroups]);
+
+  // ─── Handlers ──────────────────────────────────────────────────────────
+
+  function stepAnchor(direction: 1 | -1) {
+    const d = new Date(anchorDate);
+    switch (view) {
+      case 'day':
+        d.setDate(d.getDate() + direction);
+        break;
+      case '3day':
+        d.setDate(d.getDate() + direction * 3);
+        break;
+      case 'week':
+        d.setDate(d.getDate() + direction * 7);
+        break;
+      case 'month':
+        d.setMonth(d.getMonth() + direction);
+        break;
+      default:
+        return;
+    }
+    setAnchorDate(d);
+  }
+
+  function pickView(next: ViewMode) {
+    setPreviousView(null);
+    setView(next);
+  }
+
+  function jumpToToday() {
+    setPreviousView(null);
+    setAnchorDate(new Date());
+    // Re-seed the schedule window so today is centered.
+    const t = new Date();
+    const from = new Date(t);
+    from.setDate(from.getDate() - SCHEDULE_INITIAL_HALF_WINDOW);
+    const to = new Date(t);
+    to.setDate(to.getDate() + SCHEDULE_INITIAL_HALF_WINDOW + 1);
+    setScheduleWindow({ from: isoDate(from), to: isoDate(to) });
+  }
+
+  function onMonthCellTap(iso: string) {
+    setPreviousView('month');
+    setAnchorDate(parseIsoLocal(iso));
+    setView('day');
+  }
+
+  function onWeekColumnTap(iso: string) {
+    setPreviousView('week');
+    setAnchorDate(parseIsoLocal(iso));
+    setView('day');
+  }
+
+  function onBack() {
+    if (!previousView) return;
+    setView(previousView);
+    setPreviousView(null);
+  }
+
+  function openSettings() {
+    router.push('/me');
+  }
+
+  async function handleRowPress(row: AgendaRow, dateIso: string) {
+    if (!userId) return;
+    if (row.kind === 'skip') return;
+    if (row.kind === 'completion') {
+      if (row.isFlex) return;
+      await unmarkCompleted(row.id);
+      await load();
+      return;
+    }
+    const habit = habits.find((h) => h.id === row.habitId);
+    if (!habit) return;
+    if (habit.kind === 'flex') {
+      await markFlexCompleted(habit.id, userId);
+    } else {
+      await markScheduledCompleted(habit.id, userId, dateIso);
+    }
+    await load();
+  }
+
+  function handleRowLongPress(row: AgendaRow, dateIso: string) {
+    const id = row.kind === 'completion' ? row.habit.id : row.habitId;
+    router.push(`/habit/${id}?occurrenceDate=${dateIso}`);
+  }
+
+  function onScheduleLoadEarlier() {
+    if (scheduleExtendingRef.current) return;
+    scheduleExtendingRef.current = true;
+    setScheduleWindow((w) => {
+      const fromDate = parseIsoLocal(w.from);
+      fromDate.setDate(fromDate.getDate() - SCHEDULE_EXTEND_BY);
+      return { from: isoDate(fromDate), to: w.to };
+    });
+  }
+
+  function onScheduleLoadMore() {
+    if (scheduleExtendingRef.current) return;
+    scheduleExtendingRef.current = true;
+    setScheduleWindow((w) => {
+      const toDate = parseIsoLocal(w.to);
+      toDate.setDate(toDate.getDate() + SCHEDULE_EXTEND_BY);
+      return { from: w.from, to: isoDate(toDate) };
+    });
+  }
+
+  // ─── Render ────────────────────────────────────────────────────────────
+
+  const isOnToday = isoDate(anchorDate) === isoDate(today);
+  const showBack =
+    view === 'day' && (previousView === 'month' || previousView === 'week');
 
   return (
     <ThemedView style={styles.root}>
       <SafeAreaView edges={['top']} style={styles.content}>
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-          }>
-          <ThemedText type="title">Today</ThemedText>
-          <ThemedText type="subtitle">{today}</ThemedText>
+        {/* Top bar */}
+        <View style={styles.topBar}>
+          <Pressable
+            onPress={() => setMenuOpen(true)}
+            hitSlop={12}
+            style={styles.topSide}>
+            <ThemedText style={styles.menuIcon}>☰</ThemedText>
+          </Pressable>
+          <View style={styles.titleWrap}>
+            <ThemedText type="defaultSemiBold" style={styles.title} numberOfLines={1}>
+              {headerLabel(view, anchorDate, weekStart)}
+            </ThemedText>
+          </View>
+          <View style={styles.topSideRight}>
+            {!isOnToday && (
+              <Pressable onPress={jumpToToday} hitSlop={8}>
+                <ThemedText style={styles.todayBtn}>Today</ThemedText>
+              </Pressable>
+            )}
+          </View>
+        </View>
 
-          {isEmpty && (
-            <View style={styles.emptyState}>
-              <ThemedText style={styles.placeholder}>
-                No habits yet. Add one to get started.
-              </ThemedText>
-              <Pressable onPress={onAddHabit} style={styles.primaryButton}>
-                <ThemedText type="defaultSemiBold" style={styles.primaryButtonText}>
-                  + Add habit
+        {/* Sub-bar: step arrows for non-schedule views, or back-to-prev-view */}
+        {view !== 'schedule' && (
+          <View style={styles.subBar}>
+            {showBack ? (
+              <Pressable onPress={onBack} hitSlop={12} style={styles.subSide}>
+                <ThemedText style={styles.backText}>
+                  ‹ {previousView === 'month'
+                    ? monthLabel(anchorYear, anchorMonth)
+                    : 'Week'}
                 </ThemedText>
               </Pressable>
-            </View>
-          )}
+            ) : (
+              <Pressable
+                onPress={() => stepAnchor(-1)}
+                hitSlop={16}
+                style={styles.subSide}>
+                <ThemedText style={styles.arrow}>‹</ThemedText>
+              </Pressable>
+            )}
 
-          {occurrences.length > 0 && (
-            <View style={styles.section}>
-              <ThemedText type="subtitle">Scheduled</ThemedText>
-              {occurrences.map((occ) => {
-                const completion = completions.find(
-                  (c) =>
-                    c.habit_id === occ.habit.id &&
-                    c.occurrence_date === occ.occurrenceDate,
-                );
-                const done = !!completion;
-                return (
-                  <Pressable
-                    key={`${occ.habit.id}_${occ.occurrenceDate}`}
-                    onPress={() => toggleScheduled(occ.habit, occ.occurrenceDate)}
-                    onLongPress={() => onEditScheduled(occ.habit, occ.occurrenceDate)}
-                    style={styles.row}>
-                    <ThemedText style={styles.circle}>{done ? '●' : '○'}</ThemedText>
-                    <ThemedText style={[styles.rowTitle, done && styles.rowDone]}>
-                      {occ.habit.icon ?? ''} {occ.habit.title}
-                    </ThemedText>
-                    <ThemedText style={styles.rowMeta}>
-                      {occ.occurrenceTime.toLocaleTimeString(undefined, {
-                        hour: 'numeric',
-                        minute: '2-digit',
-                      })}
-                    </ThemedText>
-                  </Pressable>
-                );
-              })}
-            </View>
-          )}
+            <View style={styles.subSpacer} />
 
-          {flexHabits.length > 0 && (
-            <View style={styles.section}>
-              <ThemedText type="subtitle">Flex this week</ThemedText>
-              {flexHabits.map((h) => {
-                const done = completions.filter(
-                  (c) => c.habit_id === h.id && c.period_start === wk,
-                ).length;
-                const target = h.target_count ?? 0;
-                return (
-                  <Pressable
-                    key={h.id}
-                    onPress={() => addFlexCompletion(h)}
-                    onLongPress={() => onEditFlex(h)}
-                    style={styles.row}>
-                    <ThemedText style={styles.rowTitle}>
-                      {h.icon ?? ''} {h.title}
-                    </ThemedText>
-                    <ThemedText style={styles.rowMeta}>
-                      {done} of {target}
-                    </ThemedText>
-                  </Pressable>
-                );
-              })}
-            </View>
-          )}
+            {!showBack ? (
+              <Pressable
+                onPress={() => stepAnchor(1)}
+                hitSlop={16}
+                style={styles.subSideRight}>
+                <ThemedText style={styles.arrow}>›</ThemedText>
+              </Pressable>
+            ) : (
+              <View style={styles.subSideRight} />
+            )}
+          </View>
+        )}
 
-          {!isEmpty && (
-            <Pressable onPress={onAddHabit} style={styles.secondaryButton}>
-              <ThemedText type="defaultSemiBold" style={styles.secondaryButtonText}>
-                + Add habit
-              </ThemedText>
-            </Pressable>
-          )}
-        </ScrollView>
+        {/* Body */}
+        {loading ? (
+          <View style={styles.loading}>
+            <ActivityIndicator />
+          </View>
+        ) : view === 'day' ? (
+          <CalendarDayView
+            anchorDate={anchorDate}
+            dayGroups={dayGroups}
+            onAnchorChange={setAnchorDate}
+            onRowPress={handleRowPress}
+            onRowLongPress={handleRowLongPress}
+          />
+        ) : view === '3day' ? (
+          <Calendar3DayView
+            anchorDate={anchorDate}
+            dayGroups={dayGroups}
+            onAnchorChange={setAnchorDate}
+            onRowPress={handleRowPress}
+            onRowLongPress={handleRowLongPress}
+          />
+        ) : view === 'week' ? (
+          <CalendarWeekView
+            anchorDate={anchorDate}
+            weekStart={weekStart}
+            dayGroups={dayGroups}
+            onAnchorChange={setAnchorDate}
+            onColumnPress={onWeekColumnTap}
+          />
+        ) : view === 'month' ? (
+          <CalendarMonthView
+            cells={buildMonthGrid(anchorYear, anchorMonth, today)}
+            groupByIso={groupByIso}
+            selectedIso={null}
+            onSelectDay={onMonthCellTap}
+          />
+        ) : view === 'schedule' ? (
+          <CalendarScheduleView
+            dayGroups={dayGroups}
+            todayIso={isoDate(today)}
+            onLoadEarlier={onScheduleLoadEarlier}
+            onLoadMore={onScheduleLoadMore}
+            onRowPress={handleRowPress}
+            onRowLongPress={handleRowLongPress}
+          />
+        ) : null}
+
+        <CalendarFAB onPress={() => router.push('/habit/new')} />
       </SafeAreaView>
+
+      <CalendarMenuDrawer
+        visible={menuOpen}
+        view={view}
+        available={AVAILABLE_VIEWS}
+        onPickView={pickView}
+        habits={habits}
+        filterHabitId={filterHabitId}
+        onPickFilter={setFilterHabitId}
+        onOpenSettings={openSettings}
+        onClose={() => setMenuOpen(false)}
+      />
     </ThemedView>
   );
 }
 
+// ─── Helpers ─────────────────────────────────────────────────────────────
+
+function headerLabel(view: ViewMode, anchor: Date, weekStart: number): string {
+  switch (view) {
+    case 'day':
+      return anchor.toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+      });
+    case '3day': {
+      const days = nDayRange(anchor, 3);
+      const start = parseIsoLocal(days[0]);
+      const end = parseIsoLocal(days[2]);
+      return `${shortMd(start)} – ${shortMd(end)}`;
+    }
+    case 'week': {
+      const wk = weekDatesFrom(anchor, weekStart);
+      const start = parseIsoLocal(wk[0]);
+      const end = parseIsoLocal(wk[6]);
+      return `${shortMd(start)} – ${shortMd(end)}`;
+    }
+    case 'month':
+      return anchor.toLocaleDateString('en-US', {
+        month: 'long',
+        year: 'numeric',
+      });
+    case 'schedule':
+      return 'Schedule';
+  }
+}
+
+function shortMd(d: Date): string {
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function parseIsoLocal(iso: string): Date {
+  const [y, m, d] = iso.split('-').map((n) => parseInt(n, 10));
+  return new Date(y, m - 1, d, 0, 0, 0, 0);
+}
+
+// ─── Styles ──────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
   root: { flex: 1 },
   content: { flex: 1 },
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    gap: 16,
-    paddingBottom: 32,
-  },
-  centered: { alignItems: 'center', justifyContent: 'center' },
-  emptyState: { gap: 12, marginTop: 32 },
-  placeholder: { opacity: 0.6 },
-  primaryButton: {
-    borderWidth: 1,
-    borderColor: 'rgba(127,127,127,0.4)',
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-  },
-  primaryButtonText: { fontSize: 15 },
-  secondaryButton: {
-    alignItems: 'center',
-    paddingVertical: 12,
-    marginTop: 12,
-  },
-  secondaryButtonText: { fontSize: 15, opacity: 0.7 },
-  section: { gap: 4, marginTop: 8 },
-  row: {
+  topBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(127,127,127,0.25)',
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    paddingBottom: 4,
   },
-  circle: { fontSize: 22, width: 28, textAlign: 'center' },
-  rowTitle: { flex: 1, fontSize: 16 },
-  rowDone: { opacity: 0.45, textDecorationLine: 'line-through' },
-  rowMeta: { opacity: 0.6, fontSize: 14 },
+  topSide: { width: 80, alignItems: 'flex-start' },
+  topSideRight: { width: 80, alignItems: 'flex-end' },
+  menuIcon: { fontSize: 24, paddingHorizontal: 6, paddingVertical: 4 },
+  titleWrap: { flex: 1, alignItems: 'center' },
+  title: { fontSize: 18 },
+  todayBtn: { fontSize: 14, color: '#7c3aed', fontWeight: '600' },
+  subBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+  },
+  subSide: { minWidth: 40, alignItems: 'flex-start' },
+  subSideRight: { minWidth: 40, alignItems: 'flex-end' },
+  subSpacer: { flex: 1 },
+  arrow: { fontSize: 26, opacity: 0.6 },
+  backText: { fontSize: 15, opacity: 0.85 },
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 });

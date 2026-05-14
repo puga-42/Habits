@@ -6,8 +6,10 @@ import {
   densityBucket,
   expandHabit,
   monthLabel,
+  nDayRange,
   nextMonth,
   prevMonth,
+  weekDatesFrom,
   type AgendaRow,
   type CompletionWithHabit,
   type DayGroup,
@@ -498,6 +500,86 @@ describe('completionCountByDate', () => {
     expect(map.get('2026-05-12')).toBe(1);
     expect(map.get('2026-05-13')).toBe(2);
     expect(map.has('2026-05-14')).toBe(false);
+  });
+});
+
+// ─── nDayRange ─────────────────────────────────────────────────────────────
+
+describe('nDayRange', () => {
+  it('returns n consecutive ISO dates starting at the anchor', () => {
+    const anchor = new Date(2026, 4, 13);
+    expect(nDayRange(anchor, 3)).toEqual([
+      '2026-05-13',
+      '2026-05-14',
+      '2026-05-15',
+    ]);
+  });
+
+  it('handles month rollover', () => {
+    const anchor = new Date(2026, 4, 30);
+    expect(nDayRange(anchor, 3)).toEqual([
+      '2026-05-30',
+      '2026-05-31',
+      '2026-06-01',
+    ]);
+  });
+
+  it('handles year rollover', () => {
+    const anchor = new Date(2026, 11, 31);
+    expect(nDayRange(anchor, 2)).toEqual(['2026-12-31', '2027-01-01']);
+  });
+
+  it('returns empty array for n=0', () => {
+    expect(nDayRange(new Date(2026, 4, 13), 0)).toEqual([]);
+  });
+});
+
+// ─── weekDatesFrom ─────────────────────────────────────────────────────────
+
+describe('weekDatesFrom', () => {
+  it('returns 7 dates with Sunday as week-start when anchor is mid-week', () => {
+    const anchor = new Date(2026, 4, 13); // Wednesday May 13
+    expect(weekDatesFrom(anchor, 0)).toEqual([
+      '2026-05-10',
+      '2026-05-11',
+      '2026-05-12',
+      '2026-05-13',
+      '2026-05-14',
+      '2026-05-15',
+      '2026-05-16',
+    ]);
+  });
+
+  it('rolls week to Monday-start', () => {
+    const anchor = new Date(2026, 4, 13); // Wed
+    expect(weekDatesFrom(anchor, 1)).toEqual([
+      '2026-05-11',
+      '2026-05-12',
+      '2026-05-13',
+      '2026-05-14',
+      '2026-05-15',
+      '2026-05-16',
+      '2026-05-17',
+    ]);
+  });
+
+  it('handles weekStart later in the week than the anchor', () => {
+    const anchor = new Date(2026, 4, 13); // Wed (getDay=3)
+    // weekStart=Thu (4): shift = 3-4 = -1 → +7 = 6 → start = anchor - 6 = Thu May 7
+    expect(weekDatesFrom(anchor, 4)).toEqual([
+      '2026-05-07',
+      '2026-05-08',
+      '2026-05-09',
+      '2026-05-10',
+      '2026-05-11',
+      '2026-05-12',
+      '2026-05-13',
+    ]);
+  });
+
+  it('returns the anchor as the first date when anchor matches weekStart', () => {
+    const anchor = new Date(2026, 4, 17); // Sunday May 17
+    expect(weekDatesFrom(anchor, 0)[0]).toBe('2026-05-17');
   });
 });
 
