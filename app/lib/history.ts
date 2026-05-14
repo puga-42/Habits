@@ -365,6 +365,21 @@ export function completionCountByDate(groups: DayGroup[]): Map<string, number> {
   return out;
 }
 
+// Same shape as completionCountByDate but works on raw completion rows so the
+// caller doesn't have to build DayGroups for every visible day. Scheduled
+// completions bucket by their occurrence_date; flex completions (no
+// occurrence_date) bucket by the local date of completed_at.
+export function countCompletionsByDate(
+  completions: CompletionWithHabit[],
+): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const c of completions) {
+    const date = c.occurrence_date ?? isoDate(new Date(c.completed_at));
+    out.set(date, (out.get(date) ?? 0) + 1);
+  }
+  return out;
+}
+
 // 5-level bucket scale matching the GitHub contributions graph: 0, 1, 2, 3, 4+.
 export function densityBucket(count: number): 0 | 1 | 2 | 3 | 4 {
   if (count <= 0) return 0;

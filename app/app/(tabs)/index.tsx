@@ -18,6 +18,7 @@ import { CalendarScheduleView } from '@/components/calendar-schedule-view';
 import { CalendarWeekView } from '@/components/calendar-week-view';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { WeekStrip } from '@/components/week-strip';
 import { useAuth } from '@/lib/auth';
 import {
   applySectionReorder,
@@ -33,6 +34,7 @@ import {
 import {
   buildDayGroups,
   buildMonthGrid,
+  countCompletionsByDate,
   fetchRange,
   monthLabel,
   nDayRange,
@@ -185,6 +187,14 @@ export default function CalendarScreen() {
         today,
       ),
     [daysInRange, filteredHabits, filteredCompletions, filteredOverrides, today],
+  );
+
+  // Day-by-day completion counts across the fetched window, used to fill the
+  // week-strip cells. Computed directly from completions so we don't need to
+  // build DayGroups for the 21-day strip range separately.
+  const completionCountByIso = useMemo(
+    () => countCompletionsByDate(filteredCompletions),
+    [filteredCompletions],
   );
 
   const groupByIso = useMemo(() => {
@@ -349,38 +359,45 @@ export default function CalendarScreen() {
           </View>
         </View>
 
-        {/* Sub-bar: step arrows for non-schedule views, or back-to-prev-view */}
-        {view !== 'schedule' && (
+        {/* Day view: optional back-to-prev-view affordance, then the week strip. */}
+        {view === 'day' && showBack && (
           <View style={styles.subBar}>
-            {showBack ? (
-              <Pressable onPress={onBack} hitSlop={12} style={styles.subSide}>
-                <ThemedText style={styles.backText}>
-                  ‹ {previousView === 'month'
-                    ? monthLabel(anchorYear, anchorMonth)
-                    : 'Week'}
-                </ThemedText>
-              </Pressable>
-            ) : (
-              <Pressable
-                onPress={() => stepAnchor(-1)}
-                hitSlop={16}
-                style={styles.subSide}>
-                <ThemedText style={styles.arrow}>‹</ThemedText>
-              </Pressable>
-            )}
-
+            <Pressable onPress={onBack} hitSlop={12} style={styles.subSide}>
+              <ThemedText style={styles.backText}>
+                ‹ {previousView === 'month'
+                  ? monthLabel(anchorYear, anchorMonth)
+                  : 'Week'}
+              </ThemedText>
+            </Pressable>
             <View style={styles.subSpacer} />
+          </View>
+        )}
+        {view === 'day' && (
+          <WeekStrip
+            anchorDate={anchorDate}
+            weekStart={weekStart}
+            today={today}
+            countByDate={completionCountByIso}
+            onSelect={setAnchorDate}
+          />
+        )}
 
-            {!showBack ? (
-              <Pressable
-                onPress={() => stepAnchor(1)}
-                hitSlop={16}
-                style={styles.subSideRight}>
-                <ThemedText style={styles.arrow}>›</ThemedText>
-              </Pressable>
-            ) : (
-              <View style={styles.subSideRight} />
-            )}
+        {/* Other views: keep the step-arrow sub-bar. */}
+        {view !== 'day' && view !== 'schedule' && (
+          <View style={styles.subBar}>
+            <Pressable
+              onPress={() => stepAnchor(-1)}
+              hitSlop={16}
+              style={styles.subSide}>
+              <ThemedText style={styles.arrow}>‹</ThemedText>
+            </Pressable>
+            <View style={styles.subSpacer} />
+            <Pressable
+              onPress={() => stepAnchor(1)}
+              hitSlop={16}
+              style={styles.subSideRight}>
+              <ThemedText style={styles.arrow}>›</ThemedText>
+            </Pressable>
           </View>
         )}
 

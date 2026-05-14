@@ -3,18 +3,20 @@ import {
   buildDayGroups,
   buildMonthGrid,
   completionCountByDate,
+  countCompletionsByDate,
   densityBucket,
   expandHabit,
   monthLabel,
   nDayRange,
   nextMonth,
+  partitionRows,
   prevMonth,
   weekDatesFrom,
   type AgendaRow,
   type CompletionWithHabit,
   type DayGroup,
 } from '../history';
-import { isoDate, type Habit, type HabitOverride } from '../habits';
+import { isoDate, nextSortIndexFromList, type Habit, type HabitOverride } from '../habits';
 
 // ─── Fixtures ──────────────────────────────────────────────────────────────
 
@@ -34,6 +36,7 @@ const meditate: Habit = {
   until: null,
   target_count: null,
   target_period: null,
+  sort_index: 1,
   created_at: '2026-05-01T00:00:00Z',
   updated_at: '2026-05-01T00:00:00Z',
   deleted_at: null,
@@ -503,6 +506,70 @@ describe('completionCountByDate', () => {
   });
 });
 
+// ─── countCompletionsByDate ────────────────────────────────────────────────
+
+describe('countCompletionsByDate', () => {
+  function comp(
+    overrides: Partial<CompletionWithHabit> & {
+      occurrence_date?: string | null;
+      completed_at?: string;
+    },
+  ): CompletionWithHabit {
+    return {
+      id: overrides.id ?? 'c-' + Math.random(),
+      habit_id: 'h-test',
+      owner_id: 'u1',
+      occurrence_date: overrides.occurrence_date ?? null,
+      period_start: null,
+      completed_at: overrides.completed_at ?? '2026-05-13T10:00:00Z',
+      note: null,
+      visibility_override: null,
+      created_at: '2026-05-13T10:00:00Z',
+      updated_at: '2026-05-13T10:00:00Z',
+      habits: { id: 'h-test', title: 'Test', icon: null, color: null, kind: 'scheduled' },
+      ...overrides,
+    } as CompletionWithHabit;
+  }
+
+  it('returns empty for empty input', () => {
+    expect(countCompletionsByDate([]).size).toBe(0);
+  });
+
+  it('buckets a scheduled completion by occurrence_date', () => {
+    const map = countCompletionsByDate([comp({ occurrence_date: '2026-05-13' })]);
+    expect(map.get('2026-05-13')).toBe(1);
+  });
+
+  it('buckets a flex completion (no occurrence_date) by local date of completed_at', () => {
+    // 2026-05-13 at 10:00 UTC → still 2026-05-13 in most local zones; the
+    // local-date conversion is what the function performs.
+    const c = comp({
+      occurrence_date: null,
+      completed_at: new Date(2026, 4, 13, 10, 0).toISOString(),
+    });
+    const map = countCompletionsByDate([c]);
+    expect(map.get('2026-05-13')).toBe(1);
+  });
+
+  it('sums multiple completions on the same date', () => {
+    const map = countCompletionsByDate([
+      comp({ id: 'c1', occurrence_date: '2026-05-13' }),
+      comp({ id: 'c2', occurrence_date: '2026-05-13' }),
+    ]);
+    expect(map.get('2026-05-13')).toBe(2);
+  });
+
+  it('keeps separate counts per date', () => {
+    const map = countCompletionsByDate([
+      comp({ id: 'c1', occurrence_date: '2026-05-12' }),
+      comp({ id: 'c2', occurrence_date: '2026-05-13' }),
+      comp({ id: 'c3', occurrence_date: '2026-05-13' }),
+    ]);
+    expect(map.get('2026-05-12')).toBe(1);
+    expect(map.get('2026-05-13')).toBe(2);
+  });
+});
+
 // ─── nDayRange ─────────────────────────────────────────────────────────────
 
 describe('nDayRange', () => {
@@ -580,6 +647,128 @@ describe('weekDatesFrom', () => {
   it('returns the anchor as the first date when anchor matches weekStart', () => {
     const anchor = new Date(2026, 4, 17); // Sunday May 17
     expect(weekDatesFrom(anchor, 0)[0]).toBe('2026-05-17');
+  });
+});
+
+// ─── densityBucket ─────────────────────────────────────────────────────────
+
+// ─── partitionRows ─────────────────────────────────────────────────────────
+
+describe('partitionRows', () => {
+  function makeHabit(id: string, sortIndex: number): Habit {
+    return {
+      id,
+      lineage_id: id,
+      owner_id: 'u1',
+      kind: 'scheduled',
+      title: id,
+      description: null,
+      icon: null,
+      color: null,
+      visibility: 'private',
+      timezone: 'UTC',
+      dtstart: '2026-05-01T00:00:00Z',
+      rrule: 'FREQ=DAILY',
+      until: null,
+      target_count: null,
+      target_period: null,
+      sort_index: sortIndex,
+      created_at: '2026-05-01T00:00:00Z',
+      updated_at: '2026-05-01T00:00:00Z',
+      deleted_at: null,
+    };
+  }
+  const h1 = makeHabit('h1', 1);
+  const h2 = makeHabit('h2', 2);
+  const h3 = makeHabit('h3', 3);
+  const habitMap = new Map([h1, h2, h3].map((h) => [h.id, h] as const));
+
+  function completion(habitId: string): AgendaRow {
+    return {
+      kind: 'completion',
+      id: 'c-' + habitId,
+      habit: { id: habitId, title: habitId, icon: null, color: null },
+      time: null,
+      isFlex: false,
+    };
+  }
+  function scheduled(habitId: string): AgendaRow {
+    return {
+      kind: 'scheduled',
+      habitId,
+      habit: { id: habitId, title: habitId, icon: null, color: null },
+      time: null,
+    };
+  }
+  function skip(habitId: string): AgendaRow {
+    return {
+      kind: 'skip',
+      habitId,
+      habit: { id: habitId, title: habitId, icon: null, color: null },
+      time: null,
+    };
+  }
+
+  it('puts completion rows in the completed bucket', () => {
+    const out = partitionRows([completion('h1')], habitMap);
+    expect(out.completed).toHaveLength(1);
+    expect(out.notCompleted).toEqual([]);
+  });
+
+  it('puts scheduled rows in the notCompleted bucket', () => {
+    const out = partitionRows([scheduled('h1')], habitMap);
+    expect(out.notCompleted).toHaveLength(1);
+    expect(out.completed).toEqual([]);
+  });
+
+  it('puts skip rows in the completed bucket', () => {
+    const out = partitionRows([skip('h1')], habitMap);
+    expect(out.completed).toHaveLength(1);
+    expect(out.notCompleted).toEqual([]);
+  });
+
+  it("sorts each bucket by the habit's sort_index ASC", () => {
+    const out = partitionRows(
+      [scheduled('h3'), scheduled('h1'), scheduled('h2')],
+      habitMap,
+    );
+    expect(out.notCompleted.map((r) => (r.kind === 'scheduled' ? r.habitId : null))).toEqual([
+      'h1',
+      'h2',
+      'h3',
+    ]);
+  });
+
+  it('sorts completion rows by sort_index too', () => {
+    const out = partitionRows(
+      [completion('h3'), completion('h1'), completion('h2')],
+      habitMap,
+    );
+    expect(out.completed.map((r) => (r.kind === 'completion' ? r.habit.id : null))).toEqual([
+      'h1',
+      'h2',
+      'h3',
+    ]);
+  });
+
+  it('returns both empty for no rows', () => {
+    const out = partitionRows([], habitMap);
+    expect(out).toEqual({ notCompleted: [], completed: [] });
+  });
+});
+
+// ─── nextSortIndexFromList ─────────────────────────────────────────────────
+
+describe('nextSortIndexFromList', () => {
+  it('returns 1 for an empty list', () => {
+    expect(nextSortIndexFromList([])).toBe(1);
+  });
+  it('returns max + 1', () => {
+    expect(nextSortIndexFromList([0, 1, 5])).toBe(6);
+    expect(nextSortIndexFromList([10])).toBe(11);
+  });
+  it('handles negative entries', () => {
+    expect(nextSortIndexFromList([-2, -1, 0])).toBe(1);
   });
 });
 
