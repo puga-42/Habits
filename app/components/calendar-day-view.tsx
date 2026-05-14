@@ -1,34 +1,64 @@
 // Day view: shows one day at a time, with horizontal swipe (via PagerView)
-// to move +/-1 day. The pager keeps three pages (prev/current/next) and
-// resets to the middle after each swipe.
+// to move +/-1 day. Each page hosts a single DraggableFlatList whose data
+// is the day's rows interleaved with a non-draggable "Completed" header
+// item. Drag-to-reorder works inside either section; cross-section drops
+// are reverted via onDragEnd validation.
+//
+// This replaces the previous Nestable* structure. Combining
+// NestableScrollContainer + multiple NestableDraggableFlatLists inside
+// PagerView produced "ref.measureLayout must be called with a ref to a
+// native component" warnings and various touch/scroll bugs. The single
+// DraggableFlatList per page sits in a configuration the library is
+// designed for.
 
-import { useEffect, useMemo, useRef } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { StyleSheet, View } from 'react-native';
+import DraggableFlatList, {
+  type RenderItemParams,
+} from 'react-native-draggable-flatlist';
 import PagerView from 'react-native-pager-view';
 
 import { AgendaRow } from '@/components/agenda-row';
 import { ThemedText } from '@/components/themed-text';
-import { isoDate } from '@/lib/habits';
-import type { AgendaRow as AgendaRowT, DayGroup } from '@/lib/history';
+import { isoDate, type Habit } from '@/lib/habits';
+import {
+  partitionRows,
+  type AgendaRow as AgendaRowT,
+  type DayGroup,
+} from '@/lib/history';
+
+type Section = 'notCompleted' | 'completed';
+
+type DayItem =
+  | { kind: 'completed-header' }
+  | { kind: 'all-done' }
+  | { kind: 'row'; row: AgendaRowT; section: Section };
+
+const SNAPPY_DROP = { damping: 30, stiffness: 700, mass: 0.6 };
 
 type Props = {
   anchorDate: Date;
+  habits: Habit[];
   dayGroups: DayGroup[];
   onAnchorChange: (date: Date) => void;
   onRowPress: (row: AgendaRowT, dateIso: string) => void;
-  onRowLongPress: (row: AgendaRowT, dateIso: string) => void;
+  onReorderSection: (
+    dateIso: string,
+    section: Section,
+    newRows: AgendaRowT[],
+  ) => void;
 };
 
 export function CalendarDayView({
   anchorDate,
+  habits,
   dayGroups,
   onAnchorChange,
   onRowPress,
-  onRowLongPress,
+  onReorderSection,
 }: Props) {
   const pagerRef = useRef<PagerView>(null);
 
-  // Three pages: yesterday, today, tomorrow (relative to current anchor).
   const pageDates = useMemo(() => {
     const out: Date[] = [];
     for (let offset = -1; offset <= 1; offset++) {
@@ -40,8 +70,6 @@ export function CalendarDayView({
     return out;
   }, [anchorDate]);
 
-  // After the anchor changes (because of a swipe), reset the pager back to
-  // its middle slot so the user can keep swiping in either direction.
   useEffect(() => {
     pagerRef.current?.setPageWithoutAnimation(1);
   }, [anchorDate]);
@@ -51,6 +79,12 @@ export function CalendarDayView({
     for (const g of dayGroups) m.set(g.date, g);
     return m;
   }, [dayGroups]);
+
+  const habitMap = useMemo(() => {
+    const m = new Map<string, Habit>();
+    for (const h of habits) m.set(h.id, h);
+    return m;
+  }, [habits]);
 
   return (
     <PagerView
@@ -63,16 +97,13 @@ export function CalendarDayView({
         onAnchorChange(pageDates[idx]);
       }}>
       {pageDates.map((d, idx) => (
-        // Stable keys (idx) so anchor jumps update content in place rather
-        // than remounting pages. Remounting causes PagerView to reset to
-        // position 0 and fire onPageSelected, which would feed back into
-        // onAnchorChange and loop forever.
-        <View key={idx} style={styles.page}>
+        <View key={idx} style={styles.page} collapsable={false}>
           <DayContent
             date={d}
             group={groupByIso.get(isoDate(d))}
+            habitMap={habitMap}
             onRowPress={onRowPress}
-            onRowLongPress={onRowLongPress}
+            onReorderSection={onReorderSection}
           />
         </View>
       ))}
@@ -83,88 +114,193 @@ export function CalendarDayView({
 function DayContent({
   date,
   group,
+  habitMap,
   onRowPress,
-  onRowLongPress,
+  onReorderSection,
 }: {
   date: Date;
   group: DayGroup | undefined;
+  habitMap: Map<string, Habit>;
   onRowPress: (row: AgendaRowT, dateIso: string) => void;
-  onRowLongPress: (row: AgendaRowT, dateIso: string) => void;
+  onReorderSection: (
+    dateIso: string,
+    section: Section,
+    newRows: AgendaRowT[],
+  ) => void;
 }) {
   const iso = isoDate(date);
   const rows = group?.rows ?? [];
-  const morning: AgendaRowT[] = [];
-  const afternoon: AgendaRowT[] = [];
-  const evening: AgendaRowT[] = [];
-  const untimed: AgendaRowT[] = [];
+  const { notCompleted, completed } = useMemo(
+    () => partitionRows(rows, habitMap),
+    [rows, habitMap],
+  );
 
-  for (const row of rows) {
-    if (!row.time) {
-      untimed.push(row);
-      continue;
+  // Flat data array: [...notCompletedRows, all-done?, completed-header?, ...completedRows].
+  // We intentionally do NOT mirror this into local state — doing so with
+  // useEffect caused an infinite re-render loop on days where `rows` is `[]`
+  // (the empty-array literal creates a new reference every render, which
+  // propagated through useMemo and re-triggered the effect).
+  const data = useMemo<DayItem[]>(() => {
+    const out: DayItem[] = [];
+    if (notCompleted.length > 0) {
+      for (const row of notCompleted) {
+        out.push({ kind: 'row', row, section: 'notCompleted' });
+      }
+    } else if (completed.length > 0) {
+      out.push({ kind: 'all-done' });
     }
-    const h = row.time.getHours();
-    if (h < 12) morning.push(row);
-    else if (h < 18) afternoon.push(row);
-    else evening.push(row);
+    if (completed.length > 0) {
+      out.push({ kind: 'completed-header' });
+      for (const row of completed) {
+        out.push({ kind: 'row', row, section: 'completed' });
+      }
+    }
+    return out;
+  }, [notCompleted, completed]);
+
+  // A counter bumped on invalid drops; used as the DraggableFlatList's key so
+  // the library remounts and resets its internal post-drag state back to
+  // `data` (the source order).
+  const [generation, setGeneration] = useState(0);
+
+  if (rows.length === 0) {
+    return (
+      <View style={styles.emptyState}>
+        <ThemedText style={styles.emptyText}>
+          Nothing scheduled for this day.
+        </ThemedText>
+      </View>
+    );
   }
 
-  const isEmpty = rows.length === 0;
+  const keyExtractor = (item: DayItem): string => {
+    if (item.kind === 'completed-header') return '__ch';
+    if (item.kind === 'all-done') return '__ad';
+    if (item.row.kind === 'completion') return `c-${item.row.id}`;
+    return `${item.row.kind}-${item.row.habitId}`;
+  };
 
-  return (
-    <ScrollView contentContainerStyle={styles.scrollContent}>
-      {isEmpty ? (
-        <View style={styles.emptyState}>
-          <ThemedText style={styles.emptyText}>Nothing scheduled for this day.</ThemedText>
+  const renderItem = ({ item, drag, isActive }: RenderItemParams<DayItem>) => {
+    if (item.kind === 'all-done') {
+      return (
+        <ThemedText style={styles.allDone}>Everything done for today.</ThemedText>
+      );
+    }
+    if (item.kind === 'completed-header') {
+      return (
+        <View style={styles.completedHeader}>
+          <View style={styles.completedRule} />
+          <ThemedText style={styles.completedLabel}>Completed</ThemedText>
+          <View style={styles.completedRule} />
         </View>
-      ) : (
-        <>
-          {renderSection('Morning', morning, iso, onRowPress, onRowLongPress)}
-          {renderSection('Afternoon', afternoon, iso, onRowPress, onRowLongPress)}
-          {renderSection('Evening', evening, iso, onRowPress, onRowLongPress)}
-          {renderSection('Other', untimed, iso, onRowPress, onRowLongPress)}
-        </>
-      )}
-    </ScrollView>
-  );
-}
+      );
+    }
+    return (
+      <AgendaRow
+        row={item.row}
+        onPress={() => onRowPress(item.row, iso)}
+        onLongPress={drag}
+        isActive={isActive}
+      />
+    );
+  };
 
-function renderSection(
-  title: string,
-  rows: AgendaRowT[],
-  iso: string,
-  onRowPress: (row: AgendaRowT, dateIso: string) => void,
-  onRowLongPress: (row: AgendaRowT, dateIso: string) => void,
-) {
-  if (rows.length === 0) return null;
+  const onDragEnd = ({
+    data: newData,
+    from,
+    to,
+  }: {
+    data: DayItem[];
+    from: number;
+    to: number;
+  }) => {
+    // No movement (tap-only on the handle). Don't trigger an optimistic
+    // state update + network reorder for a no-op.
+    if (from === to) return;
+    const moved = newData[to];
+    if (!moved || moved.kind !== 'row') {
+      setGeneration((g) => g + 1);
+      return;
+    }
+    // Determine which section the row landed in by scanning for a
+    // completed-header before the new position.
+    let landedSection: Section = 'notCompleted';
+    for (let i = 0; i < to; i++) {
+      if (newData[i].kind === 'completed-header') {
+        landedSection = 'completed';
+        break;
+      }
+    }
+    if (landedSection !== moved.section) {
+      // Crossed the boundary; force a remount to snap back to source order.
+      setGeneration((g) => g + 1);
+      return;
+    }
+    // Valid: extract this section's rows in new order and propagate.
+    // Screen will optimistically update sort_indexes, which will recompute
+    // `data` to match the drop — no remount needed.
+    const sectionRows: AgendaRowT[] = [];
+    let currentSection: Section = 'notCompleted';
+    for (const item of newData) {
+      if (item.kind === 'completed-header') {
+        currentSection = 'completed';
+        continue;
+      }
+      if (item.kind === 'row' && currentSection === moved.section) {
+        sectionRows.push(item.row);
+      }
+    }
+    onReorderSection(iso, moved.section, sectionRows);
+  };
+
   return (
-    <View key={title} style={styles.section}>
-      <ThemedText style={styles.sectionHeader}>{title}</ThemedText>
-      {rows.map((row, i) => (
-        <AgendaRow
-          key={`${title}-${i}`}
-          row={row}
-          onPress={() => onRowPress(row, iso)}
-          onLongPress={() => onRowLongPress(row, iso)}
-        />
-      ))}
-    </View>
+    <DraggableFlatList
+      key={generation}
+      data={data}
+      keyExtractor={keyExtractor}
+      renderItem={renderItem}
+      onDragEnd={onDragEnd}
+      animationConfig={SNAPPY_DROP}
+      autoscrollSpeed={0}
+      autoscrollThreshold={0}
+      // containerStyle sizes the outer wrapper that hosts the FlatList — the
+      // PagerView page only fills if this is set; the inner FlatList's `style`
+      // alone isn't enough.
+      containerStyle={styles.scrollRoot}
+      contentContainerStyle={styles.scrollContent}
+      keyboardShouldPersistTaps="handled"
+    />
   );
 }
 
 const styles = StyleSheet.create({
   pager: { flex: 1 },
   page: { flex: 1 },
-  scrollContent: { padding: 20, paddingBottom: 100 },
-  section: { gap: 4, marginBottom: 12 },
-  sectionHeader: {
+  scrollRoot: { flex: 1 },
+  scrollContent: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 120 },
+  emptyState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 32,
+  },
+  emptyText: { opacity: 0.55, fontSize: 15 },
+  allDone: { paddingVertical: 16, opacity: 0.55, fontSize: 14 },
+  completedHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 14,
+  },
+  completedRule: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(127,127,127,0.3)',
+  },
+  completedLabel: {
     fontSize: 12,
     opacity: 0.55,
     textTransform: 'uppercase',
     letterSpacing: 0.6,
-    marginTop: 8,
-    marginBottom: 4,
   },
-  emptyState: { alignItems: 'center', paddingVertical: 64 },
-  emptyText: { opacity: 0.55, fontSize: 15 },
 });

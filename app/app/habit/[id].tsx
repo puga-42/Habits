@@ -19,7 +19,6 @@ import {
   applyEditFuture,
   applyEditThis,
   fetchHabit,
-  formatTime,
   type Habit,
   type OccurrencePatch,
 } from '@/lib/habits';
@@ -69,9 +68,8 @@ export default function EditHabitScreen() {
         if (!occurrenceDate) {
           throw new Error('"This and future" needs an occurrence date.');
         }
-        const splitTime = occurrenceTimeFor(occurrenceDate, habit, draft.time);
+        const splitTime = occurrenceMidnight(occurrenceDate);
         const newInsert = draftToInsert(draft);
-        // The new habit's dtstart is the split point with the new time-of-day.
         if (newInsert.kind === 'scheduled') {
           newInsert.dtstart = splitTime.toISOString();
         }
@@ -167,25 +165,14 @@ function buildPatch(original: Habit, draft: ReturnType<typeof useHabitForm>['dra
   if (draft.title.trim() !== original.title) patch.title = draft.title.trim();
   if (draft.icon !== original.icon) patch.icon = draft.icon;
   if (draft.color !== original.color) patch.color = draft.color;
-  if (original.dtstart) {
-    const originalTime = formatTime(new Date(original.dtstart));
-    const draftTime = formatTime(draft.time);
-    if (originalTime !== draftTime) patch.time = draftTime;
-  }
   return patch;
 }
 
-// Build the timestamp of the occurrence being edited. Uses the original
-// habit's time-of-day so the split lines up with where the existing series
-// would have fired on that date.
-function occurrenceTimeFor(occurrenceDate: string, original: Habit, _draftTime: Date): Date {
+// Local midnight on the occurrence date — used as the split point for
+// "this and future" edits now that habits don't carry a time-of-day.
+function occurrenceMidnight(occurrenceDate: string): Date {
   const [y, m, d] = occurrenceDate.split('-').map((n) => parseInt(n, 10));
-  const out = new Date(y, m - 1, d, 0, 0, 0, 0);
-  if (original.dtstart) {
-    const ot = new Date(original.dtstart);
-    out.setHours(ot.getHours(), ot.getMinutes(), 0, 0);
-  }
-  return out;
+  return new Date(y, m - 1, d, 0, 0, 0, 0);
 }
 
 const styles = StyleSheet.create({

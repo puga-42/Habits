@@ -22,6 +22,7 @@ export type Habit = {
   until: string | null;
   target_count: number | null;
   target_period: FlexPeriod | null;
+  sort_index: number;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
@@ -54,6 +55,7 @@ export async function fetchHabits(ownerId: string): Promise<Habit[]> {
     .select('*')
     .eq('owner_id', ownerId)
     .is('deleted_at', null)
+    .order('sort_index', { ascending: true })
     .order('created_at', { ascending: true });
   if (error) throw error;
   return (data ?? []) as Habit[];
@@ -154,10 +156,79 @@ export async function createHabit(
   ownerId: string,
   input: HabitInsert,
 ): Promise<void> {
+  const sortIndex = await nextSortIndex(ownerId);
   const { error } = await supabase
     .from('habits')
-    .insert({ owner_id: ownerId, ...input });
+    .insert({ owner_id: ownerId, sort_index: sortIndex, ...input });
   if (error) throw error;
+}
+
+// Pure: next sort_index given the current list of existing indexes.
+export function nextSortIndexFromList(indexes: number[]): number {
+  if (indexes.length === 0) return 1;
+  return Math.max(...indexes) + 1;
+}
+
+// Looks up the owner's current max sort_index and returns +1.
+export async function nextSortIndex(ownerId: string): Promise<number> {
+  const { data, error } = await supabase
+    .from('habits')
+    .select('sort_index')
+    .eq('owner_id', ownerId)
+    .is('deleted_at', null);
+  if (error) throw error;
+  const indexes = (data ?? []).map((r: { sort_index: number }) => r.sort_index);
+  return nextSortIndexFromList(indexes);
+}
+
+// Pure: apply a section-local reorder to the full habits list, preserving
+// the relative position of every habit NOT in the reordered section.
+//
+// `sectionIds` is the new order of habit IDs in the section the user
+// rearranged (e.g. "not-completed on Tuesday"). We find the slots those
+// habits occupy in the current sorted list and refill them in the new order;
+// habits outside `sectionIds` stay put. This is important for the schedule
+// view, where many days are visible at once and the old behavior (yanking
+// every visible-on-this-day habit to the front of the global list) caused
+// rows on other days to jump around when the user reordered one day's section.
+export function applySectionReorder(
+  habits: Habit[],
+  sectionIds: string[],
+): Habit[] {
+  const byId = new Map(habits.map((h) => [h.id, h]));
+  const sectionSet = new Set(sectionIds.filter((id) => byId.has(id)));
+  const filteredSectionIds = sectionIds.filter((id) => sectionSet.has(id));
+
+  const baseline = [...habits].sort(
+    (a, b) =>
+      a.sort_index - b.sort_index || a.created_at.localeCompare(b.created_at),
+  );
+
+  let cursor = 0;
+  const result: Habit[] = [];
+  for (const current of baseline) {
+    if (sectionSet.has(current.id)) {
+      const nextId = filteredSectionIds[cursor++];
+      const replacement = byId.get(nextId);
+      if (replacement) result.push(replacement);
+    } else {
+      result.push(current);
+    }
+  }
+
+  return result.map((h, i) => ({ ...h, sort_index: i + 1 }));
+}
+
+// Apply a new ordering: each id gets sort_index = position + 1.
+// RLS scopes updates to the user's own rows.
+export async function reorderHabits(orderedIds: string[]): Promise<void> {
+  const updates = orderedIds.map((id, idx) =>
+    supabase.from('habits').update({ sort_index: idx + 1 }).eq('id', id),
+  );
+  const results = await Promise.all(updates);
+  for (const r of results) {
+    if (r.error) throw r.error;
+  }
 }
 
 // ─── Edit + override mutations ─────────────────────────────────────────────

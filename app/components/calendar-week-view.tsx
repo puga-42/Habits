@@ -2,13 +2,14 @@
 // Swipe horizontally to advance by 7 days. Columns are narrow so each row
 // is rendered compactly (marker + emoji only).
 
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import PagerView from 'react-native-pager-view';
 
 import { ThemedText } from '@/components/themed-text';
-import { isoDate } from '@/lib/habits';
+import { isoDate, type Habit } from '@/lib/habits';
 import {
+  partitionRows,
   weekDatesFrom,
   type AgendaRow as AgendaRowT,
   type DayGroup,
@@ -17,6 +18,7 @@ import {
 type Props = {
   anchorDate: Date;
   weekStart: number;
+  habits: Habit[];
   dayGroups: DayGroup[];
   onAnchorChange: (date: Date) => void;
   onColumnPress: (iso: string) => void;
@@ -25,6 +27,7 @@ type Props = {
 export function CalendarWeekView({
   anchorDate,
   weekStart,
+  habits,
   dayGroups,
   onAnchorChange,
   onColumnPress,
@@ -53,6 +56,12 @@ export function CalendarWeekView({
     return m;
   }, [dayGroups]);
 
+  const habitMap = useMemo(() => {
+    const m = new Map<string, Habit>();
+    for (const h of habits) m.set(h.id, h);
+    return m;
+  }, [habits]);
+
   return (
     <PagerView
       ref={pagerRef}
@@ -68,6 +77,7 @@ export function CalendarWeekView({
           <WeekColumns
             weekDays={weekDatesFrom(anchorForPage, weekStart)}
             groupByIso={groupByIso}
+            habitMap={habitMap}
             onColumnPress={onColumnPress}
           />
         </View>
@@ -79,60 +89,105 @@ export function CalendarWeekView({
 function WeekColumns({
   weekDays,
   groupByIso,
+  habitMap,
   onColumnPress,
 }: {
   weekDays: string[];
   groupByIso: Map<string, DayGroup>;
+  habitMap: Map<string, Habit>;
   onColumnPress: (iso: string) => void;
 }) {
   const todayIso = isoDate(new Date());
   return (
     <View style={styles.columnsRow}>
-      {weekDays.map((iso, i) => {
-        const [y, m, d] = iso.split('-').map((n) => parseInt(n, 10));
-        const date = new Date(y, m - 1, d);
-        const group = groupByIso.get(iso);
-        const isToday = iso === todayIso;
-        return (
-          <Pressable
-            key={iso}
-            onPress={() => onColumnPress(iso)}
-            style={({ pressed }) => [
-              styles.column,
-              i < 6 && styles.columnDivider,
-              pressed && styles.columnPressed,
-            ]}>
-            <View style={styles.dayHeader}>
-              <ThemedText style={[styles.weekday, isToday && styles.todayText]}>
-                {date.toLocaleDateString('en-US', { weekday: 'narrow' })}
-              </ThemedText>
-              <ThemedText style={[styles.dateNum, isToday && styles.todayText]}>
-                {date.getDate()}
-              </ThemedText>
-            </View>
-            <ScrollView contentContainerStyle={styles.cellContent}>
-              {(group?.rows ?? []).map((row, ri) => (
-                <CompactRow key={ri} row={row} />
-              ))}
-            </ScrollView>
-          </Pressable>
-        );
-      })}
+      {weekDays.map((iso, i) => (
+        <WeekColumn
+          key={iso}
+          iso={iso}
+          isFirst={i === 0}
+          isLast={i === 6}
+          todayIso={todayIso}
+          group={groupByIso.get(iso)}
+          habitMap={habitMap}
+          onColumnPress={onColumnPress}
+        />
+      ))}
     </View>
+  );
+}
+
+function WeekColumn({
+  iso,
+  isLast,
+  todayIso,
+  group,
+  habitMap,
+  onColumnPress,
+}: {
+  iso: string;
+  isFirst: boolean;
+  isLast: boolean;
+  todayIso: string;
+  group: DayGroup | undefined;
+  habitMap: Map<string, Habit>;
+  onColumnPress: (iso: string) => void;
+}) {
+  const [y, m, d] = iso.split('-').map((n) => parseInt(n, 10));
+  const date = new Date(y, m - 1, d);
+  const isToday = iso === todayIso;
+  const { notCompleted, completed } = partitionRows(group?.rows ?? [], habitMap);
+  const sortedRows = [...notCompleted, ...completed];
+
+  const [containerH, setContainerH] = useState(0);
+  const [contentH, setContentH] = useState(0);
+  const scrollEnabled = contentH > containerH;
+
+  return (
+    <Pressable
+      onPress={() => onColumnPress(iso)}
+      style={({ pressed }) => [
+        styles.column,
+        !isLast && styles.columnDivider,
+        pressed && styles.columnPressed,
+      ]}>
+      <View style={styles.dayHeader}>
+        <ThemedText style={[styles.weekday, isToday && styles.todayText]}>
+          {date.toLocaleDateString('en-US', { weekday: 'narrow' })}
+        </ThemedText>
+        <ThemedText style={[styles.dateNum, isToday && styles.todayText]}>
+          {date.getDate()}
+        </ThemedText>
+      </View>
+      <ScrollView
+        onLayout={(e) => setContainerH(e.nativeEvent.layout.height)}
+        onContentSizeChange={(_w, h) => setContentH(h)}
+        scrollEnabled={scrollEnabled}
+        contentContainerStyle={styles.cellContent}>
+        {sortedRows.map((row, ri) => (
+          <CompactRow key={ri} row={row} />
+        ))}
+      </ScrollView>
+    </Pressable>
   );
 }
 
 function CompactRow({ row }: { row: AgendaRowT }) {
   const isSkip = row.kind === 'skip';
   const isScheduled = row.kind === 'scheduled';
+  const isCompletion = row.kind === 'completion';
   const marker = isSkip ? '—' : isScheduled ? '○' : '✓';
   return (
     <View
       style={[
         styles.compactRow,
         row.habit.color ? { borderLeftColor: row.habit.color } : null,
+        (isCompletion || isSkip) && styles.compactRowMuted,
       ]}>
-      <ThemedText style={[styles.marker, isSkip && styles.markerDim]}>
+      <ThemedText
+        style={[
+          styles.marker,
+          (isSkip || isCompletion) && styles.markerDim,
+        ]}>
         {marker}
       </ThemedText>
       <ThemedText style={styles.emoji}>{row.habit.icon ?? '·'}</ThemedText>
@@ -171,6 +226,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     gap: 2,
   },
+  compactRowMuted: { opacity: 0.5 },
   marker: { fontSize: 11, opacity: 0.75 },
   markerDim: { opacity: 0.45 },
   emoji: { fontSize: 12 },

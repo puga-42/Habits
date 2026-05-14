@@ -20,10 +20,12 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useAuth } from '@/lib/auth';
 import {
+  applySectionReorder,
   fetchHabits,
   isoDate,
   markFlexCompleted,
   markScheduledCompleted,
+  reorderHabits,
   unmarkCompleted,
   type Habit,
   type HabitOverride,
@@ -41,7 +43,9 @@ import {
 } from '@/lib/history';
 import { fetchProfile, type Profile } from '@/lib/profile';
 
-const AVAILABLE_VIEWS: ViewMode[] = ['day', '3day', 'week', 'month', 'schedule'];
+// Schedule view temporarily disabled — the agenda swipe + drag combo has
+// outstanding bugs there. Re-add 'schedule' when it's ready.
+const AVAILABLE_VIEWS: ViewMode[] = ['day', '3day', 'week', 'month'];
 const SCHEDULE_INITIAL_HALF_WINDOW = 7; // days each direction
 const SCHEDULE_EXTEND_BY = 7;
 
@@ -270,9 +274,28 @@ export default function CalendarScreen() {
     await load();
   }
 
-  function handleRowLongPress(row: AgendaRow, dateIso: string) {
-    const id = row.kind === 'completion' ? row.habit.id : row.habitId;
-    router.push(`/habit/${id}?occurrenceDate=${dateIso}`);
+  // Reorder happens within a section on a specific day. We only renumber the
+  // habits in that section, preserving the relative order of every other
+  // habit. The schedule view shows many days at once, so the previous
+  // approach (yanking every habit visible on the tapped day to the front of
+  // the global list) caused rows on other days to jump around.
+  async function handleReorderSection(
+    dateIso: string,
+    section: 'notCompleted' | 'completed',
+    newRows: AgendaRow[],
+  ) {
+    const newSectionIds = newRows.map((r) =>
+      r.kind === 'completion' ? r.habit.id : r.habitId,
+    );
+
+    const updatedHabits = applySectionReorder(habits, newSectionIds);
+    setHabits(updatedHabits);
+
+    const globalOrder = updatedHabits.map((h) => h.id);
+    reorderHabits(globalOrder).catch((err) => {
+      console.warn('Reorder failed, refetching', err);
+      load();
+    });
   }
 
   function onScheduleLoadEarlier() {
@@ -369,23 +392,25 @@ export default function CalendarScreen() {
         ) : view === 'day' ? (
           <CalendarDayView
             anchorDate={anchorDate}
+            habits={habits}
             dayGroups={dayGroups}
             onAnchorChange={setAnchorDate}
             onRowPress={handleRowPress}
-            onRowLongPress={handleRowLongPress}
+            onReorderSection={handleReorderSection}
           />
         ) : view === '3day' ? (
           <Calendar3DayView
             anchorDate={anchorDate}
+            habits={habits}
             dayGroups={dayGroups}
             onAnchorChange={setAnchorDate}
             onRowPress={handleRowPress}
-            onRowLongPress={handleRowLongPress}
           />
         ) : view === 'week' ? (
           <CalendarWeekView
             anchorDate={anchorDate}
             weekStart={weekStart}
+            habits={habits}
             dayGroups={dayGroups}
             onAnchorChange={setAnchorDate}
             onColumnPress={onWeekColumnTap}
@@ -400,11 +425,12 @@ export default function CalendarScreen() {
         ) : view === 'schedule' ? (
           <CalendarScheduleView
             dayGroups={dayGroups}
+            habits={habits}
             todayIso={isoDate(today)}
             onLoadEarlier={onScheduleLoadEarlier}
             onLoadMore={onScheduleLoadMore}
             onRowPress={handleRowPress}
-            onRowLongPress={handleRowLongPress}
+            onReorderSection={handleReorderSection}
           />
         ) : null}
 

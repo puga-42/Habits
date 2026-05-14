@@ -1,7 +1,7 @@
 // Month view: Google Calendar-style 6×7 grid with habit chips per cell.
 // Tap a cell to switch to Day view anchored on that date.
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
@@ -40,8 +40,16 @@ export function CalendarMonthView({
     return out;
   }, [cells]);
 
+  const [containerH, setContainerH] = useState(0);
+  const [contentH, setContentH] = useState(0);
+  const scrollEnabled = contentH > containerH;
+
   return (
-    <ScrollView contentContainerStyle={styles.scrollContent}>
+    <ScrollView
+      onLayout={(e) => setContainerH(e.nativeEvent.layout.height)}
+      onContentSizeChange={(_w, h) => setContentH(h)}
+      scrollEnabled={scrollEnabled}
+      contentContainerStyle={styles.scrollContent}>
       <View style={styles.weekdayRow}>
         {WEEKDAY_LABELS.map((d, i) => (
           <ThemedText key={i} style={styles.weekday}>

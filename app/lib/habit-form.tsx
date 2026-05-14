@@ -15,7 +15,6 @@ import type {
 export type HabitDraft = {
   title: string;
   kind: 'scheduled' | 'flex';
-  time: Date;
   recurrence: RecurrenceState;
   startsOn: Date;
   endsOn: Date | null;
@@ -26,19 +25,10 @@ export type HabitDraft = {
   visibility: Visibility;
 };
 
-function defaultTime(): Date {
-  const t = new Date();
-  t.setSeconds(0, 0);
-  const minutes = t.getMinutes();
-  t.setMinutes(minutes - (minutes % 15) + 15);
-  return t;
-}
-
 function defaultDraft(): HabitDraft {
   return {
     title: '',
     kind: 'scheduled',
-    time: defaultTime(),
     recurrence: { pattern: 'daily', byDays: ['MO', 'WE', 'FR'], interval: 2 },
     startsOn: new Date(),
     endsOn: null,
@@ -56,7 +46,6 @@ export function habitToDraft(habit: Habit): HabitDraft {
     return {
       title: habit.title,
       kind: 'scheduled',
-      time: dtstart,
       recurrence: parseRrule(habit.rrule ?? 'FREQ=DAILY'),
       startsOn: dtstart,
       endsOn: habit.until ? new Date(habit.until) : null,
@@ -70,7 +59,6 @@ export function habitToDraft(habit: Habit): HabitDraft {
   return {
     title: habit.title,
     kind: 'flex',
-    time: defaultTime(),
     recurrence: { pattern: 'daily', byDays: [], interval: 1 },
     startsOn: new Date(),
     endsOn: null,
@@ -87,8 +75,9 @@ export function habitToDraft(habit: Habit): HabitDraft {
 export function draftToInsert(draft: HabitDraft): HabitInsert {
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
   if (draft.kind === 'scheduled') {
+    // No user-facing time-of-day; dtstart is the start date at local midnight.
     const dtstart = new Date(draft.startsOn);
-    dtstart.setHours(draft.time.getHours(), draft.time.getMinutes(), 0, 0);
+    dtstart.setHours(0, 0, 0, 0);
     return {
       title: draft.title.trim(),
       kind: 'scheduled',

@@ -374,6 +374,35 @@ export function densityBucket(count: number): 0 | 1 | 2 | 3 | 4 {
   return 4;
 }
 
+// ─── Section partition ─────────────────────────────────────────────────────
+
+// Split a day's rows into "not completed" vs "completed" buckets, sorted by
+// each row's habit's sort_index. Skip rows count as completed (the user has
+// explicitly acted on them).
+export function partitionRows(
+  rows: AgendaRow[],
+  habitMap: Map<string, Habit>,
+): { notCompleted: AgendaRow[]; completed: AgendaRow[] } {
+  const notCompleted: AgendaRow[] = [];
+  const completed: AgendaRow[] = [];
+  for (const row of rows) {
+    if (row.kind === 'completion' || row.kind === 'skip') {
+      completed.push(row);
+    } else {
+      notCompleted.push(row);
+    }
+  }
+
+  const sortKey = (row: AgendaRow): number => {
+    const id = row.kind === 'completion' ? row.habit.id : row.habitId;
+    const h = habitMap.get(id);
+    return h?.sort_index ?? Number.MAX_SAFE_INTEGER;
+  };
+  notCompleted.sort((a, b) => sortKey(a) - sortKey(b));
+  completed.sort((a, b) => sortKey(a) - sortKey(b));
+  return { notCompleted, completed };
+}
+
 // ─── Range helpers for calendar views ──────────────────────────────────────
 
 // n consecutive ISO dates starting at `anchor` (local midnight).

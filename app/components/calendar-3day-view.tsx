@@ -1,33 +1,39 @@
 // 3-day view: three day columns side by side; swipe horizontally to advance
-// by 3 days. Today is the leftmost column on first open.
+// by 3 days. Today is the leftmost column on first open. Each column shows
+// open habits on top and completed/skipped below (muted). No drag-reorder
+// in this view — the columns are too tight for the handle. Use Day or
+// Schedule view to reorder.
 
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import PagerView from 'react-native-pager-view';
 
 import { AgendaRow } from '@/components/agenda-row';
 import { ThemedText } from '@/components/themed-text';
-import { isoDate } from '@/lib/habits';
-import type { AgendaRow as AgendaRowT, DayGroup } from '@/lib/history';
+import { isoDate, type Habit } from '@/lib/habits';
+import {
+  partitionRows,
+  type AgendaRow as AgendaRowT,
+  type DayGroup,
+} from '@/lib/history';
 
 type Props = {
   anchorDate: Date;
+  habits: Habit[];
   dayGroups: DayGroup[];
   onAnchorChange: (date: Date) => void;
   onRowPress: (row: AgendaRowT, dateIso: string) => void;
-  onRowLongPress: (row: AgendaRowT, dateIso: string) => void;
 };
 
 export function Calendar3DayView({
   anchorDate,
+  habits,
   dayGroups,
   onAnchorChange,
   onRowPress,
-  onRowLongPress,
 }: Props) {
   const pagerRef = useRef<PagerView>(null);
 
-  // Three 3-day windows: previous triple, current triple, next triple.
   const windowStarts = useMemo(() => {
     const out: Date[] = [];
     for (let pageOffset = -1; pageOffset <= 1; pageOffset++) {
@@ -49,6 +55,12 @@ export function Calendar3DayView({
     return m;
   }, [dayGroups]);
 
+  const habitMap = useMemo(() => {
+    const m = new Map<string, Habit>();
+    for (const h of habits) m.set(h.id, h);
+    return m;
+  }, [habits]);
+
   return (
     <PagerView
       ref={pagerRef}
@@ -64,8 +76,8 @@ export function Calendar3DayView({
           <ColumnsPage
             start={start}
             groupByIso={groupByIso}
+            habitMap={habitMap}
             onRowPress={onRowPress}
-            onRowLongPress={onRowLongPress}
           />
         </View>
       ))}
@@ -76,13 +88,13 @@ export function Calendar3DayView({
 function ColumnsPage({
   start,
   groupByIso,
+  habitMap,
   onRowPress,
-  onRowLongPress,
 }: {
   start: Date;
   groupByIso: Map<string, DayGroup>;
+  habitMap: Map<string, Habit>;
   onRowPress: (row: AgendaRowT, dateIso: string) => void;
-  onRowLongPress: (row: AgendaRowT, dateIso: string) => void;
 }) {
   const days = [0, 1, 2].map((off) => {
     const d = new Date(start);
@@ -95,23 +107,66 @@ function ColumnsPage({
       {days.map((d, i) => (
         <View key={i} style={[styles.column, i < 2 && styles.columnDivider]}>
           <DayHeader date={d} />
-          <ScrollView contentContainerStyle={styles.columnContent}>
-            {(groupByIso.get(isoDate(d))?.rows ?? []).length === 0 ? (
-              <ThemedText style={styles.emptyText}>—</ThemedText>
-            ) : (
-              groupByIso.get(isoDate(d))!.rows.map((row, ri) => (
-                <AgendaRow
-                  key={ri}
-                  row={row}
-                  onPress={() => onRowPress(row, isoDate(d))}
-                  onLongPress={() => onRowLongPress(row, isoDate(d))}
-                />
-              ))
-            )}
-          </ScrollView>
+          <DayColumn
+            date={d}
+            group={groupByIso.get(isoDate(d))}
+            habitMap={habitMap}
+            onRowPress={onRowPress}
+          />
         </View>
       ))}
     </View>
+  );
+}
+
+function DayColumn({
+  date,
+  group,
+  habitMap,
+  onRowPress,
+}: {
+  date: Date;
+  group: DayGroup | undefined;
+  habitMap: Map<string, Habit>;
+  onRowPress: (row: AgendaRowT, dateIso: string) => void;
+}) {
+  const iso = isoDate(date);
+  const rows = group?.rows ?? [];
+  const { notCompleted, completed } = useMemo(
+    () => partitionRows(rows, habitMap),
+    [rows, habitMap],
+  );
+
+  const [containerH, setContainerH] = useState(0);
+  const [contentH, setContentH] = useState(0);
+  const scrollEnabled = contentH > containerH;
+
+  if (rows.length === 0) {
+    return <ThemedText style={styles.emptyText}>—</ThemedText>;
+  }
+
+  const renderRow = (row: AgendaRowT, idx: number) => (
+    <AgendaRow
+      key={`${row.kind}-${idx}`}
+      row={row}
+      onPress={() => onRowPress(row, iso)}
+    />
+  );
+
+  return (
+    <ScrollView
+      onLayout={(e) => setContainerH(e.nativeEvent.layout.height)}
+      onContentSizeChange={(_w, h) => setContentH(h)}
+      scrollEnabled={scrollEnabled}
+      contentContainerStyle={styles.columnContent}>
+      {notCompleted.map(renderRow)}
+      {completed.length > 0 && notCompleted.length > 0 && (
+        <View style={styles.completedHeader}>
+          <ThemedText style={styles.completedLabel}>Completed</ThemedText>
+        </View>
+      )}
+      {completed.map((row, i) => renderRow(row, i + notCompleted.length))}
+    </ScrollView>
   );
 }
 
@@ -144,9 +199,21 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: 'rgba(127,127,127,0.2)',
   },
-  dayWeekday: { fontSize: 11, opacity: 0.6, textTransform: 'uppercase', letterSpacing: 0.5 },
+  dayWeekday: {
+    fontSize: 11,
+    opacity: 0.6,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
   dayDate: { fontSize: 20, marginTop: 2 },
   dayEmphasis: { color: '#7c3aed', opacity: 1 },
-  columnContent: { padding: 8, paddingBottom: 100 },
+  columnContent: { padding: 6, paddingBottom: 100 },
   emptyText: { fontSize: 12, opacity: 0.4, textAlign: 'center', paddingVertical: 20 },
+  completedHeader: { paddingTop: 12, paddingBottom: 4, paddingHorizontal: 4 },
+  completedLabel: {
+    fontSize: 10,
+    opacity: 0.55,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
 });

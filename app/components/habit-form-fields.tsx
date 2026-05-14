@@ -68,14 +68,6 @@ export function HabitFormFields({ lockKind = false }: Props) {
 
       {draft.kind === 'scheduled' ? (
         <>
-          <Row label="Time">
-            <DateTimePicker
-              value={draft.time}
-              mode="time"
-              display="compact"
-              onChange={(_e, date) => date && update({ time: date })}
-            />
-          </Row>
           <Row label="Repeats" onPress={() => router.push('/habit/recurrence')}>
             <ThemedText style={styles.rowValue}>{describeRrule(draft.recurrence)}</ThemedText>
             <ThemedText style={styles.chevron}>›</ThemedText>
