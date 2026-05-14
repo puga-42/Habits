@@ -40,6 +40,7 @@ type Props = {
   anchorDate: Date;
   habits: Habit[];
   dayGroups: DayGroup[];
+  flexProgressByHabitId: Map<string, { count: number; target: number }>;
   onAnchorChange: (date: Date) => void;
   onRowPress: (row: AgendaRowT, dateIso: string) => void;
   onReorderSection: (
@@ -53,6 +54,7 @@ export function CalendarDayView({
   anchorDate,
   habits,
   dayGroups,
+  flexProgressByHabitId,
   onAnchorChange,
   onRowPress,
   onReorderSection,
@@ -102,6 +104,7 @@ export function CalendarDayView({
             date={d}
             group={groupByIso.get(isoDate(d))}
             habitMap={habitMap}
+            flexProgressByHabitId={flexProgressByHabitId}
             onRowPress={onRowPress}
             onReorderSection={onReorderSection}
           />
@@ -115,12 +118,14 @@ function DayContent({
   date,
   group,
   habitMap,
+  flexProgressByHabitId,
   onRowPress,
   onReorderSection,
 }: {
   date: Date;
   group: DayGroup | undefined;
   habitMap: Map<string, Habit>;
+  flexProgressByHabitId: Map<string, { count: number; target: number }>;
   onRowPress: (row: AgendaRowT, dateIso: string) => void;
   onReorderSection: (
     dateIso: string,
@@ -195,15 +200,20 @@ function DayContent({
         </View>
       );
     }
+    const habitId =
+      item.row.kind === 'completion' ? item.row.habit.id : item.row.habitId;
     return (
       <AgendaRow
         row={item.row}
         onPress={() => onRowPress(item.row, iso)}
         onLongPress={drag}
+        flexProgress={flexProgressByHabitId.get(habitId)}
         isActive={isActive}
       />
     );
   };
+
+  const ItemSeparator = () => <View style={styles.itemSeparator} />;
 
   const onDragEnd = ({
     data: newData,
@@ -268,6 +278,7 @@ function DayContent({
       // alone isn't enough.
       containerStyle={styles.scrollRoot}
       contentContainerStyle={styles.scrollContent}
+      ItemSeparatorComponent={ItemSeparator}
       keyboardShouldPersistTaps="handled"
     />
   );
@@ -277,7 +288,8 @@ const styles = StyleSheet.create({
   pager: { flex: 1 },
   page: { flex: 1 },
   scrollRoot: { flex: 1 },
-  scrollContent: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 120 },
+  scrollContent: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 120 },
+  itemSeparator: { height: 10 },
   emptyState: {
     flex: 1,
     alignItems: 'center',

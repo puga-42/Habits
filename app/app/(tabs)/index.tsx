@@ -36,6 +36,7 @@ import {
   buildMonthGrid,
   countCompletionsByDate,
   fetchRange,
+  flexProgressByHabit,
   monthLabel,
   nDayRange,
   weekDatesFrom,
@@ -195,6 +196,13 @@ export default function CalendarScreen() {
   const completionCountByIso = useMemo(
     () => countCompletionsByDate(filteredCompletions),
     [filteredCompletions],
+  );
+
+  // Per-flex-habit progress through the current period (day/week/month). Drives
+  // the trailing mini ring on flex completion pills.
+  const flexProgressByHabitId = useMemo(
+    () => flexProgressByHabit(filteredHabits, filteredCompletions, today),
+    [filteredHabits, filteredCompletions, today],
   );
 
   const groupByIso = useMemo(() => {
@@ -411,6 +419,7 @@ export default function CalendarScreen() {
             anchorDate={anchorDate}
             habits={habits}
             dayGroups={dayGroups}
+            flexProgressByHabitId={flexProgressByHabitId}
             onAnchorChange={setAnchorDate}
             onRowPress={handleRowPress}
             onReorderSection={handleReorderSection}
@@ -420,6 +429,7 @@ export default function CalendarScreen() {
             anchorDate={anchorDate}
             habits={habits}
             dayGroups={dayGroups}
+            flexProgressByHabitId={flexProgressByHabitId}
             onAnchorChange={setAnchorDate}
             onRowPress={handleRowPress}
           />
@@ -444,6 +454,7 @@ export default function CalendarScreen() {
             dayGroups={dayGroups}
             habits={habits}
             todayIso={isoDate(today)}
+            flexProgressByHabitId={flexProgressByHabitId}
             onLoadEarlier={onScheduleLoadEarlier}
             onLoadMore={onScheduleLoadMore}
             onRowPress={handleRowPress}

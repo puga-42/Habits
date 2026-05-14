@@ -7,7 +7,9 @@ import { rrulestr } from 'rrule';
 import { supabase } from './supabase';
 import {
   isoDate,
+  weekStart,
   type Completion,
+  type FlexPeriod,
   type Habit,
   type HabitKind,
   type HabitOverride,
@@ -38,6 +40,7 @@ export type CompletionWithHabit = Completion & {
 type AgendaHabit = {
   id: string;
   title: string;
+  description: string | null;
   icon: string | null;
   color: string | null;
 };
@@ -229,6 +232,7 @@ export function buildDayGroups(
                 habit: {
                   id: c.habits.id,
                   title: patch.title ?? c.habits.title,
+                  description: habitMap.get(c.habit_id)?.description ?? null,
                   icon: patch.icon ?? c.habits.icon,
                   color: patch.color ?? c.habits.color,
                 },
@@ -255,6 +259,7 @@ export function buildDayGroups(
               habit: {
                 id: habit.id,
                 title: patch.title ?? habit.title,
+                description: habit.description,
                 icon: patch.icon ?? habit.icon,
                 color: patch.color ?? habit.color,
               },
@@ -282,6 +287,7 @@ export function buildDayGroups(
         habit: {
           id: c.habits.id,
           title: patch.title ?? c.habits.title,
+          description: habitMap.get(c.habit_id)?.description ?? null,
           icon: patch.icon ?? c.habits.icon,
           color: patch.color ?? c.habits.color,
         },
@@ -320,7 +326,13 @@ export function buildDayGroups(
 }
 
 function agendaHabitFor(h: Habit): AgendaHabit {
-  return { id: h.id, title: h.title, icon: h.icon, color: h.color };
+  return {
+    id: h.id,
+    title: h.title,
+    description: h.description,
+    icon: h.icon,
+    color: h.color,
+  };
 }
 
 function appendTo<K, V>(map: Map<K, V[]>, key: K, value: V) {
@@ -363,6 +375,42 @@ export function completionCountByDate(groups: DayGroup[]): Map<string, number> {
     if (count > 0) out.set(g.date, count);
   }
   return out;
+}
+
+// For each flex habit, return how many completions fall in the current
+// period (day/week/month) and the configured target. Weekly periods are
+// Monday-first (mirrors habits.ts `weekStart`). Habits missing target_count
+// or target_period are skipped entirely.
+export function flexProgressByHabit(
+  habits: Habit[],
+  completions: CompletionWithHabit[],
+  today: Date,
+): Map<string, { count: number; target: number }> {
+  const byHabit = new Map<string, CompletionWithHabit[]>();
+  for (const c of completions) {
+    const bucket = byHabit.get(c.habit_id);
+    if (bucket) bucket.push(c);
+    else byHabit.set(c.habit_id, [c]);
+  }
+
+  const out = new Map<string, { count: number; target: number }>();
+  for (const h of habits) {
+    if (h.kind !== 'flex') continue;
+    if (h.target_count == null || h.target_period == null) continue;
+    const periodStart = currentFlexPeriodStart(today, h.target_period);
+    const hCompletions = byHabit.get(h.id) ?? [];
+    const count = hCompletions.filter((c) => c.period_start === periodStart)
+      .length;
+    out.set(h.id, { count, target: h.target_count });
+  }
+  return out;
+}
+
+function currentFlexPeriodStart(today: Date, period: FlexPeriod): string {
+  if (period === 'day') return isoDate(today);
+  if (period === 'week') return isoDate(weekStart(today));
+  // month
+  return isoDate(new Date(today.getFullYear(), today.getMonth(), 1));
 }
 
 // Same shape as completionCountByDate but works on raw completion rows so the

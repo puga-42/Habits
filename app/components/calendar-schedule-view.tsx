@@ -42,6 +42,7 @@ type Props = {
   dayGroups: DayGroup[];
   habits: Habit[];
   todayIso: string;
+  flexProgressByHabitId: Map<string, { count: number; target: number }>;
   onLoadEarlier: () => void;
   onLoadMore: () => void;
   onRowPress: (row: AgendaRowT, dateIso: string) => void;
@@ -56,6 +57,7 @@ export function CalendarScheduleView({
   dayGroups,
   habits,
   todayIso,
+  flexProgressByHabitId,
   onLoadEarlier,
   onLoadMore,
   onRowPress,
@@ -126,11 +128,14 @@ export function CalendarScheduleView({
     if (item.kind === 'empty-day') {
       return <ThemedText style={styles.empty}>No completions</ThemedText>;
     }
+    const habitId =
+      item.row.kind === 'completion' ? item.row.habit.id : item.row.habitId;
     return (
       <AgendaRow
         row={item.row}
         onPress={() => onRowPress(item.row, item.iso)}
         onLongPress={drag}
+        flexProgress={flexProgressByHabitId.get(habitId)}
         isActive={isActive}
       />
     );

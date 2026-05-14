@@ -23,6 +23,7 @@ type Props = {
   dayGroups: DayGroup[];
   onAnchorChange: (date: Date) => void;
   onRowPress: (row: AgendaRowT, dateIso: string) => void;
+  flexProgressByHabitId: Map<string, { count: number; target: number }>;
 };
 
 export function Calendar3DayView({
@@ -31,6 +32,7 @@ export function Calendar3DayView({
   dayGroups,
   onAnchorChange,
   onRowPress,
+  flexProgressByHabitId,
 }: Props) {
   const pagerRef = useRef<PagerView>(null);
 
@@ -78,6 +80,7 @@ export function Calendar3DayView({
             groupByIso={groupByIso}
             habitMap={habitMap}
             onRowPress={onRowPress}
+            flexProgressByHabitId={flexProgressByHabitId}
           />
         </View>
       ))}
@@ -90,11 +93,13 @@ function ColumnsPage({
   groupByIso,
   habitMap,
   onRowPress,
+  flexProgressByHabitId,
 }: {
   start: Date;
   groupByIso: Map<string, DayGroup>;
   habitMap: Map<string, Habit>;
   onRowPress: (row: AgendaRowT, dateIso: string) => void;
+  flexProgressByHabitId: Map<string, { count: number; target: number }>;
 }) {
   const days = [0, 1, 2].map((off) => {
     const d = new Date(start);
@@ -112,6 +117,7 @@ function ColumnsPage({
             group={groupByIso.get(isoDate(d))}
             habitMap={habitMap}
             onRowPress={onRowPress}
+            flexProgressByHabitId={flexProgressByHabitId}
           />
         </View>
       ))}
@@ -124,11 +130,13 @@ function DayColumn({
   group,
   habitMap,
   onRowPress,
+  flexProgressByHabitId,
 }: {
   date: Date;
   group: DayGroup | undefined;
   habitMap: Map<string, Habit>;
   onRowPress: (row: AgendaRowT, dateIso: string) => void;
+  flexProgressByHabitId: Map<string, { count: number; target: number }>;
 }) {
   const iso = isoDate(date);
   const rows = group?.rows ?? [];
@@ -145,13 +153,19 @@ function DayColumn({
     return <ThemedText style={styles.emptyText}>—</ThemedText>;
   }
 
-  const renderRow = (row: AgendaRowT, idx: number) => (
-    <AgendaRow
-      key={`${row.kind}-${idx}`}
-      row={row}
-      onPress={() => onRowPress(row, iso)}
-    />
-  );
+  const renderRow = (row: AgendaRowT, idx: number) => {
+    const habitId = row.kind === 'completion' ? row.habit.id : row.habitId;
+    return (
+      <View key={`${row.kind}-${idx}`} style={styles.rowWrap}>
+        <AgendaRow
+          row={row}
+          onPress={() => onRowPress(row, iso)}
+          compact
+          flexProgress={flexProgressByHabitId.get(habitId)}
+        />
+      </View>
+    );
+  };
 
   return (
     <ScrollView
@@ -208,6 +222,7 @@ const styles = StyleSheet.create({
   dayDate: { fontSize: 20, marginTop: 2 },
   dayEmphasis: { color: '#7c3aed', opacity: 1 },
   columnContent: { padding: 6, paddingBottom: 100 },
+  rowWrap: { marginBottom: 6 },
   emptyText: { fontSize: 12, opacity: 0.4, textAlign: 'center', paddingVertical: 20 },
   completedHeader: { paddingTop: 12, paddingBottom: 4, paddingHorizontal: 4 },
   completedLabel: {

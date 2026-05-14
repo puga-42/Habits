@@ -6,6 +6,7 @@ import {
   countCompletionsByDate,
   densityBucket,
   expandHabit,
+  flexProgressByHabit,
   monthLabel,
   nDayRange,
   nextMonth,
@@ -450,7 +451,13 @@ describe('buildDayGroups (today + future)', () => {
 // ─── completionCountByDate ─────────────────────────────────────────────────
 
 describe('completionCountByDate', () => {
-  const fakeAgendaHabit = { id: 'h', title: 'H', icon: null, color: null };
+  const fakeAgendaHabit = {
+    id: 'h',
+    title: 'H',
+    description: null,
+    icon: null,
+    color: null,
+  };
 
   function completionRow(id: string): AgendaRow {
     return {
@@ -567,6 +574,144 @@ describe('countCompletionsByDate', () => {
     ]);
     expect(map.get('2026-05-12')).toBe(1);
     expect(map.get('2026-05-13')).toBe(2);
+  });
+});
+
+// ─── flexProgressByHabit ───────────────────────────────────────────────────
+
+describe('flexProgressByHabit', () => {
+  // 2026-05-14 is a Thursday. The Monday of that week is 2026-05-11.
+  const TODAY = new Date(2026, 4, 14);
+
+  function flexHabit(
+    overrides: Partial<Habit> & {
+      id: string;
+      target_count: number;
+      target_period: 'day' | 'week' | 'month';
+    },
+  ): Habit {
+    return {
+      lineage_id: overrides.id,
+      owner_id: 'u1',
+      kind: 'flex',
+      title: overrides.id,
+      description: null,
+      color: null,
+      icon: null,
+      visibility: 'private',
+      timezone: 'UTC',
+      dtstart: null,
+      rrule: null,
+      until: null,
+      sort_index: 1,
+      created_at: '2026-05-01T00:00:00Z',
+      updated_at: '2026-05-01T00:00:00Z',
+      deleted_at: null,
+      ...overrides,
+    } as Habit;
+  }
+
+  function comp(habit_id: string, period_start: string): CompletionWithHabit {
+    return {
+      id: 'c-' + Math.random(),
+      habit_id,
+      owner_id: 'u1',
+      occurrence_date: null,
+      period_start,
+      completed_at: period_start + 'T00:00:00Z',
+      note: null,
+      visibility_override: null,
+      created_at: '2026-05-13T10:00:00Z',
+      updated_at: '2026-05-13T10:00:00Z',
+      habits: { id: habit_id, title: habit_id, icon: null, color: null, kind: 'flex' },
+    } as CompletionWithHabit;
+  }
+
+  it('returns empty map when no flex habits', () => {
+    const scheduled = flexHabit({
+      id: 'h-sched',
+      target_count: 1,
+      target_period: 'day',
+    });
+    scheduled.kind = 'scheduled';
+    expect(flexProgressByHabit([scheduled], [], TODAY).size).toBe(0);
+  });
+
+  it('counts completions in the current week for a weekly flex habit', () => {
+    const gym = flexHabit({ id: 'h-gym', target_count: 3, target_period: 'week' });
+    const completions = [
+      comp('h-gym', '2026-05-11'), // this week's Monday
+      comp('h-gym', '2026-05-11'), // also this week
+    ];
+    const map = flexProgressByHabit([gym], completions, TODAY);
+    expect(map.get('h-gym')).toEqual({ count: 2, target: 3 });
+  });
+
+  it('ignores completions outside the current week for a weekly flex habit', () => {
+    const gym = flexHabit({ id: 'h-gym', target_count: 3, target_period: 'week' });
+    const completions = [
+      comp('h-gym', '2026-05-04'), // last week
+      comp('h-gym', '2026-05-11'), // this week
+    ];
+    const map = flexProgressByHabit([gym], completions, TODAY);
+    expect(map.get('h-gym')).toEqual({ count: 1, target: 3 });
+  });
+
+  it('counts only todays completions for a daily flex habit', () => {
+    const water = flexHabit({ id: 'h-water', target_count: 8, target_period: 'day' });
+    const completions = [
+      comp('h-water', '2026-05-14'),
+      comp('h-water', '2026-05-14'),
+      comp('h-water', '2026-05-13'), // yesterday — ignored
+    ];
+    const map = flexProgressByHabit([water], completions, TODAY);
+    expect(map.get('h-water')).toEqual({ count: 2, target: 8 });
+  });
+
+  it('counts completions in the current month for a monthly flex habit', () => {
+    const learn = flexHabit({
+      id: 'h-learn',
+      target_count: 10,
+      target_period: 'month',
+    });
+    // period_start is the *start of the period* (first of the month), not the
+    // day the completion happened. Two May completions both bucket to 2026-05-01.
+    const completions = [
+      comp('h-learn', '2026-05-01'),
+      comp('h-learn', '2026-05-01'),
+      comp('h-learn', '2026-04-01'), // last month — ignored
+    ];
+    const map = flexProgressByHabit([learn], completions, TODAY);
+    expect(map.get('h-learn')).toEqual({ count: 2, target: 10 });
+  });
+
+  it('keeps per-habit counts independent', () => {
+    const gym = flexHabit({ id: 'h-gym', target_count: 3, target_period: 'week' });
+    const water = flexHabit({ id: 'h-water', target_count: 8, target_period: 'day' });
+    const completions = [
+      comp('h-gym', '2026-05-11'),
+      comp('h-water', '2026-05-14'),
+      comp('h-water', '2026-05-14'),
+    ];
+    const map = flexProgressByHabit([gym, water], completions, TODAY);
+    expect(map.get('h-gym')).toEqual({ count: 1, target: 3 });
+    expect(map.get('h-water')).toEqual({ count: 2, target: 8 });
+  });
+
+  it('skips flex habits missing target_count or target_period', () => {
+    const malformed = flexHabit({
+      id: 'h-bad',
+      target_count: 0,
+      target_period: 'week',
+    });
+    malformed.target_count = null;
+    expect(flexProgressByHabit([malformed], [], TODAY).size).toBe(0);
+  });
+
+  it('reports zero count when no completions match the current period', () => {
+    const gym = flexHabit({ id: 'h-gym', target_count: 3, target_period: 'week' });
+    const map = flexProgressByHabit([gym], [], TODAY);
+    expect(map.get('h-gym')).toEqual({ count: 0, target: 3 });
   });
 });
 
@@ -687,7 +832,7 @@ describe('partitionRows', () => {
     return {
       kind: 'completion',
       id: 'c-' + habitId,
-      habit: { id: habitId, title: habitId, icon: null, color: null },
+      habit: { id: habitId, title: habitId, description: null, icon: null, color: null },
       time: null,
       isFlex: false,
     };
@@ -696,7 +841,7 @@ describe('partitionRows', () => {
     return {
       kind: 'scheduled',
       habitId,
-      habit: { id: habitId, title: habitId, icon: null, color: null },
+      habit: { id: habitId, title: habitId, description: null, icon: null, color: null },
       time: null,
     };
   }
@@ -704,7 +849,7 @@ describe('partitionRows', () => {
     return {
       kind: 'skip',
       habitId,
-      habit: { id: habitId, title: habitId, icon: null, color: null },
+      habit: { id: habitId, title: habitId, description: null, icon: null, color: null },
       time: null,
     };
   }
