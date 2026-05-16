@@ -23,7 +23,7 @@ type Props = {
   dayGroups: DayGroup[];
   onAnchorChange: (date: Date) => void;
   onRowPress: (row: AgendaRowT, dateIso: string) => void;
-  onPillPress?: (row: AgendaRowT) => void;
+  onPillPress?: (row: AgendaRowT, dateIso: string) => void;
   onSwipeAction: (row: AgendaRowT, dateIso: string, action: SwipeAction) => void;
   flexProgressByHabitId: Map<string, { count: number; target: number }>;
 };
@@ -107,7 +107,7 @@ function ColumnsPage({
   groupByIso: Map<string, DayGroup>;
   habitMap: Map<string, Habit>;
   onRowPress: (row: AgendaRowT, dateIso: string) => void;
-  onPillPress?: (row: AgendaRowT) => void;
+  onPillPress?: (row: AgendaRowT, dateIso: string) => void;
   onSwipeAction: (row: AgendaRowT, dateIso: string, action: SwipeAction) => void;
   flexProgressByHabitId: Map<string, { count: number; target: number }>;
 }) {
@@ -164,7 +164,7 @@ function DayColumn({
   group: DayGroup | undefined;
   habitMap: Map<string, Habit>;
   onRowPress: (row: AgendaRowT, dateIso: string) => void;
-  onPillPress?: (row: AgendaRowT) => void;
+  onPillPress?: (row: AgendaRowT, dateIso: string) => void;
   onSwipeAction: (row: AgendaRowT, dateIso: string, action: SwipeAction) => void;
   onDrawerOpen: (closeFn: () => void) => void;
   onDrawerClose: () => void;
@@ -192,7 +192,7 @@ function DayColumn({
         <HabitRowSwipeable
           row={row}
           dateIso={iso}
-          onPress={row.kind === 'completion' && onPillPress ? () => onPillPress(row) : undefined}
+          onPress={onPillPress ? () => onPillPress(row, iso) : undefined}
           onTrailingPress={() => onRowPress(row, iso)}
           onSwipeAction={(action) => onSwipeAction(row, iso, action)}
           onDrawerOpen={onDrawerOpen}

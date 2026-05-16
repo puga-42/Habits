@@ -34,6 +34,7 @@ function AuthGate() {
       <Stack.Screen name="habit" options={{ presentation: 'modal' }} />
       <Stack.Screen name="completion" />
       <Stack.Screen name="likers" />
+      <Stack.Screen name="feedback" options={{ presentation: 'modal' }} />
     </Stack>
   );
 }

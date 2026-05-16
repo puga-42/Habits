@@ -8,7 +8,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Calendar3DayView } from '@/components/calendar-3day-view';
 import { CalendarDayView } from '@/components/calendar-day-view';
-import { CalendarFAB } from '@/components/calendar-fab';
+import { FabSpeedDial } from '@/components/fab-speed-dial';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import {
   CalendarMenuDrawer,
   type ViewMode,
@@ -299,10 +300,12 @@ export default function CalendarScreen() {
     await load();
   }
 
-  function handlePillPress(row: AgendaRow) {
-    if (row.kind === 'completion') {
-      router.push(`/completion/${row.id}`);
-    }
+  function handlePillPress(row: AgendaRow, dateIso: string) {
+    const habitId = row.kind === 'completion' ? row.habit.id : row.habitId;
+    router.push({
+      pathname: '/habit/view',
+      params: { id: habitId, occurrenceDate: dateIso },
+    });
   }
 
   async function handleSwipeAction(
@@ -506,7 +509,22 @@ export default function CalendarScreen() {
           />
         ) : null}
 
-        <CalendarFAB onPress={() => router.push('/habit/new')} />
+        <FabSpeedDial
+          actions={[
+            {
+              key: 'new-habit',
+              label: 'New habit',
+              icon: <IconSymbol name="plus.circle" size={20} color="#7c3aed" />,
+              onPress: () => router.push('/habit/new'),
+            },
+            {
+              key: 'feedback',
+              label: 'Feedback',
+              icon: <IconSymbol name="bubble.left" size={20} color="#7c3aed" />,
+              onPress: () => router.push('/feedback'),
+            },
+          ]}
+        />
       </SafeAreaView>
 
       <CalendarMenuDrawer

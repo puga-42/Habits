@@ -36,7 +36,7 @@ type Props = {
   onLoadEarlier: () => void;
   onLoadMore: () => void;
   onRowPress: (row: AgendaRowT, dateIso: string) => void;
-  onPillPress?: (row: AgendaRowT) => void;
+  onPillPress?: (row: AgendaRowT, dateIso: string) => void;
   onSwipeAction: (row: AgendaRowT, dateIso: string, action: SwipeAction) => void;
   onReorderSection: (
     dateIso: string,
@@ -132,7 +132,7 @@ export function CalendarScheduleView({
       <HabitRowSwipeable
         row={item.row}
         dateIso={item.iso}
-        onPress={item.row.kind === 'completion' && onPillPress ? () => onPillPress(item.row) : undefined}
+        onPress={onPillPress ? () => onPillPress(item.row, item.iso) : undefined}
         onTrailingPress={() => onRowPress(item.row, item.iso)}
         onSwipeAction={(action) => onSwipeAction(item.row, item.iso, action)}
         onDrawerOpen={handleDrawerOpen}
