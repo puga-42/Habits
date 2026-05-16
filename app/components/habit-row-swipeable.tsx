@@ -34,6 +34,7 @@ function useReducedMotion(): boolean {
 type Props = {
   row: AgendaRowT;
   dateIso: string;
+  onPress?: () => void;
   onTrailingPress: () => void;
   onSwipeAction: (action: SwipeAction) => void;
   onDrawerOpen?: (closeFn: () => void) => void;
@@ -46,6 +47,7 @@ type Props = {
 
 export function HabitRowSwipeable({
   row,
+  onPress,
   onTrailingPress,
   onSwipeAction,
   onDrawerOpen,
@@ -80,6 +82,7 @@ export function HabitRowSwipeable({
     return (
       <AgendaRow
         row={row}
+        onPress={onPress}
         onTrailingPress={onTrailingPress}
         onLongPress={onLongPress}
         flexProgress={flexProgress}
@@ -116,6 +119,7 @@ export function HabitRowSwipeable({
     >
       <AgendaRow
         row={row}
+        onPress={onPress}
         onTrailingPress={onTrailingPress}
         onLongPress={onLongPress}
         flexProgress={flexProgress}

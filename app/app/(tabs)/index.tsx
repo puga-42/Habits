@@ -16,6 +16,7 @@ import {
 import { CalendarMonthView } from '@/components/calendar-month-view';
 import { CalendarScheduleView } from '@/components/calendar-schedule-view';
 import { CalendarWeekView } from '@/components/calendar-week-view';
+import { CompletionToast } from '@/components/completion-toast';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { WeekStrip } from '@/components/week-strip';
@@ -85,6 +86,9 @@ export default function CalendarScreen() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const scheduleExtendingRef = useRef(false);
+
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastCompletionId, setToastCompletionId] = useState<string | null>(null);
 
   const anchorYear = anchorDate.getFullYear();
   const anchorMonth = anchorDate.getMonth() + 1;
@@ -282,14 +286,22 @@ export default function CalendarScreen() {
   async function handleTrailingPress(row: AgendaRow, dateIso: string) {
     if (!userId) return;
     if (!canCompleteOn(dateIso, today)) return;
+    let completionId: string | undefined;
     if (row.kind === 'scheduled') {
-      await markScheduledCompleted(row.habitId, userId, dateIso);
-      await load();
-      return;
+      completionId = await markScheduledCompleted(row.habitId, userId, dateIso);
+    } else if (row.kind === 'flex' && row.count < row.target) {
+      completionId = await markFlexCompleted(row.habitId, userId);
     }
-    if (row.kind === 'flex' && row.count < row.target) {
-      await markFlexCompleted(row.habitId, userId);
-      await load();
+    if (completionId) {
+      setToastCompletionId(completionId);
+      setToastVisible(true);
+    }
+    await load();
+  }
+
+  function handlePillPress(row: AgendaRow) {
+    if (row.kind === 'completion') {
+      router.push(`/completion/${row.id}`);
     }
   }
 
@@ -448,6 +460,7 @@ export default function CalendarScreen() {
             flexProgressByHabitId={flexProgressByHabitId}
             onAnchorChange={setAnchorDate}
             onRowPress={handleTrailingPress}
+            onPillPress={handlePillPress}
             onSwipeAction={handleSwipeAction}
             onReorderSection={handleReorderSection}
           />
@@ -459,6 +472,7 @@ export default function CalendarScreen() {
             flexProgressByHabitId={flexProgressByHabitId}
             onAnchorChange={setAnchorDate}
             onRowPress={handleTrailingPress}
+            onPillPress={handlePillPress}
             onSwipeAction={handleSwipeAction}
           />
         ) : view === 'week' ? (
@@ -486,6 +500,7 @@ export default function CalendarScreen() {
             onLoadEarlier={onScheduleLoadEarlier}
             onLoadMore={onScheduleLoadMore}
             onRowPress={handleTrailingPress}
+            onPillPress={handlePillPress}
             onSwipeAction={handleSwipeAction}
             onReorderSection={handleReorderSection}
           />
@@ -504,6 +519,14 @@ export default function CalendarScreen() {
         onPickFilter={setFilterHabitId}
         onOpenSettings={openSettings}
         onClose={() => setMenuOpen(false)}
+      />
+
+      <CompletionToast
+        visible={toastVisible}
+        onPress={() => {
+          if (toastCompletionId) router.push(`/completion/${toastCompletionId}`);
+        }}
+        onDismiss={() => setToastVisible(false)}
       />
     </ThemedView>
   );

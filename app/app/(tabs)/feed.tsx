@@ -1,7 +1,7 @@
 // Feed tab — reverse-chronological stream of the viewer's own + friends'
 // visible completions. See /FEED_PLAN.md for the architectural details.
 
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -36,6 +36,7 @@ const PAGE_SIZE = 20;
 
 export default function FeedScreen() {
   const { session } = useAuth();
+  const router = useRouter();
   const viewerId = session?.user.id ?? null;
   const [items, setItems] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -211,6 +212,11 @@ export default function FeedScreen() {
                     completionId: item.id,
                     ownerId: item.owner_id,
                   })
+                }
+                onEdit={
+                  item.owner_id === viewerId
+                    ? () => router.push(`/completion/${item.id}`)
+                    : undefined
                 }
                 onReport={() =>
                   reportContent(viewerId, {

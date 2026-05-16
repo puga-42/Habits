@@ -37,6 +37,7 @@ type Props = {
   flexProgressByHabitId: Map<string, { count: number; target: number }>;
   onAnchorChange: (date: Date) => void;
   onRowPress: (row: AgendaRowT, dateIso: string) => void;
+  onPillPress?: (row: AgendaRowT) => void;
   onSwipeAction: (row: AgendaRowT, dateIso: string, action: SwipeAction) => void;
   onReorderSection: (
     dateIso: string,
@@ -52,6 +53,7 @@ export function CalendarDayView({
   flexProgressByHabitId,
   onAnchorChange,
   onRowPress,
+  onPillPress,
   onSwipeAction,
   onReorderSection,
 }: Props) {
@@ -102,6 +104,7 @@ export function CalendarDayView({
             habitMap={habitMap}
             flexProgressByHabitId={flexProgressByHabitId}
             onRowPress={onRowPress}
+            onPillPress={onPillPress}
             onSwipeAction={onSwipeAction}
             onReorderSection={onReorderSection}
           />
@@ -117,6 +120,7 @@ function DayContent({
   habitMap,
   flexProgressByHabitId,
   onRowPress,
+  onPillPress,
   onSwipeAction,
   onReorderSection,
 }: {
@@ -125,6 +129,7 @@ function DayContent({
   habitMap: Map<string, Habit>;
   flexProgressByHabitId: Map<string, { count: number; target: number }>;
   onRowPress: (row: AgendaRowT, dateIso: string) => void;
+  onPillPress?: (row: AgendaRowT) => void;
   onSwipeAction: (row: AgendaRowT, dateIso: string, action: SwipeAction) => void;
   onReorderSection: (
     dateIso: string,
@@ -207,6 +212,7 @@ function DayContent({
       <HabitRowSwipeable
         row={item.row}
         dateIso={iso}
+        onPress={item.row.kind === 'completion' && onPillPress ? () => onPillPress(item.row) : undefined}
         onTrailingPress={() => onRowPress(item.row, iso)}
         onSwipeAction={(action) => onSwipeAction(item.row, iso, action)}
         onDrawerOpen={handleDrawerOpen}

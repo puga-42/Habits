@@ -25,6 +25,7 @@ const FALLBACK_COLOR = 'rgba(127,127,127,0.45)';
 
 type Props = {
   row: AgendaRowT;
+  onPress?: () => void;
   onTrailingPress?: () => void;
   onLongPress?: () => void;
   // Period progress for flex rows. When provided on a flex completion row,
@@ -41,6 +42,7 @@ type Props = {
 
 export function AgendaRow({
   row,
+  onPress,
   onTrailingPress,
   onLongPress,
   flexProgress,
@@ -72,12 +74,13 @@ export function AgendaRow({
 
   return (
     <Pressable
+      onPress={onPress}
       onLongPress={onLongPress}
       delayLongPress={LONG_PRESS_MS}
       style={({ pressed }) => [
         styles.pill,
         compact && styles.pillCompact,
-        pressed && onLongPress && styles.pillPressed,
+        pressed && (onLongPress || onPress) && styles.pillPressed,
         isSkip && styles.pillSkipped,
       ]}>
       <View

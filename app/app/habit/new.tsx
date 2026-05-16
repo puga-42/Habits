@@ -34,7 +34,8 @@ export default function NewHabitScreen() {
       reset();
       router.back();
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
+      const message =
+        err instanceof Error ? err.message : (err as any)?.message ?? JSON.stringify(err);
       Alert.alert('Could not save', message);
     } finally {
       setSaving(false);

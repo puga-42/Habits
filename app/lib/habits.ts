@@ -1,3 +1,4 @@
+import * as Crypto from 'expo-crypto';
 import { rrulestr } from 'rrule';
 
 import { supabase } from './supabase';
@@ -105,25 +106,31 @@ export async function markScheduledCompleted(
   habitId: string,
   ownerId: string,
   occurrenceDate: string,
-): Promise<void> {
+): Promise<string> {
+  const id = Crypto.randomUUID();
   const { error } = await supabase.from('habit_completions').insert({
+    id,
     habit_id: habitId,
     owner_id: ownerId,
     occurrence_date: occurrenceDate,
   });
   if (error) throw error;
+  return id;
 }
 
 export async function markFlexCompleted(
   habitId: string,
   ownerId: string,
-): Promise<void> {
+): Promise<string> {
+  const id = Crypto.randomUUID();
   const { error } = await supabase.from('habit_completions').insert({
+    id,
     habit_id: habitId,
     owner_id: ownerId,
     period_start: isoDate(weekStart(new Date())),
   });
   if (error) throw error;
+  return id;
 }
 
 export async function unmarkCompleted(completionId: string): Promise<void> {

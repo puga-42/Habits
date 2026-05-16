@@ -19,6 +19,7 @@ type Props = {
   now: Date;
   onToggleLike: () => void;
   onOpenComments: () => void;
+  onEdit?: () => void;
   onReport: () => void;
   onBlock: () => void;
   onMute: () => void;
@@ -30,6 +31,7 @@ export function FeedCard({
   now,
   onToggleLike,
   onOpenComments,
+  onEdit,
   onReport,
   onBlock,
   onMute,
@@ -67,6 +69,11 @@ export function FeedCard({
             @{item.owner_handle} · {formatRelativeTime(item.completed_at, now)}
           </ThemedText>
         </View>
+        {isSelf && onEdit && (
+          <Pressable onPress={onEdit} hitSlop={10} style={styles.menuButton}>
+            <IconSymbol name="pencil" color="rgba(127,127,127,0.9)" size={18} />
+          </Pressable>
+        )}
         <Pressable onPress={openOverflow} hitSlop={10} style={styles.menuButton}>
           <IconSymbol name="ellipsis" color="rgba(127,127,127,0.9)" size={22} />
         </Pressable>
@@ -86,6 +93,14 @@ export function FeedCard({
         </View>
       ) : null}
 
+      {item.note ? (
+        <Pressable onPress={() => setNoteExpanded((v) => !v)} style={styles.noteWrap}>
+          <ThemedText style={styles.note} numberOfLines={noteExpanded ? undefined : 2}>
+            {item.note}
+          </ThemedText>
+        </Pressable>
+      ) : null}
+
       <View style={styles.actionWrap}>
         <FeedActionBar
           completionId={item.id}
@@ -96,15 +111,6 @@ export function FeedCard({
           onOpenComments={onOpenComments}
         />
       </View>
-
-      {item.note ? (
-        <Pressable onPress={() => setNoteExpanded((v) => !v)} style={styles.noteWrap}>
-          <ThemedText style={styles.note} numberOfLines={noteExpanded ? undefined : 2}>
-            <ThemedText style={styles.noteAuthor}>{item.owner_handle} </ThemedText>
-            {item.note}
-          </ThemedText>
-        </Pressable>
-      ) : null}
     </View>
   );
 }
@@ -136,5 +142,4 @@ const styles = StyleSheet.create({
   actionWrap: { paddingHorizontal: 14, marginTop: 6 },
   noteWrap: { paddingHorizontal: 14, marginTop: 4 },
   note: { fontSize: 14, lineHeight: 19 },
-  noteAuthor: { fontWeight: '600' },
 });

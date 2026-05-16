@@ -23,6 +23,7 @@ type Props = {
   dayGroups: DayGroup[];
   onAnchorChange: (date: Date) => void;
   onRowPress: (row: AgendaRowT, dateIso: string) => void;
+  onPillPress?: (row: AgendaRowT) => void;
   onSwipeAction: (row: AgendaRowT, dateIso: string, action: SwipeAction) => void;
   flexProgressByHabitId: Map<string, { count: number; target: number }>;
 };
@@ -33,6 +34,7 @@ export function Calendar3DayView({
   dayGroups,
   onAnchorChange,
   onRowPress,
+  onPillPress,
   onSwipeAction,
   flexProgressByHabitId,
 }: Props) {
@@ -82,6 +84,7 @@ export function Calendar3DayView({
             groupByIso={groupByIso}
             habitMap={habitMap}
             onRowPress={onRowPress}
+            onPillPress={onPillPress}
             onSwipeAction={onSwipeAction}
             flexProgressByHabitId={flexProgressByHabitId}
           />
@@ -96,6 +99,7 @@ function ColumnsPage({
   groupByIso,
   habitMap,
   onRowPress,
+  onPillPress,
   onSwipeAction,
   flexProgressByHabitId,
 }: {
@@ -103,6 +107,7 @@ function ColumnsPage({
   groupByIso: Map<string, DayGroup>;
   habitMap: Map<string, Habit>;
   onRowPress: (row: AgendaRowT, dateIso: string) => void;
+  onPillPress?: (row: AgendaRowT) => void;
   onSwipeAction: (row: AgendaRowT, dateIso: string, action: SwipeAction) => void;
   flexProgressByHabitId: Map<string, { count: number; target: number }>;
 }) {
@@ -132,6 +137,7 @@ function ColumnsPage({
             group={groupByIso.get(isoDate(d))}
             habitMap={habitMap}
             onRowPress={onRowPress}
+            onPillPress={onPillPress}
             onSwipeAction={onSwipeAction}
             onDrawerOpen={handleDrawerOpen}
             onDrawerClose={handleDrawerClose}
@@ -148,6 +154,7 @@ function DayColumn({
   group,
   habitMap,
   onRowPress,
+  onPillPress,
   onSwipeAction,
   onDrawerOpen,
   onDrawerClose,
@@ -157,6 +164,7 @@ function DayColumn({
   group: DayGroup | undefined;
   habitMap: Map<string, Habit>;
   onRowPress: (row: AgendaRowT, dateIso: string) => void;
+  onPillPress?: (row: AgendaRowT) => void;
   onSwipeAction: (row: AgendaRowT, dateIso: string, action: SwipeAction) => void;
   onDrawerOpen: (closeFn: () => void) => void;
   onDrawerClose: () => void;
@@ -184,6 +192,7 @@ function DayColumn({
         <HabitRowSwipeable
           row={row}
           dateIso={iso}
+          onPress={row.kind === 'completion' && onPillPress ? () => onPillPress(row) : undefined}
           onTrailingPress={() => onRowPress(row, iso)}
           onSwipeAction={(action) => onSwipeAction(row, iso, action)}
           onDrawerOpen={onDrawerOpen}
