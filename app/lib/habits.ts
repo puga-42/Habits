@@ -345,6 +345,12 @@ export function applyTimeToDate(d: Date, hhmm: string): Date {
 
 // ─── Date helpers ──────────────────────────────────────────────────────────
 
+// A habit can only be completed on today or a past date. Future dates are
+// rejected: you can't have done something that hasn't happened yet.
+export function canCompleteOn(dateIso: string, today: Date): boolean {
+  return dateIso <= isoDate(today);
+}
+
 export function isoDate(d: Date): string {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');

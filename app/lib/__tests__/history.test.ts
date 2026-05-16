@@ -274,7 +274,7 @@ describe('buildDayGroups (past)', () => {
     expect(groups[1].rows).toHaveLength(1);
   });
 
-  it('groups flex completions by the local date of completed_at', () => {
+  it('does not emit a row for a flex completion on a past day (flex shows as one pill, not per-tap rows)', () => {
     const completion = mkFlex('c1', gym, '2026-05-11', '2026-05-13T18:30:00Z');
     const groups = buildDayGroups(
       ['2026-05-13'],
@@ -283,9 +283,7 @@ describe('buildDayGroups (past)', () => {
       [],
       MAY_14,
     );
-    expect(groups[0].rows).toHaveLength(1);
-    const row = groups[0].rows[0];
-    if (row.kind === 'completion') expect(row.isFlex).toBe(true);
+    expect(groups[0].rows).toEqual([]);
   });
 
   it('applies an edit override to the displayed title/icon/color', () => {
@@ -440,11 +438,151 @@ describe('buildDayGroups (today + future)', () => {
     expect(groups[1].rows).toEqual([]);
   });
 
-  it('renders flex completions on today as completion rows', () => {
-    const completion = mkFlex('c1', gym, '2026-05-11', '2026-05-13T18:00:00Z');
-    const groups = buildDayGroups([todayIso], [gym], [completion], [], TODAY);
+  it('does NOT render flex completions as individual completion rows on today (only the flex pill)', () => {
+    const completions = [
+      mkFlex('c1', gym, '2026-05-11', '2026-05-13T08:00:00Z'),
+      mkFlex('c2', gym, '2026-05-11', '2026-05-13T18:00:00Z'),
+    ];
+    const groups = buildDayGroups([todayIso], [gym], completions, [], TODAY);
+    const completionRows = groups[0].rows.filter((r) => r.kind === 'completion');
+    expect(completionRows).toEqual([]);
+    const flexRow = groups[0].rows.find((r) => r.kind === 'flex');
+    expect(flexRow).toBeDefined();
+    if (flexRow && flexRow.kind === 'flex') {
+      expect(flexRow.count).toBe(2);
+    }
+  });
+
+  it('flex pill count keeps incrementing past target (over-achievement) with no extra rows', () => {
+    const completions = [
+      mkFlex('c1', gym, '2026-05-11', '2026-05-12T08:00:00Z'),
+      mkFlex('c2', gym, '2026-05-11', '2026-05-12T18:00:00Z'),
+      mkFlex('c3', gym, '2026-05-11', '2026-05-13T08:00:00Z'),
+      mkFlex('c4', gym, '2026-05-11', '2026-05-13T12:00:00Z'),
+      mkFlex('c5', gym, '2026-05-11', '2026-05-13T18:00:00Z'),
+    ];
+    const groups = buildDayGroups([todayIso], [gym], completions, [], TODAY);
     expect(groups[0].rows).toHaveLength(1);
-    expect(groups[0].rows[0].kind).toBe('completion');
+    const row = groups[0].rows[0];
+    expect(row.kind).toBe('flex');
+    if (row.kind === 'flex') {
+      expect(row.count).toBe(5);
+      expect(row.target).toBe(3);
+    }
+  });
+});
+
+// ─── buildDayGroups: flex "log it" rows ────────────────────────────────────
+
+describe('buildDayGroups (flex log-it rows)', () => {
+  const TODAY = new Date(2026, 4, 13); // Wed May 13, 2026
+  const todayIso = isoDate(TODAY);
+
+  it('emits a flex row on today even when no completions exist (the bug fix)', () => {
+    const groups = buildDayGroups([todayIso], [gym], [], [], TODAY);
+    const flexRow = groups[0].rows.find((r) => r.kind === 'flex');
+    expect(flexRow).toBeDefined();
+    if (flexRow && flexRow.kind === 'flex') {
+      expect(flexRow.habitId).toBe(gym.id);
+      expect(flexRow.count).toBe(0);
+      expect(flexRow.target).toBe(3);
+      expect(flexRow.period).toBe('week');
+    }
+  });
+
+  it('still emits a flex row after the target has been hit (over-achievement)', () => {
+    // Three completions in the same week as TODAY (week of May 11).
+    const completions = [
+      mkFlex('c1', gym, '2026-05-11', '2026-05-11T18:00:00Z'),
+      mkFlex('c2', gym, '2026-05-11', '2026-05-12T18:00:00Z'),
+      mkFlex('c3', gym, '2026-05-11', '2026-05-13T08:00:00Z'),
+    ];
+    const groups = buildDayGroups([todayIso], [gym], completions, [], TODAY);
+    const flexRow = groups[0].rows.find((r) => r.kind === 'flex');
+    expect(flexRow).toBeDefined();
+    if (flexRow && flexRow.kind === 'flex') {
+      expect(flexRow.count).toBe(3);
+      expect(flexRow.target).toBe(3);
+    }
+  });
+
+  it('emits a flex row on a future day with the count for that day\'s containing period', () => {
+    // Future day in the same week as TODAY → count includes earlier-in-week completion.
+    const sameWeekFuture = '2026-05-15'; // Fri of week starting Mon May 11
+    const completions = [
+      mkFlex('c1', gym, '2026-05-11', '2026-05-12T18:00:00Z'),
+    ];
+    const groups = buildDayGroups([sameWeekFuture], [gym], completions, [], TODAY);
+    const flexRow = groups[0].rows.find((r) => r.kind === 'flex');
+    expect(flexRow).toBeDefined();
+    if (flexRow && flexRow.kind === 'flex') {
+      expect(flexRow.count).toBe(1);
+    }
+  });
+
+  it('a future day in a later week shows count 0 (its own period has no completions)', () => {
+    const nextWeekDay = '2026-05-20'; // Wed of next week
+    const completions = [
+      mkFlex('c1', gym, '2026-05-11', '2026-05-12T18:00:00Z'),
+    ];
+    const groups = buildDayGroups([nextWeekDay], [gym], completions, [], TODAY);
+    const flexRow = groups[0].rows.find((r) => r.kind === 'flex');
+    expect(flexRow).toBeDefined();
+    if (flexRow && flexRow.kind === 'flex') {
+      expect(flexRow.count).toBe(0);
+    }
+  });
+
+  it('does NOT emit a flex row on a past day', () => {
+    const pastIso = '2026-05-10';
+    const groups = buildDayGroups([pastIso], [gym], [], [], TODAY);
+    expect(groups[0].rows.find((r) => r.kind === 'flex')).toBeUndefined();
+  });
+
+  it('skips flex habits missing target_count or target_period', () => {
+    const broken: Habit = { ...gym, target_count: null };
+    const groups = buildDayGroups([todayIso], [broken], [], [], TODAY);
+    expect(groups[0].rows.find((r) => r.kind === 'flex')).toBeUndefined();
+  });
+
+  it('a daily flex row counts only that exact day\'s completions', () => {
+    const dailyHydrate: Habit = {
+      ...gym,
+      id: 'h-hydrate',
+      lineage_id: 'h-hydrate',
+      target_count: 8,
+      target_period: 'day',
+    };
+    const completions = [
+      mkFlex('c1', dailyHydrate, todayIso, '2026-05-13T09:00:00Z'),
+      mkFlex('c2', dailyHydrate, todayIso, '2026-05-13T11:00:00Z'),
+      // Yesterday's completion shouldn't count toward today.
+      mkFlex('c3', dailyHydrate, '2026-05-12', '2026-05-12T09:00:00Z'),
+    ];
+    const groups = buildDayGroups(
+      [todayIso],
+      [dailyHydrate],
+      completions,
+      [],
+      TODAY,
+    );
+    const flexRow = groups[0].rows.find((r) => r.kind === 'flex');
+    expect(flexRow).toBeDefined();
+    if (flexRow && flexRow.kind === 'flex') {
+      expect(flexRow.count).toBe(2);
+      expect(flexRow.period).toBe('day');
+    }
+  });
+
+  it('partitionRows places flex rows in the not-completed bucket', () => {
+    const completions = [
+      mkFlex('c1', gym, '2026-05-11', '2026-05-12T18:00:00Z'),
+    ];
+    const groups = buildDayGroups([todayIso], [gym], completions, [], TODAY);
+    const habitMap = new Map([[gym.id, gym]]);
+    const { notCompleted, completed } = partitionRows(groups[0].rows, habitMap);
+    expect(notCompleted.some((r) => r.kind === 'flex')).toBe(true);
+    expect(completed.some((r) => r.kind === 'flex')).toBe(false);
   });
 });
 

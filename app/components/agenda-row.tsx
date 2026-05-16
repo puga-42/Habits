@@ -15,6 +15,7 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import type { FlexPeriod } from '@/lib/habits';
 import type { AgendaRow as AgendaRowT } from '@/lib/history';
 
 const LONG_PRESS_MS = 300;
@@ -45,11 +46,15 @@ export function AgendaRow({
 }: Props) {
   const isSkip = row.kind === 'skip';
   const isCompletion = row.kind === 'completion';
+  const isFlex = row.kind === 'flex';
   const isFlexCompletion = isCompletion && row.isFlex;
 
   const habitColor = row.habit.color ?? FALLBACK_COLOR;
   const iconSize = compact ? 32 : 40;
   const emojiSize = compact ? 18 : 22;
+
+  // Subtitle text shown under the title for flex log-it rows: "2 / 3 this week".
+  const flexSubtitle = isFlex ? formatFlexProgress(row.count, row.target, row.period) : null;
 
   return (
     <Pressable
@@ -85,7 +90,11 @@ export function AgendaRow({
           numberOfLines={1}>
           {row.habit.title}
         </ThemedText>
-        {!compact && row.habit.description ? (
+        {!compact && flexSubtitle ? (
+          <ThemedText style={styles.description} numberOfLines={1}>
+            {flexSubtitle}
+          </ThemedText>
+        ) : !compact && row.habit.description ? (
           <ThemedText
             style={[styles.description, isSkip && styles.descriptionSkipped]}
             numberOfLines={1}>
@@ -95,7 +104,9 @@ export function AgendaRow({
       </View>
 
       <View style={styles.trailing}>
-        {isFlexCompletion && flexProgress ? (
+        {isFlex ? (
+          <FlexRing count={row.count} target={row.target} color={habitColor} />
+        ) : isFlexCompletion && flexProgress ? (
           <FlexRing count={flexProgress.count} target={flexProgress.target} color={habitColor} />
         ) : (
           <Marker kind={row.kind} color={habitColor} />
@@ -103,6 +114,11 @@ export function AgendaRow({
       </View>
     </Pressable>
   );
+}
+
+function formatFlexProgress(count: number, target: number, period: FlexPeriod): string {
+  const suffix = period === 'day' ? 'today' : period === 'week' ? 'this week' : 'this month';
+  return `${count} / ${target} ${suffix}`;
 }
 
 function Marker({

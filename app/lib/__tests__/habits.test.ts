@@ -1,4 +1,4 @@
-import { applySectionReorder, type Habit } from '../habits';
+import { applySectionReorder, canCompleteOn, type Habit } from '../habits';
 
 function h(id: string, sort_index: number, created_at = '2026-05-01T00:00:00Z'): Habit {
   return {
@@ -82,5 +82,25 @@ describe('applySectionReorder', () => {
     // slot. Baseline ordering: H1, H2, H3.
     const result = applySectionReorder(habits, ['H1']);
     expect(result.map((x) => x.id)).toEqual(['H1', 'H2', 'H3']);
+  });
+});
+
+describe('canCompleteOn', () => {
+  const today = new Date(2026, 4, 13); // May 13, 2026
+
+  it('allows completing on today', () => {
+    expect(canCompleteOn('2026-05-13', today)).toBe(true);
+  });
+
+  it('allows completing on a past day', () => {
+    expect(canCompleteOn('2026-05-10', today)).toBe(true);
+  });
+
+  it('rejects completing on a future day', () => {
+    expect(canCompleteOn('2026-05-14', today)).toBe(false);
+  });
+
+  it('rejects completing on a date far in the future', () => {
+    expect(canCompleteOn('2027-01-01', today)).toBe(false);
   });
 });

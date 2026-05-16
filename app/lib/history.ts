@@ -64,6 +64,18 @@ export type AgendaRow =
       habitId: string;
       habit: AgendaHabit;
       time: Date | null;
+    }
+  // A flex habit's persistent "log it" row. Always tappable, even after the
+  // period target is met — the app intentionally lets users record beyond the
+  // target so they can see when a goal is consistently exceeded.
+  | {
+      kind: 'flex';
+      habitId: string;
+      habit: AgendaHabit;
+      time: null;
+      period: FlexPeriod;
+      count: number;   // completions in this day's containing period
+      target: number;  // habit.target_count
     };
 
 export type DayGroup = {
@@ -206,6 +218,29 @@ export function buildDayGroups(
       const dayEnd = new Date(dayStart);
       dayEnd.setHours(23, 59, 59, 999);
 
+      // Flex habits: emit a persistent "log it" row per habit per day, with
+      // the count of completions in this day's containing period (week/month/
+      // day). The row is shown even after the target is met — over-target
+      // logging is a deliberate feature, not a bug.
+      for (const habit of habits) {
+        if (habit.kind !== 'flex') continue;
+        if (habit.target_count == null || habit.target_period == null) continue;
+        const periodStart = flexPeriodStartFor(dayIso, habit.target_period);
+        let count = 0;
+        for (const c of completions) {
+          if (c.habit_id === habit.id && c.period_start === periodStart) count++;
+        }
+        rows.push({
+          kind: 'flex',
+          habitId: habit.id,
+          habit: agendaHabitFor(habit),
+          time: null,
+          period: habit.target_period,
+          count,
+          target: habit.target_count,
+        });
+      }
+
       for (const habit of habits) {
         if (habit.kind !== 'scheduled') continue;
         const occurrences = expandHabit(habit, dayStart, dayEnd);
@@ -270,10 +305,13 @@ export function buildDayGroups(
       }
     }
 
-    // Any completions on this day not yet rendered: flex completions, or
-    // completions whose scheduled occurrence didn't match expansion (e.g.,
-    // habit was deleted or its RRULE changed). Still part of what happened.
+    // Any completions on this day not yet rendered. Flex completions are
+    // intentionally skipped — flex habits surface as a single "log it" pill
+    // whose count reflects the period total, not as one row per tap. This
+    // loop now exists only to catch scheduled completions whose occurrence
+    // didn't match expansion (e.g., habit was deleted or its RRULE changed).
     for (const c of dayCompletions) {
+      if (c.habits.kind === 'flex') continue;
       if (handledCompletionIds.has(c.id)) continue;
       const editOverride = dayOverrides.find(
         (o) =>
@@ -411,6 +449,16 @@ function currentFlexPeriodStart(today: Date, period: FlexPeriod): string {
   if (period === 'week') return isoDate(weekStart(today));
   // month
   return isoDate(new Date(today.getFullYear(), today.getMonth(), 1));
+}
+
+// The ISO start-of-period for an arbitrary calendar day. Mirrors
+// `currentFlexPeriodStart` but works on any date, not just today — needed to
+// compute progress for flex "log it" rows on future days.
+export function flexPeriodStartFor(dayIso: string, period: FlexPeriod): string {
+  const d = parseIsoToLocalMidnight(dayIso);
+  if (period === 'day') return dayIso;
+  if (period === 'week') return isoDate(weekStart(d));
+  return isoDate(new Date(d.getFullYear(), d.getMonth(), 1));
 }
 
 // Same shape as completionCountByDate but works on raw completion rows so the

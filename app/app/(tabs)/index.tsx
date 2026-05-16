@@ -22,6 +22,7 @@ import { WeekStrip } from '@/components/week-strip';
 import { useAuth } from '@/lib/auth';
 import {
   applySectionReorder,
+  canCompleteOn,
   fetchHabits,
   isoDate,
   markFlexCompleted,
@@ -282,13 +283,15 @@ export default function CalendarScreen() {
       await load();
       return;
     }
+    if (!canCompleteOn(dateIso, today)) return;
+    if (row.kind === 'flex') {
+      await markFlexCompleted(row.habitId, userId);
+      await load();
+      return;
+    }
     const habit = habits.find((h) => h.id === row.habitId);
     if (!habit) return;
-    if (habit.kind === 'flex') {
-      await markFlexCompleted(habit.id, userId);
-    } else {
-      await markScheduledCompleted(habit.id, userId, dateIso);
-    }
+    await markScheduledCompleted(habit.id, userId, dateIso);
     await load();
   }
 

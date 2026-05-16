@@ -173,9 +173,9 @@ function WeekColumn({
 
 function CompactRow({ row }: { row: AgendaRowT }) {
   const isSkip = row.kind === 'skip';
-  const isScheduled = row.kind === 'scheduled';
   const isCompletion = row.kind === 'completion';
-  const marker = isSkip ? '—' : isScheduled ? '○' : '✓';
+  const isFlex = row.kind === 'flex';
+  const marker = isSkip ? '—' : isCompletion ? '✓' : isFlex ? '◔' : '○';
   return (
     <View
       style={[
