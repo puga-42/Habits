@@ -47,7 +47,7 @@ export function FeedCard({
     }
     buttons.push({ text: 'Mute this habit', onPress: onMute });
     buttons.push({ text: 'Cancel', style: 'cancel' });
-    Alert.alert('Options', undefined, buttons);
+    Alert.alert('Options', undefined, buttons, { cancelable: true });
   };
 
   const fallbackColor = item.habit_color ?? 'rgba(127,127,127,0.45)';

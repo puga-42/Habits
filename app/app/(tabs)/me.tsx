@@ -57,6 +57,9 @@ export default function MeScreen() {
         <View style={styles.section}>
           <ThemedText type="defaultSemiBold">Signed in as</ThemedText>
           <ThemedText style={styles.muted}>{email}</ThemedText>
+          {profile && (
+            <ThemedText style={styles.handle}>@{profile.handle}</ThemedText>
+          )}
         </View>
 
         <View style={styles.section}>
@@ -151,6 +154,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   muted: { opacity: 0.6, fontSize: 14 },
+  handle: { opacity: 0.5, fontSize: 14, marginTop: 2 },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',

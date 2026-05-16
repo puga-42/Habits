@@ -1,9 +1,12 @@
 // Shared form fields used by both the create (`/habit/new`) and edit
 // (`/habit/[id]`) screens. The screens own their own header + save logic.
 
-import DateTimePicker from '@react-native-community/datetimepicker';
+import DateTimePicker, {
+  type DateTimePickerEvent,
+} from '@react-native-community/datetimepicker';
 import { useRouter } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { useState } from 'react';
+import { Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { useHabitForm } from '@/lib/habit-form';
@@ -72,14 +75,7 @@ export function HabitFormFields({ lockKind = false }: Props) {
             <ThemedText style={styles.rowValue}>{describeRrule(draft.recurrence)}</ThemedText>
             <ThemedText style={styles.chevron}>›</ThemedText>
           </Row>
-          <Row label="Starts">
-            <DateTimePicker
-              value={draft.startsOn}
-              mode="date"
-              display="compact"
-              onChange={(_e, date) => date && update({ startsOn: date })}
-            />
-          </Row>
+          <StartsOnRow value={draft.startsOn} onChange={(d) => update({ startsOn: d })} />
         </>
       ) : (
         <>
@@ -174,6 +170,37 @@ export function HabitFormFields({ lockKind = false }: Props) {
         ))}
       </View>
     </ScrollView>
+  );
+}
+
+function StartsOnRow({ value, onChange }: { value: Date; onChange: (d: Date) => void }) {
+  const [showPicker, setShowPicker] = useState(false);
+
+  function handleChange(e: DateTimePickerEvent, date?: Date) {
+    if (Platform.OS === 'android') setShowPicker(false);
+    if (date) onChange(date);
+  }
+
+  if (Platform.OS === 'android') {
+    return (
+      <>
+        <Row label="Starts" onPress={() => setShowPicker(true)}>
+          <ThemedText style={styles.rowValue}>
+            {value.toLocaleDateString()}
+          </ThemedText>
+          <ThemedText style={styles.chevron}>›</ThemedText>
+        </Row>
+        {showPicker && (
+          <DateTimePicker value={value} mode="date" display="default" onChange={handleChange} />
+        )}
+      </>
+    );
+  }
+
+  return (
+    <Row label="Starts">
+      <DateTimePicker value={value} mode="date" display="compact" onChange={handleChange} />
+    </Row>
   );
 }
 
