@@ -1,24 +1,298 @@
-import { StyleSheet } from 'react-native';
+// Feed tab — reverse-chronological stream of the viewer's own + friends'
+// visible completions. See /FEED_PLAN.md for the architectural details.
+
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  FlatList,
+  RefreshControl,
+  StyleSheet,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { FeedCard } from '@/components/feed-card';
+import { FeedCommentsSheet } from '@/components/feed-comments-sheet';
+import { FeedEmpty } from '@/components/feed-empty';
+import { FeedNewPill } from '@/components/feed-new-pill';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { useAuth } from '@/lib/auth';
+import {
+  applyLikeToggle,
+  blockUser,
+  fetchFeedPage,
+  likeCompletion,
+  mergeFeedPages,
+  muteHabit,
+  reportContent,
+  subscribeToFeed,
+  unlikeCompletion,
+  type FeedItem,
+} from '@/lib/feed';
+
+const PAGE_SIZE = 20;
 
 export default function FeedScreen() {
+  const { session } = useAuth();
+  const viewerId = session?.user.id ?? null;
+  const [items, setItems] = useState<FeedItem[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [reachedEnd, setReachedEnd] = useState(false);
+  const [paging, setPaging] = useState(false);
+  const [pendingNew, setPendingNew] = useState(0);
+  const [activeCommentTarget, setActiveCommentTarget] = useState<{
+    completionId: string;
+    ownerId: string;
+  } | null>(null);
+  const listRef = useRef<FlatList<FeedItem>>(null);
+  const isAtTopRef = useRef(true);
+  const now = useRef(new Date()).current;
+
+  const loadFirstPage = useCallback(async () => {
+    setLoading(true);
+    try {
+      const page = await fetchFeedPage(undefined, PAGE_SIZE);
+      setItems(page);
+      setReachedEnd(page.length < PAGE_SIZE);
+      setPendingNew(0);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (viewerId) loadFirstPage();
+  }, [viewerId, loadFirstPage]);
+
+  // Subscribe to Realtime while the feed screen is focused.
+  useFocusEffect(
+    useCallback(() => {
+      if (!viewerId) return;
+      const unsub = subscribeToFeed({
+        onCompletion: (event, id) => {
+          if (event === 'INSERT') {
+            // We don't yet know if this is in-feed (friends-only RLS), so
+            // re-fetch only if user is at top, otherwise nudge the pill.
+            if (isAtTopRef.current) {
+              loadFirstPage();
+            } else {
+              setPendingNew((n) => n + 1);
+            }
+          } else if (event === 'DELETE') {
+            setItems((prev) => prev.filter((i) => i.id !== id));
+          }
+        },
+        onLike: (event, completionId) => {
+          setItems((prev) =>
+            prev.map((i) =>
+              i.id === completionId
+                ? applyLikeToggle(i, event === 'INSERT' ? true : i.viewer_liked)
+                : i,
+            ),
+          );
+          // The above keeps viewer_liked sticky; refetch the page for count
+          // accuracy on the next pull-to-refresh.
+        },
+        onComment: (event, completionId) => {
+          setItems((prev) =>
+            prev.map((i) =>
+              i.id === completionId
+                ? {
+                    ...i,
+                    comment_count:
+                      event === 'INSERT'
+                        ? i.comment_count + 1
+                        : event === 'DELETE'
+                          ? Math.max(0, i.comment_count - 1)
+                          : i.comment_count,
+                  }
+                : i,
+            ),
+          );
+        },
+        onCommentLike: () => {
+          // Card-level state doesn't include comment-like aggregates.
+        },
+      });
+      return unsub;
+    }, [viewerId, loadFirstPage]),
+  );
+
+  const refresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await loadFirstPage();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [loadFirstPage]);
+
+  const loadMore = useCallback(async () => {
+    if (paging || reachedEnd || items.length === 0) return;
+    const last = items[items.length - 1];
+    setPaging(true);
+    try {
+      const next = await fetchFeedPage(
+        { completed_at: last.completed_at, id: last.id },
+        PAGE_SIZE,
+      );
+      setItems((prev) => mergeFeedPages(prev, next));
+      if (next.length < PAGE_SIZE) setReachedEnd(true);
+    } finally {
+      setPaging(false);
+    }
+  }, [items, paging, reachedEnd]);
+
+  const handleToggleLike = useCallback(
+    async (item: FeedItem) => {
+      if (!viewerId) return;
+      const next = !item.viewer_liked;
+      setItems((prev) =>
+        prev.map((i) => (i.id === item.id ? applyLikeToggle(i, next) : i)),
+      );
+      try {
+        if (next) await likeCompletion(item.id, viewerId);
+        else await unlikeCompletion(item.id, viewerId);
+      } catch {
+        setItems((prev) =>
+          prev.map((i) => (i.id === item.id ? applyLikeToggle(i, !next) : i)),
+        );
+      }
+    },
+    [viewerId],
+  );
+
+  const handleScrollToTop = useCallback(() => {
+    listRef.current?.scrollToOffset({ offset: 0, animated: true });
+    loadFirstPage();
+  }, [loadFirstPage]);
+
+  if (!viewerId) {
+    return (
+      <ThemedView style={styles.root}>
+        <SafeAreaView edges={['top']} style={styles.content}>
+          <ThemedText type="title">Feed</ThemedText>
+        </SafeAreaView>
+      </ThemedView>
+    );
+  }
+
+  const showEmpty = !loading && items.length === 0;
+
   return (
     <ThemedView style={styles.root}>
-      <SafeAreaView edges={['top']} style={styles.content}>
-        <ThemedText type="title">Feed</ThemedText>
-        <ThemedText style={styles.placeholder}>
-          Your friends&apos; completions, with inline photos and videos.
-        </ThemedText>
+      <SafeAreaView edges={['top']} style={styles.safe}>
+        <View style={styles.header}>
+          <ThemedText type="title">Feed</ThemedText>
+        </View>
+
+        {loading && items.length === 0 ? (
+          <View style={styles.center}>
+            <ActivityIndicator />
+          </View>
+        ) : showEmpty ? (
+          <FeedEmpty />
+        ) : (
+          <FlatList
+            ref={listRef}
+            data={items}
+            keyExtractor={(i) => i.id}
+            renderItem={({ item }) => (
+              <FeedCard
+                item={item}
+                viewerId={viewerId}
+                now={now}
+                onToggleLike={() => handleToggleLike(item)}
+                onOpenComments={() =>
+                  setActiveCommentTarget({
+                    completionId: item.id,
+                    ownerId: item.owner_id,
+                  })
+                }
+                onReport={() =>
+                  reportContent(viewerId, {
+                    kind: 'completion',
+                    id: item.id,
+                  })
+                }
+                onBlock={() =>
+                  blockUser(viewerId, item.owner_id).then(loadFirstPage)
+                }
+                onMute={() =>
+                  muteHabit(viewerId, item.habit_id).then(loadFirstPage)
+                }
+              />
+            )}
+            ItemSeparatorComponent={Separator}
+            // Stories rail hook: an empty header today, slotted with a
+            // <FeedStoriesRail /> in the follow-up plan.
+            ListHeaderComponent={null}
+            ListFooterComponent={
+              paging ? (
+                <View style={styles.footer}>
+                  <ActivityIndicator />
+                </View>
+              ) : null
+            }
+            onScroll={(e) => {
+              isAtTopRef.current = e.nativeEvent.contentOffset.y < 60;
+            }}
+            scrollEventThrottle={120}
+            onEndReached={loadMore}
+            onEndReachedThreshold={0.4}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={refresh} />
+            }
+          />
+        )}
+
+        <FeedNewPill count={pendingNew} onPress={handleScrollToTop} />
+
+        <FeedCommentsSheet
+          visible={activeCommentTarget !== null}
+          completionId={activeCommentTarget?.completionId ?? null}
+          completionOwnerId={activeCommentTarget?.ownerId ?? null}
+          onClose={() => setActiveCommentTarget(null)}
+          onCountChange={(delta) => {
+            if (!activeCommentTarget) return;
+            setItems((prev) =>
+              prev.map((i) =>
+                i.id === activeCommentTarget.completionId
+                  ? {
+                      ...i,
+                      comment_count: Math.max(0, i.comment_count + delta),
+                    }
+                  : i,
+              ),
+            );
+          }}
+        />
       </SafeAreaView>
     </ThemedView>
   );
 }
 
+function Separator() {
+  return <View style={styles.separator} />;
+}
+
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  content: { flex: 1, paddingHorizontal: 20, paddingTop: 16, gap: 8 },
-  placeholder: { opacity: 0.6, marginTop: 24 },
+  safe: { flex: 1 },
+  content: { flex: 1, paddingHorizontal: 20, paddingTop: 16 },
+  header: {
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 6,
+  },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  separator: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(127,127,127,0.25)',
+    marginHorizontal: 14,
+  },
+  footer: { paddingVertical: 18, alignItems: 'center' },
 });

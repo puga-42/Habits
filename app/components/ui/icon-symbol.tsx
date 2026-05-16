@@ -20,6 +20,15 @@ const MAPPING = {
   'rectangle.stack.fill': 'dynamic-feed',
   'person.2.fill': 'people',
   'person.crop.circle.fill': 'account-circle',
+  heart: 'favorite-border',
+  'heart.fill': 'favorite',
+  'bubble.right': 'mode-comment',
+  ellipsis: 'more-horiz',
+  xmark: 'close',
+  'arrow.up': 'arrow-upward',
+  'paperplane.fill': 'send',
+  'play.fill': 'play-arrow',
+  bell: 'notifications-none',
 } as IconMapping;
 
 /**
