@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { useThemeColor } from '@/hooks/use-theme-color';
 import {
   signInWithApple,
   signInWithEmail,
@@ -21,6 +22,8 @@ import {
 } from '@/lib/sign-in';
 
 export default function SignInScreen() {
+  const textColor = useThemeColor({}, 'text');
+  const inputBg = useThemeColor({ light: '#fff', dark: 'rgba(255,255,255,0.08)' }, 'background');
   const [busy, setBusy] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -74,7 +77,7 @@ export default function SignInScreen() {
             </View>
             <View style={styles.buttonContainer}>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { color: textColor, backgroundColor: inputBg }]}
                 placeholder="Email"
                 placeholderTextColor="#999"
                 autoCapitalize="none"
@@ -84,7 +87,7 @@ export default function SignInScreen() {
                 onChangeText={setEmail}
               />
               <TextInput
-                style={styles.input}
+                style={[styles.input, { color: textColor, backgroundColor: inputBg }]}
                 placeholder="Password"
                 placeholderTextColor="#999"
                 autoCapitalize="none"
@@ -148,8 +151,6 @@ const styles = StyleSheet.create({
     borderColor: '#ccc',
     paddingHorizontal: 16,
     fontSize: 16,
-    color: '#000',
-    backgroundColor: '#fff',
   },
   emailButton: {
     height: 50,

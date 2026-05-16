@@ -1,15 +1,20 @@
-// Day view: shows one day at a time, with horizontal swipe (via PagerView)
-// to move +/-1 day. Each page hosts a single DraggableFlatList whose data
-// is the day's rows interleaved with a non-draggable "Completed" header
-// item. Drag-to-reorder works inside either section; cross-section drops
-// are reverted via onDragEnd validation.
+// Day view: shows one day at a time, with horizontal swipe to move +/-1 day.
+// Uses a native horizontal ScrollView (pagingEnabled) for swipe navigation —
+// iOS resolves directional gesture conflicts between the outer horizontal
+// scroll and nested vertical DraggableFlatLists natively.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import {
+  Dimensions,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+  StyleSheet,
+  View,
+} from 'react-native';
 import DraggableFlatList, {
   type RenderItemParams,
 } from 'react-native-draggable-flatlist';
-import PagerView from 'react-native-pager-view';
+import { ScrollView } from 'react-native-gesture-handler';
 
 import { HabitRowSwipeable } from '@/components/habit-row-swipeable';
 import { ThemedText } from '@/components/themed-text';
@@ -29,6 +34,7 @@ type DayItem =
   | { kind: 'row'; row: AgendaRowT; section: Section };
 
 const SNAPPY_DROP = { damping: 30, stiffness: 700, mass: 0.6 };
+const SCREEN_WIDTH = Dimensions.get('window').width;
 
 type Props = {
   anchorDate: Date;
@@ -57,7 +63,9 @@ export function CalendarDayView({
   onSwipeAction,
   onReorderSection,
 }: Props) {
-  const pagerRef = useRef<PagerView>(null);
+  const scrollRef = useRef<any>(null);
+  const outerScrollRef = useRef<any>(null);
+  const isResetting = useRef(false);
 
   const pageDates = useMemo(() => {
     const out: Date[] = [];
@@ -71,8 +79,27 @@ export function CalendarDayView({
   }, [anchorDate]);
 
   useEffect(() => {
-    pagerRef.current?.setPageWithoutAnimation(1);
+    scrollRef.current?.scrollTo({ x: SCREEN_WIDTH, animated: false });
   }, [anchorDate]);
+
+  const handleScrollEnd = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      if (isResetting.current) {
+        isResetting.current = false;
+        return;
+      }
+      const x = e.nativeEvent.contentOffset.x;
+      const page = Math.round(x / SCREEN_WIDTH);
+      if (page === 1) return;
+      isResetting.current = true;
+      const direction = page === 0 ? -1 : 1;
+      const next = new Date(anchorDate);
+      next.setDate(anchorDate.getDate() + direction);
+      next.setHours(0, 0, 0, 0);
+      onAnchorChange(next);
+    },
+    [anchorDate, onAnchorChange],
+  );
 
   const groupByIso = useMemo(() => {
     const m = new Map<string, DayGroup>();
@@ -87,17 +114,22 @@ export function CalendarDayView({
   }, [habits]);
 
   return (
-    <PagerView
-      ref={pagerRef}
-      initialPage={1}
-      style={styles.pager}
-      onPageSelected={(e) => {
-        const idx = e.nativeEvent.position;
-        if (idx === 1) return;
-        onAnchorChange(pageDates[idx]);
-      }}>
+    <ScrollView
+      ref={(node) => {
+        scrollRef.current = node;
+        outerScrollRef.current = node;
+      }}
+      horizontal
+      pagingEnabled
+      showsHorizontalScrollIndicator={false}
+      scrollEventThrottle={16}
+      onMomentumScrollEnd={handleScrollEnd}
+      contentOffset={{ x: SCREEN_WIDTH, y: 0 }}
+      bounces={false}
+      waitFor={[]}
+    >
       {pageDates.map((d, idx) => (
-        <View key={idx} style={styles.page} collapsable={false}>
+        <View key={idx} style={styles.page}>
           <DayContent
             date={d}
             group={groupByIso.get(isoDate(d))}
@@ -107,10 +139,11 @@ export function CalendarDayView({
             onPillPress={onPillPress}
             onSwipeAction={onSwipeAction}
             onReorderSection={onReorderSection}
+            simultaneousHandlers={outerScrollRef}
           />
         </View>
       ))}
-    </PagerView>
+    </ScrollView>
   );
 }
 
@@ -123,6 +156,7 @@ function DayContent({
   onPillPress,
   onSwipeAction,
   onReorderSection,
+  simultaneousHandlers,
 }: {
   date: Date;
   group: DayGroup | undefined;
@@ -136,6 +170,7 @@ function DayContent({
     section: Section,
     newRows: AgendaRowT[],
   ) => void;
+  simultaneousHandlers?: React.Ref<any> | React.Ref<any>[];
 }) {
   const iso = isoDate(date);
   const rows = group?.rows ?? [];
@@ -281,13 +316,14 @@ function DayContent({
       contentContainerStyle={styles.scrollContent}
       ItemSeparatorComponent={ItemSeparator}
       keyboardShouldPersistTaps="handled"
+      simultaneousHandlers={simultaneousHandlers}
+      activationDistance={10}
     />
   );
 }
 
 const styles = StyleSheet.create({
-  pager: { flex: 1 },
-  page: { flex: 1 },
+  page: { width: SCREEN_WIDTH, flex: 1 },
   scrollRoot: { flex: 1 },
   scrollContent: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 120 },
   itemSeparator: { height: 10 },

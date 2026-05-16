@@ -9,6 +9,7 @@ import { useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { useThemeColor } from '@/hooks/use-theme-color';
 import { useHabitForm } from '@/lib/habit-form';
 import type { FlexPeriod, Visibility } from '@/lib/habits';
 import { describeRrule } from '@/lib/recurrence';
@@ -30,6 +31,7 @@ type Props = {
 export function HabitFormFields({ lockKind = false }: Props) {
   const router = useRouter();
   const { draft, update } = useHabitForm();
+  const textColor = useThemeColor({}, 'text');
 
   return (
     <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
@@ -41,9 +43,23 @@ export function HabitFormFields({ lockKind = false }: Props) {
           onChangeText={(t) => update({ title: t })}
           placeholder="e.g. Meditate"
           placeholderTextColor="rgba(127,127,127,0.5)"
-          style={styles.input}
+          style={[styles.input, { color: textColor }]}
           autoFocus={!draft.title}
           returnKeyType="done"
+        />
+      </View>
+
+      {/* Description */}
+      <View style={styles.section}>
+        <ThemedText style={styles.label}>Description</ThemedText>
+        <TextInput
+          value={draft.description}
+          onChangeText={(t) => update({ description: t })}
+          placeholder="Optional — what's this habit about?"
+          placeholderTextColor="rgba(127,127,127,0.5)"
+          style={[styles.input, styles.textArea, { color: textColor }]}
+          multiline
+          textAlignVertical="top"
         />
       </View>
 
@@ -88,7 +104,7 @@ export function HabitFormFields({ lockKind = false }: Props) {
                 update({ targetCount: isNaN(n) ? 0 : n });
               }}
               keyboardType="number-pad"
-              style={styles.input}
+              style={[styles.input, { color: textColor }]}
             />
           </View>
           <View style={styles.section}>
@@ -238,7 +254,10 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     borderColor: 'rgba(127,127,127,0.3)',
-    color: '#000',
+  },
+  textArea: {
+    minHeight: 80,
+    paddingTop: 10,
   },
   segment: {
     flexDirection: 'row',

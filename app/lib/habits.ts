@@ -145,6 +145,7 @@ export async function unmarkCompleted(completionId: string): Promise<void> {
 // scheduled/flex split is decided by the caller.
 export type HabitInsert = {
   title: string;
+  description?: string | null;
   kind: HabitKind;
   icon: string;
   color: string;

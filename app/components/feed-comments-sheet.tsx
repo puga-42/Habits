@@ -20,6 +20,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { FeedCommentRow } from '@/components/feed-comment-row';
 import { ThemedText } from '@/components/themed-text';
+import { useThemeColor } from '@/hooks/use-theme-color';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useAuth } from '@/lib/auth';
@@ -52,6 +53,7 @@ export function FeedCommentsSheet({
   onCountChange,
 }: Props) {
   const { session } = useAuth();
+  const textColor = useThemeColor({}, 'text');
   const viewerId = session?.user.id ?? null;
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(false);
@@ -219,7 +221,7 @@ export function FeedCommentsSheet({
                     onChangeText={setInput}
                     placeholder="Add a comment…"
                     placeholderTextColor="rgba(127,127,127,0.6)"
-                    style={styles.input}
+                    style={[styles.input, { color: textColor }]}
                     multiline
                     maxLength={500}
                   />
@@ -295,7 +297,6 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     backgroundColor: 'rgba(127,127,127,0.12)',
     fontSize: 15,
-    color: '#000',
   },
   sendButton: {
     width: 40,

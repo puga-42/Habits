@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { useThemeColor } from '@/hooks/use-theme-color';
 import { useHabitForm } from '@/lib/habit-form';
 import {
   WEEKDAYS,
@@ -25,6 +26,7 @@ const PATTERN_OPTIONS: Array<{ key: Pattern; label: string }> = [
 export default function RecurrenceScreen() {
   const router = useRouter();
   const { draft, update } = useHabitForm();
+  const textColor = useThemeColor({}, 'text');
   const { recurrence } = draft;
 
   function setPattern(pattern: Pattern) {
@@ -110,7 +112,7 @@ export default function RecurrenceScreen() {
                   setInterval(isNaN(n) || n < 1 ? 1 : n);
                 }}
                 keyboardType="number-pad"
-                style={styles.input}
+                style={[styles.input, { color: textColor }]}
               />
             </View>
           )}
@@ -180,7 +182,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     borderColor: 'rgba(127,127,127,0.3)',
-    color: '#000',
   },
   previewBox: {
     gap: 4,
