@@ -12,6 +12,7 @@ import {
   nextMonth,
   partitionRows,
   prevMonth,
+  swipeActionsForRow,
   weekDatesFrom,
   type AgendaRow,
   type CompletionWithHabit,
@@ -1080,5 +1081,55 @@ describe('densityBucket', () => {
   });
   it('treats negative counts as 0', () => {
     expect(densityBucket(-1)).toBe(0);
+  });
+});
+
+// ─── swipeActionsForRow ───────────────────────────────────────────────────
+
+describe('swipeActionsForRow', () => {
+  const habit = { id: 'h1', title: 'H', description: null, icon: null, color: null };
+
+  it('returns [skip] for a scheduled (open) row', () => {
+    const row: AgendaRow = { kind: 'scheduled', habitId: 'h1', habit, time: null };
+    expect(swipeActionsForRow(row)).toEqual(['skip']);
+  });
+
+  it('returns [reset] for a completed scheduled row', () => {
+    const row: AgendaRow = { kind: 'completion', id: 'c1', habit, time: null, isFlex: false };
+    expect(swipeActionsForRow(row)).toEqual(['reset']);
+  });
+
+  it('returns [reset] for a completed flex row (isFlex completion)', () => {
+    const row: AgendaRow = { kind: 'completion', id: 'c1', habit, time: null, isFlex: true };
+    expect(swipeActionsForRow(row)).toEqual(['reset']);
+  });
+
+  it('returns [reset] for a skipped row', () => {
+    const row: AgendaRow = { kind: 'skip', habitId: 'h1', habit, time: null };
+    expect(swipeActionsForRow(row)).toEqual(['reset']);
+  });
+
+  it('returns [reset] for a flex row with count > 0', () => {
+    const row: AgendaRow = {
+      kind: 'flex', habitId: 'h1', habit, time: null,
+      period: 'week', count: 2, target: 3,
+    };
+    expect(swipeActionsForRow(row)).toEqual(['reset']);
+  });
+
+  it('returns [reset] for a flex row at target (full ring)', () => {
+    const row: AgendaRow = {
+      kind: 'flex', habitId: 'h1', habit, time: null,
+      period: 'week', count: 3, target: 3,
+    };
+    expect(swipeActionsForRow(row)).toEqual(['reset']);
+  });
+
+  it('returns [] for a flex row with count 0', () => {
+    const row: AgendaRow = {
+      kind: 'flex', habitId: 'h1', habit, time: null,
+      period: 'week', count: 0, target: 3,
+    };
+    expect(swipeActionsForRow(row)).toEqual([]);
   });
 });

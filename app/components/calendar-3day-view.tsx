@@ -1,20 +1,20 @@
 // 3-day view: three day columns side by side; swipe horizontally to advance
 // by 3 days. Today is the leftmost column on first open. Each column shows
 // open habits on top and completed/skipped below (muted). No drag-reorder
-// in this view — the columns are too tight for the handle. Use Day or
-// Schedule view to reorder.
+// in this view — the columns are too tight for the handle.
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import PagerView from 'react-native-pager-view';
 
-import { AgendaRow } from '@/components/agenda-row';
+import { HabitRowSwipeable } from '@/components/habit-row-swipeable';
 import { ThemedText } from '@/components/themed-text';
 import { isoDate, type Habit } from '@/lib/habits';
 import {
   partitionRows,
   type AgendaRow as AgendaRowT,
   type DayGroup,
+  type SwipeAction,
 } from '@/lib/history';
 
 type Props = {
@@ -23,6 +23,7 @@ type Props = {
   dayGroups: DayGroup[];
   onAnchorChange: (date: Date) => void;
   onRowPress: (row: AgendaRowT, dateIso: string) => void;
+  onSwipeAction: (row: AgendaRowT, dateIso: string, action: SwipeAction) => void;
   flexProgressByHabitId: Map<string, { count: number; target: number }>;
 };
 
@@ -32,6 +33,7 @@ export function Calendar3DayView({
   dayGroups,
   onAnchorChange,
   onRowPress,
+  onSwipeAction,
   flexProgressByHabitId,
 }: Props) {
   const pagerRef = useRef<PagerView>(null);
@@ -80,6 +82,7 @@ export function Calendar3DayView({
             groupByIso={groupByIso}
             habitMap={habitMap}
             onRowPress={onRowPress}
+            onSwipeAction={onSwipeAction}
             flexProgressByHabitId={flexProgressByHabitId}
           />
         </View>
@@ -93,12 +96,14 @@ function ColumnsPage({
   groupByIso,
   habitMap,
   onRowPress,
+  onSwipeAction,
   flexProgressByHabitId,
 }: {
   start: Date;
   groupByIso: Map<string, DayGroup>;
   habitMap: Map<string, Habit>;
   onRowPress: (row: AgendaRowT, dateIso: string) => void;
+  onSwipeAction: (row: AgendaRowT, dateIso: string, action: SwipeAction) => void;
   flexProgressByHabitId: Map<string, { count: number; target: number }>;
 }) {
   const days = [0, 1, 2].map((off) => {
@@ -106,6 +111,16 @@ function ColumnsPage({
     d.setDate(start.getDate() + off);
     return d;
   });
+
+  // Shared drawer coordination across the three columns.
+  const closeCurrentDrawer = useRef<(() => void) | null>(null);
+  const handleDrawerOpen = useCallback((closeFn: () => void) => {
+    closeCurrentDrawer.current?.();
+    closeCurrentDrawer.current = closeFn;
+  }, []);
+  const handleDrawerClose = useCallback(() => {
+    closeCurrentDrawer.current = null;
+  }, []);
 
   return (
     <View style={styles.columnsRow}>
@@ -117,6 +132,9 @@ function ColumnsPage({
             group={groupByIso.get(isoDate(d))}
             habitMap={habitMap}
             onRowPress={onRowPress}
+            onSwipeAction={onSwipeAction}
+            onDrawerOpen={handleDrawerOpen}
+            onDrawerClose={handleDrawerClose}
             flexProgressByHabitId={flexProgressByHabitId}
           />
         </View>
@@ -130,12 +148,18 @@ function DayColumn({
   group,
   habitMap,
   onRowPress,
+  onSwipeAction,
+  onDrawerOpen,
+  onDrawerClose,
   flexProgressByHabitId,
 }: {
   date: Date;
   group: DayGroup | undefined;
   habitMap: Map<string, Habit>;
   onRowPress: (row: AgendaRowT, dateIso: string) => void;
+  onSwipeAction: (row: AgendaRowT, dateIso: string, action: SwipeAction) => void;
+  onDrawerOpen: (closeFn: () => void) => void;
+  onDrawerClose: () => void;
   flexProgressByHabitId: Map<string, { count: number; target: number }>;
 }) {
   const iso = isoDate(date);
@@ -157,9 +181,13 @@ function DayColumn({
     const habitId = row.kind === 'completion' ? row.habit.id : row.habitId;
     return (
       <View key={`${row.kind}-${idx}`} style={styles.rowWrap}>
-        <AgendaRow
+        <HabitRowSwipeable
           row={row}
-          onPress={() => onRowPress(row, iso)}
+          dateIso={iso}
+          onTrailingPress={() => onRowPress(row, iso)}
+          onSwipeAction={(action) => onSwipeAction(row, iso, action)}
+          onDrawerOpen={onDrawerOpen}
+          onDrawerClose={onDrawerClose}
           compact
           flexProgress={flexProgressByHabitId.get(habitId)}
         />
@@ -172,6 +200,7 @@ function DayColumn({
       onLayout={(e) => setContainerH(e.nativeEvent.layout.height)}
       onContentSizeChange={(_w, h) => setContentH(h)}
       scrollEnabled={scrollEnabled}
+      onScrollBeginDrag={() => onDrawerOpen(() => {})}
       contentContainerStyle={styles.columnContent}>
       {notCompleted.map(renderRow)}
       {completed.length > 0 && notCompleted.length > 0 && (

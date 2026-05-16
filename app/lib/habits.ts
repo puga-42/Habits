@@ -378,3 +378,51 @@ export function weekStart(d: Date): Date {
   x.setDate(x.getDate() + shift);
   return x;
 }
+
+// ─── Swipe-action mutations ───────────────────────────────────────────────
+
+export async function skipOccurrence(
+  habitId: string,
+  occurrenceDate: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from('habit_overrides')
+    .upsert(
+      { habit_id: habitId, occurrence_date: occurrenceDate, kind: 'skip', patch: null },
+      { onConflict: 'habit_id,occurrence_date' },
+    );
+  if (error) throw error;
+}
+
+export async function unskipOccurrence(
+  habitId: string,
+  occurrenceDate: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from('habit_overrides')
+    .delete()
+    .eq('habit_id', habitId)
+    .eq('occurrence_date', occurrenceDate)
+    .eq('kind', 'skip');
+  if (error) throw error;
+}
+
+export async function unmarkLastFlexInPeriod(
+  habitId: string,
+  periodStart: string,
+): Promise<void> {
+  const { data, error: fetchErr } = await supabase
+    .from('habit_completions')
+    .select('id')
+    .eq('habit_id', habitId)
+    .eq('period_start', periodStart)
+    .order('created_at', { ascending: false })
+    .limit(1);
+  if (fetchErr) throw fetchErr;
+  if (!data || data.length === 0) return;
+  const { error } = await supabase
+    .from('habit_completions')
+    .delete()
+    .eq('id', data[0].id);
+  if (error) throw error;
+}

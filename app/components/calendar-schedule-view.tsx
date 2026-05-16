@@ -1,24 +1,13 @@
 // Schedule view: one continuous chronological list with sticky day headers
 // AND section-local drag-to-reorder, built on a single DraggableFlatList.
-//
-// Data is a flat array of mixed items: day headers, optional Completed
-// sub-headers, empty-day placeholders, and habit rows tagged with their day
-// and section. `stickyHeaderIndices` (a FlatList prop that DraggableFlatList
-// passes through) pins day headers as the user scrolls. `onDragEnd`
-// validates that a moved row's new position is still in the same day and
-// same section; invalid drops snap back via local state reset.
-//
-// "Load earlier" and "Load more" buttons live in
-// `ListHeaderComponent` / `ListFooterComponent` so they don't disrupt the
-// sticky-header indices.
 
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import DraggableFlatList, {
   type RenderItemParams,
 } from 'react-native-draggable-flatlist';
 
-import { AgendaRow } from '@/components/agenda-row';
+import { HabitRowSwipeable } from '@/components/habit-row-swipeable';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import type { Habit } from '@/lib/habits';
@@ -26,6 +15,7 @@ import {
   partitionRows,
   type AgendaRow as AgendaRowT,
   type DayGroup,
+  type SwipeAction,
 } from '@/lib/history';
 
 type Section = 'notCompleted' | 'completed';
@@ -46,6 +36,7 @@ type Props = {
   onLoadEarlier: () => void;
   onLoadMore: () => void;
   onRowPress: (row: AgendaRowT, dateIso: string) => void;
+  onSwipeAction: (row: AgendaRowT, dateIso: string, action: SwipeAction) => void;
   onReorderSection: (
     dateIso: string,
     section: Section,
@@ -61,6 +52,7 @@ export function CalendarScheduleView({
   onLoadEarlier,
   onLoadMore,
   onRowPress,
+  onSwipeAction,
   onReorderSection,
 }: Props) {
   const habitMap = useMemo(() => {
@@ -69,18 +61,22 @@ export function CalendarScheduleView({
     return m;
   }, [habits]);
 
-  // We render `data` directly from props on every render. The earlier
-  // approach mirrored this into local state via useEffect, which created an
-  // infinite re-render loop whenever `buildScheduleData` produced a new
-  // reference (every render) and the effect re-triggered itself.
   const data = useMemo(
     () => buildScheduleData(dayGroups, habitMap, todayIso),
     [dayGroups, habitMap, todayIso],
   );
 
-  // Bumped on invalid drops to force the DraggableFlatList to remount and
-  // reset its internal post-drag state back to the source data.
   const [generation, setGeneration] = useState(0);
+
+  // Drawer coordination.
+  const closeCurrentDrawer = useRef<(() => void) | null>(null);
+  const handleDrawerOpen = useCallback((closeFn: () => void) => {
+    closeCurrentDrawer.current?.();
+    closeCurrentDrawer.current = closeFn;
+  }, []);
+  const handleDrawerClose = useCallback(() => {
+    closeCurrentDrawer.current = null;
+  }, []);
 
   const stickyHeaderIndices = useMemo(
     () =>
@@ -131,9 +127,13 @@ export function CalendarScheduleView({
     const habitId =
       item.row.kind === 'completion' ? item.row.habit.id : item.row.habitId;
     return (
-      <AgendaRow
+      <HabitRowSwipeable
         row={item.row}
-        onPress={() => onRowPress(item.row, item.iso)}
+        dateIso={item.iso}
+        onTrailingPress={() => onRowPress(item.row, item.iso)}
+        onSwipeAction={(action) => onSwipeAction(item.row, item.iso, action)}
+        onDrawerOpen={handleDrawerOpen}
+        onDrawerClose={handleDrawerClose}
         onLongPress={drag}
         flexProgress={flexProgressByHabitId.get(habitId)}
         isActive={isActive}
@@ -150,8 +150,6 @@ export function CalendarScheduleView({
     from: number;
     to: number;
   }) => {
-    // No movement (e.g. user tapped the handle and released without dragging).
-    // Don't trigger an optimistic state update + network reorder for a no-op.
     if (from === to) return;
     const moved = newData[to];
     if (!moved || moved.kind !== 'row') {
@@ -160,8 +158,6 @@ export function CalendarScheduleView({
     }
     const ctx = contextAt(newData, to);
     if (ctx.day !== moved.iso || ctx.section !== moved.section) {
-      // Crossed a day or section boundary — force a remount so the lib
-      // resets to the source order.
       setGeneration((g) => g + 1);
       return;
     }
@@ -176,6 +172,7 @@ export function CalendarScheduleView({
       keyExtractor={keyExtractor}
       renderItem={renderItem}
       onDragEnd={onDragEnd}
+      onScrollBeginDrag={() => closeCurrentDrawer.current?.()}
       stickyHeaderIndices={stickyHeaderIndices}
       animationConfig={SNAPPY_DROP}
       autoscrollSpeed={0}
@@ -228,8 +225,6 @@ function buildScheduleData(
   return out;
 }
 
-// Walks from the start of the array to `index` to figure out which day and
-// section the item at `index` is currently sitting in.
 function contextAt(
   data: ScheduleItem[],
   index: number,

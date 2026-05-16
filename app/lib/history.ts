@@ -83,6 +83,23 @@ export type DayGroup = {
   rows: AgendaRow[];
 };
 
+// ─── Swipe-action helpers ─────────────────────────────────────────────────
+
+export type SwipeAction = 'reset' | 'skip';
+
+export function swipeActionsForRow(row: AgendaRow): SwipeAction[] {
+  switch (row.kind) {
+    case 'scheduled':
+      return ['skip'];
+    case 'completion':
+      return ['reset'];
+    case 'skip':
+      return ['reset'];
+    case 'flex':
+      return row.count > 0 ? ['reset'] : [];
+  }
+}
+
 // ─── Month grid + navigation ───────────────────────────────────────────────
 
 export function buildMonthGrid(
@@ -330,7 +347,7 @@ export function buildDayGroups(
           color: patch.color ?? c.habits.color,
         },
         time: new Date(c.completed_at),
-        isFlex: c.habits.kind === 'flex',
+        isFlex: false,
       });
       handledCompletionIds.add(c.id);
     }

@@ -4,14 +4,16 @@
 //   - title and optional description
 //   - trailing marker (○ / ✓ / —) or mini ring for flex habits
 //
-// Two gestures on the pill itself:
-//   - tap        → onPress (typically: mark complete / un-complete)
-//   - long-press → onLongPress (typically: activate DraggableFlatList reorder)
+// Gestures on the pill:
+//   - tap body      → no-op (completion moves to trailing press)
+//   - long-press    → onLongPress (activate DraggableFlatList reorder)
+//   - tap trailing  → onTrailingPress (mark complete / +1 flex)
 //
 // Views that don't support reorder simply omit onLongPress. Views with narrow
 // horizontal space (3day columns) pass `compact` to drop the description and
 // shrink the leading icon.
 
+import * as Haptics from 'expo-haptics';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
@@ -23,7 +25,7 @@ const FALLBACK_COLOR = 'rgba(127,127,127,0.45)';
 
 type Props = {
   row: AgendaRowT;
-  onPress?: () => void;
+  onTrailingPress?: () => void;
   onLongPress?: () => void;
   // Period progress for flex rows. When provided on a flex completion row,
   // the trailing area renders a quarter-step ring chart filled toward target.
@@ -39,7 +41,7 @@ type Props = {
 
 export function AgendaRow({
   row,
-  onPress,
+  onTrailingPress,
   onLongPress,
   flexProgress,
   compact = false,
@@ -56,15 +58,26 @@ export function AgendaRow({
   // Subtitle text shown under the title for flex log-it rows: "2 / 3 this week".
   const flexSubtitle = isFlex ? formatFlexProgress(row.count, row.target, row.period) : null;
 
+  // Trailing tap is actionable only for open scheduled rows and flex below target.
+  const trailingActionable =
+    (row.kind === 'scheduled' || (isFlex && row.count < row.target)) &&
+    !!onTrailingPress;
+
+  const handleTrailingPress = trailingActionable
+    ? () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        onTrailingPress!();
+      }
+    : undefined;
+
   return (
     <Pressable
-      onPress={onPress}
       onLongPress={onLongPress}
       delayLongPress={LONG_PRESS_MS}
       style={({ pressed }) => [
         styles.pill,
         compact && styles.pillCompact,
-        pressed && styles.pillPressed,
+        pressed && onLongPress && styles.pillPressed,
         isSkip && styles.pillSkipped,
       ]}>
       <View
@@ -103,7 +116,17 @@ export function AgendaRow({
         ) : null}
       </View>
 
-      <View style={styles.trailing}>
+      <Pressable
+        onPress={handleTrailingPress}
+        hitSlop={{ top: 11, bottom: 11, left: 11, right: 11 }}
+        accessibilityRole="button"
+        accessibilityLabel={trailingA11yLabel(row)}
+        accessibilityHint={trailingActionable ? trailingA11yHint(row) : undefined}
+        style={({ pressed }) => [
+          styles.trailing,
+          pressed && trailingActionable && styles.trailingPressed,
+          !trailingActionable && styles.trailingInert,
+        ]}>
         {isFlex ? (
           <FlexRing count={row.count} target={row.target} color={habitColor} />
         ) : isFlexCompletion && flexProgress ? (
@@ -111,9 +134,21 @@ export function AgendaRow({
         ) : (
           <Marker kind={row.kind} color={habitColor} />
         )}
-      </View>
+      </Pressable>
     </Pressable>
   );
+}
+
+function trailingA11yLabel(row: AgendaRowT): string {
+  if (row.kind === 'completion') return 'Completed';
+  if (row.kind === 'skip') return 'Skipped';
+  return `Complete ${row.habit.title}`;
+}
+
+function trailingA11yHint(row: AgendaRowT): string | undefined {
+  if (row.kind === 'scheduled') return 'Marks this habit complete';
+  if (row.kind === 'flex') return 'Adds one completion';
+  return undefined;
 }
 
 function formatFlexProgress(count: number, target: number, period: FlexPeriod): string {
@@ -206,6 +241,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  trailingPressed: { opacity: 0.6 },
+  trailingInert: { opacity: 0.5 },
   markerDim: { fontSize: 18, opacity: 0.5 },
   markerCheck: { fontSize: 18, fontWeight: '700' },
   ring: {

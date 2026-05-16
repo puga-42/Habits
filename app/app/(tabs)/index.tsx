@@ -28,7 +28,10 @@ import {
   markFlexCompleted,
   markScheduledCompleted,
   reorderHabits,
+  skipOccurrence,
   unmarkCompleted,
+  unmarkLastFlexInPeriod,
+  unskipOccurrence,
   type Habit,
   type HabitOverride,
 } from '@/lib/habits';
@@ -37,6 +40,7 @@ import {
   buildMonthGrid,
   countCompletionsByDate,
   fetchRange,
+  flexPeriodStartFor,
   flexProgressByHabit,
   monthLabel,
   nDayRange,
@@ -44,6 +48,7 @@ import {
   type AgendaRow,
   type CompletionWithHabit,
   type DayGroup,
+  type SwipeAction,
 } from '@/lib/history';
 import { fetchProfile, type Profile } from '@/lib/profile';
 
@@ -274,24 +279,42 @@ export default function CalendarScreen() {
     router.push('/me');
   }
 
-  async function handleRowPress(row: AgendaRow, dateIso: string) {
+  async function handleTrailingPress(row: AgendaRow, dateIso: string) {
     if (!userId) return;
-    if (row.kind === 'skip') return;
-    if (row.kind === 'completion') {
-      if (row.isFlex) return;
-      await unmarkCompleted(row.id);
+    if (!canCompleteOn(dateIso, today)) return;
+    if (row.kind === 'scheduled') {
+      await markScheduledCompleted(row.habitId, userId, dateIso);
       await load();
       return;
     }
-    if (!canCompleteOn(dateIso, today)) return;
-    if (row.kind === 'flex') {
+    if (row.kind === 'flex' && row.count < row.target) {
       await markFlexCompleted(row.habitId, userId);
       await load();
-      return;
     }
-    const habit = habits.find((h) => h.id === row.habitId);
-    if (!habit) return;
-    await markScheduledCompleted(habit.id, userId, dateIso);
+  }
+
+  async function handleSwipeAction(
+    row: AgendaRow,
+    dateIso: string,
+    action: SwipeAction,
+  ) {
+    if (!userId) return;
+    if (action === 'reset') {
+      if (row.kind === 'completion') {
+        await unmarkCompleted(row.id);
+      } else if (row.kind === 'skip') {
+        await unskipOccurrence(row.habitId, dateIso);
+      } else if (row.kind === 'flex' && row.count > 0) {
+        const habit = habits.find((h) => h.id === row.habitId);
+        if (!habit?.target_period) return;
+        const periodStart = flexPeriodStartFor(dateIso, habit.target_period);
+        await unmarkLastFlexInPeriod(row.habitId, periodStart);
+      }
+    } else if (action === 'skip') {
+      if (row.kind === 'scheduled') {
+        await skipOccurrence(row.habitId, dateIso);
+      }
+    }
     await load();
   }
 
@@ -424,7 +447,8 @@ export default function CalendarScreen() {
             dayGroups={dayGroups}
             flexProgressByHabitId={flexProgressByHabitId}
             onAnchorChange={setAnchorDate}
-            onRowPress={handleRowPress}
+            onRowPress={handleTrailingPress}
+            onSwipeAction={handleSwipeAction}
             onReorderSection={handleReorderSection}
           />
         ) : view === '3day' ? (
@@ -434,7 +458,8 @@ export default function CalendarScreen() {
             dayGroups={dayGroups}
             flexProgressByHabitId={flexProgressByHabitId}
             onAnchorChange={setAnchorDate}
-            onRowPress={handleRowPress}
+            onRowPress={handleTrailingPress}
+            onSwipeAction={handleSwipeAction}
           />
         ) : view === 'week' ? (
           <CalendarWeekView
@@ -460,7 +485,8 @@ export default function CalendarScreen() {
             flexProgressByHabitId={flexProgressByHabitId}
             onLoadEarlier={onScheduleLoadEarlier}
             onLoadMore={onScheduleLoadMore}
-            onRowPress={handleRowPress}
+            onRowPress={handleTrailingPress}
+            onSwipeAction={handleSwipeAction}
             onReorderSection={handleReorderSection}
           />
         ) : null}
