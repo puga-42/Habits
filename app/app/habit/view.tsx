@@ -151,7 +151,7 @@ const styles = StyleSheet.create({
   headerPlaceholder: { width: 40 },
   scroll: { padding: 20 },
   heroRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 24 },
-  heroIcon: { fontSize: 40, marginRight: 14 },
+  heroIcon: { fontSize: 40, lineHeight: 52, marginRight: 14 },
   heroText: { flex: 1 },
   title: { fontSize: 24 },
   description: { fontSize: 15, marginTop: 4, opacity: 0.7 },
