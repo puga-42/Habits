@@ -2,9 +2,11 @@ import {
   applyCommentLikeToggle,
   applyLikeToggle,
   formatRelativeTime,
+  mergeHabitActivityIntoFeed,
   mergeFeedPages,
   type Comment,
   type FeedItem,
+  type HabitActivityItem,
 } from '../feed';
 
 function makeItem(overrides: Partial<FeedItem> = {}): FeedItem {
@@ -157,5 +159,59 @@ describe('applyCommentLikeToggle', () => {
   it('is idempotent when already in the target state', () => {
     const liked = makeComment({ like_count: 1, viewer_liked: true });
     expect(applyCommentLikeToggle(liked, true)).toEqual(liked);
+  });
+});
+
+function makeActivity(overrides: Partial<HabitActivityItem> = {}): HabitActivityItem {
+  return {
+    id: 'a1',
+    habit_id: 'h1',
+    owner_id: 'u2',
+    event_type: 'created',
+    created_at: '2026-05-14T10:00:00Z',
+    owner_handle: 'alice',
+    owner_display_name: 'Alice',
+    owner_avatar_url: null,
+    habit_title: 'Morning run',
+    habit_icon: '🏃',
+    habit_color: '#10b981',
+    habit_kind: 'scheduled',
+    ...overrides,
+  };
+}
+
+describe('mergeHabitActivityIntoFeed', () => {
+  it('returns empty array for two empty inputs', () => {
+    expect(mergeHabitActivityIntoFeed([], [])).toEqual([]);
+  });
+
+  it('wraps completions with kind=completion', () => {
+    const result = mergeHabitActivityIntoFeed([makeItem()], []);
+    expect(result).toHaveLength(1);
+    expect(result[0].kind).toBe('completion');
+  });
+
+  it('wraps activity items with kind=habit_created', () => {
+    const result = mergeHabitActivityIntoFeed([], [makeActivity()]);
+    expect(result).toHaveLength(1);
+    expect(result[0].kind).toBe('habit_created');
+  });
+
+  it('sorts items by timestamp descending, newer first', () => {
+    const older = makeItem({ id: 'c1', completed_at: '2026-05-14T08:00:00Z' });
+    const newer = makeActivity({ id: 'a1', created_at: '2026-05-14T10:00:00Z' });
+    const result = mergeHabitActivityIntoFeed([older], [newer]);
+    expect(result[0].kind).toBe('habit_created');
+    expect(result[1].kind).toBe('completion');
+  });
+
+  it('uses id as tiebreaker when timestamps are equal', () => {
+    const ts = '2026-05-14T08:00:00Z';
+    const comp = makeItem({ id: 'zzz', completed_at: ts });
+    const act = makeActivity({ id: 'aaa', created_at: ts });
+    const result = mergeHabitActivityIntoFeed([comp], [act]);
+    // 'zzz' > 'aaa' so completion sorts first (id desc)
+    expect(result[0].kind).toBe('completion');
+    expect(result[1].kind).toBe('habit_created');
   });
 });

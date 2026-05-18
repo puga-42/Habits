@@ -2,7 +2,7 @@
 // visible completions. See /FEED_PLAN.md for the architectural details.
 
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -16,6 +16,7 @@ import { FeedCard } from '@/components/feed-card';
 import { FeedCommentsSheet } from '@/components/feed-comments-sheet';
 import { FeedEmpty } from '@/components/feed-empty';
 import { FeedNewPill } from '@/components/feed-new-pill';
+import { HabitCreatedCard } from '@/components/habit-created-card';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useAuth } from '@/lib/auth';
@@ -23,13 +24,17 @@ import {
   applyLikeToggle,
   blockUser,
   fetchFeedPage,
+  fetchHabitActivityPage,
   likeCompletion,
+  mergeHabitActivityIntoFeed,
   mergeFeedPages,
   muteHabit,
   reportContent,
   subscribeToFeed,
   unlikeCompletion,
+  type CombinedFeedEntry,
   type FeedItem,
+  type HabitActivityItem,
 } from '@/lib/feed';
 
 const PAGE_SIZE = 20;
@@ -39,6 +44,7 @@ export default function FeedScreen() {
   const router = useRouter();
   const viewerId = session?.user.id ?? null;
   const [items, setItems] = useState<FeedItem[]>([]);
+  const [activityItems, setActivityItems] = useState<HabitActivityItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [reachedEnd, setReachedEnd] = useState(false);
@@ -48,15 +54,24 @@ export default function FeedScreen() {
     completionId: string;
     ownerId: string;
   } | null>(null);
-  const listRef = useRef<FlatList<FeedItem>>(null);
+  const listRef = useRef<FlatList<CombinedFeedEntry>>(null);
+
+  const combinedItems = useMemo(
+    () => mergeHabitActivityIntoFeed(items, activityItems),
+    [items, activityItems],
+  );
   const isAtTopRef = useRef(true);
   const now = useRef(new Date()).current;
 
   const loadFirstPage = useCallback(async () => {
     setLoading(true);
     try {
-      const page = await fetchFeedPage(undefined, PAGE_SIZE);
+      const [page, activity] = await Promise.all([
+        fetchFeedPage(undefined, PAGE_SIZE),
+        fetchHabitActivityPage(50),
+      ]);
       setItems(page);
+      setActivityItems(activity);
       setReachedEnd(page.length < PAGE_SIZE);
       setPendingNew(0);
     } finally {
@@ -181,7 +196,7 @@ export default function FeedScreen() {
     );
   }
 
-  const showEmpty = !loading && items.length === 0;
+  const showEmpty = !loading && combinedItems.length === 0;
 
   return (
     <ThemedView style={styles.root}>
@@ -199,39 +214,45 @@ export default function FeedScreen() {
         ) : (
           <FlatList
             ref={listRef}
-            data={items}
-            keyExtractor={(i) => i.id}
-            renderItem={({ item }) => (
-              <FeedCard
-                item={item}
-                viewerId={viewerId}
-                now={now}
-                onToggleLike={() => handleToggleLike(item)}
-                onOpenComments={() =>
-                  setActiveCommentTarget({
-                    completionId: item.id,
-                    ownerId: item.owner_id,
-                  })
-                }
-                onEdit={
-                  item.owner_id === viewerId
-                    ? () => router.push(`/completion/${item.id}`)
-                    : undefined
-                }
-                onReport={() =>
-                  reportContent(viewerId, {
-                    kind: 'completion',
-                    id: item.id,
-                  })
-                }
-                onBlock={() =>
-                  blockUser(viewerId, item.owner_id).then(loadFirstPage)
-                }
-                onMute={() =>
-                  muteHabit(viewerId, item.habit_id).then(loadFirstPage)
-                }
-              />
-            )}
+            data={combinedItems}
+            keyExtractor={(entry) => `${entry.kind}:${entry.item.id}`}
+            renderItem={({ item: entry }) => {
+              if (entry.kind === 'habit_created') {
+                return <HabitCreatedCard item={entry.item} now={now} />;
+              }
+              const item = entry.item;
+              return (
+                <FeedCard
+                  item={item}
+                  viewerId={viewerId}
+                  now={now}
+                  onToggleLike={() => handleToggleLike(item)}
+                  onOpenComments={() =>
+                    setActiveCommentTarget({
+                      completionId: item.id,
+                      ownerId: item.owner_id,
+                    })
+                  }
+                  onEdit={
+                    item.owner_id === viewerId
+                      ? () => router.push(`/completion/${item.id}`)
+                      : undefined
+                  }
+                  onReport={() =>
+                    reportContent(viewerId, {
+                      kind: 'completion',
+                      id: item.id,
+                    })
+                  }
+                  onBlock={() =>
+                    blockUser(viewerId, item.owner_id).then(loadFirstPage)
+                  }
+                  onMute={() =>
+                    muteHabit(viewerId, item.habit_id).then(loadFirstPage)
+                  }
+                />
+              );
+            }}
             ItemSeparatorComponent={Separator}
             // Stories rail hook: an empty header today, slotted with a
             // <FeedStoriesRail /> in the follow-up plan.

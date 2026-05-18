@@ -68,6 +68,25 @@ export type FeedCursor = { completed_at: string; id: string };
 export type CommentCursor = { created_at: string; id: string };
 export type LikerCursor = { liked_at: string; user_id: string };
 
+export type HabitActivityItem = {
+  id: string;
+  habit_id: string;
+  owner_id: string;
+  event_type: 'created';
+  created_at: string;
+  owner_handle: string;
+  owner_display_name: string;
+  owner_avatar_url: string | null;
+  habit_title: string;
+  habit_icon: string | null;
+  habit_color: string | null;
+  habit_kind: HabitKind;
+};
+
+export type CombinedFeedEntry =
+  | { kind: 'completion'; item: FeedItem }
+  | { kind: 'habit_created'; item: HabitActivityItem };
+
 // ─── Page reads (single RPC each) ──────────────────────────────────────────
 
 export async function fetchFeedPage(
@@ -112,6 +131,37 @@ export async function fetchLikers(
   });
   if (error) throw error;
   return (data ?? []) as Liker[];
+}
+
+export async function fetchHabitActivityPage(limit = 50): Promise<HabitActivityItem[]> {
+  const { data, error } = await supabase
+    .from('habit_activity')
+    .select(`
+      id, habit_id, owner_id, event_type, created_at,
+      profiles:owner_id (handle, display_name, avatar_url),
+      habits:habit_id (title, icon, color, kind)
+    `)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return (data ?? []).map((row) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const r = row as any;
+    return {
+      id: r.id,
+      habit_id: r.habit_id,
+      owner_id: r.owner_id,
+      event_type: r.event_type as 'created',
+      created_at: r.created_at,
+      owner_handle: r.profiles.handle,
+      owner_display_name: r.profiles.display_name,
+      owner_avatar_url: r.profiles.avatar_url ?? null,
+      habit_title: r.habits.title,
+      habit_icon: r.habits.icon ?? null,
+      habit_color: r.habits.color ?? null,
+      habit_kind: r.habits.kind as HabitKind,
+    };
+  });
 }
 
 // ─── Mutations ─────────────────────────────────────────────────────────────
@@ -435,6 +485,24 @@ export function applyCommentLikeToggle(
       ? comment.like_count + 1
       : Math.max(0, comment.like_count - 1),
   };
+}
+
+// Merge completions and habit-creation activity into a single chronological
+// stream, sorted by their respective timestamps descending.
+export function mergeHabitActivityIntoFeed(
+  completions: FeedItem[],
+  activity: HabitActivityItem[],
+): CombinedFeedEntry[] {
+  const all: CombinedFeedEntry[] = [
+    ...completions.map((item): CombinedFeedEntry => ({ kind: 'completion', item })),
+    ...activity.map((item): CombinedFeedEntry => ({ kind: 'habit_created', item })),
+  ];
+  return all.sort((a, b) => {
+    const ta = a.kind === 'completion' ? a.item.completed_at : a.item.created_at;
+    const tb = b.kind === 'completion' ? b.item.completed_at : b.item.created_at;
+    if (ta !== tb) return ta < tb ? 1 : -1;
+    return a.item.id < b.item.id ? 1 : -1;
+  });
 }
 
 // Postgres unique-violation SQLSTATE.

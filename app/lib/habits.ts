@@ -164,11 +164,20 @@ export async function createHabit(
   ownerId: string,
   input: HabitInsert,
 ): Promise<void> {
+  const id = Crypto.randomUUID();
   const sortIndex = await nextSortIndex(ownerId);
   const { error } = await supabase
     .from('habits')
-    .insert({ owner_id: ownerId, sort_index: sortIndex, ...input });
+    .insert({ id, owner_id: ownerId, sort_index: sortIndex, ...input });
   if (error) throw error;
+  // Fire-and-forget: record creation in the activity feed.
+  // A failure here is non-critical — habit creation already succeeded.
+  supabase
+    .from('habit_activity')
+    .insert({ habit_id: id, owner_id: ownerId, event_type: 'created' })
+    .then(({ error: actErr }) => {
+      if (actErr) console.warn('habit_activity insert failed', actErr);
+    });
 }
 
 // Pure: next sort_index given the current list of existing indexes.
