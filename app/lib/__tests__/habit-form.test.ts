@@ -1,4 +1,4 @@
-import { draftToInsert, habitToDraft } from '../habit-form';
+import { defaultDraft, draftToInsert, habitToDraft } from '../habit-form';
 import type { Habit } from '../habits';
 
 const scheduledHabit: Habit = {
@@ -32,6 +32,22 @@ describe('habitToDraft', () => {
   it('defaults description to empty string when null', () => {
     const draft = habitToDraft({ ...scheduledHabit, description: null });
     expect(draft.description).toBe('');
+  });
+});
+
+describe('defaultDraft', () => {
+  it('uses public visibility when no argument provided', () => {
+    expect(defaultDraft().visibility).toBe('public');
+  });
+
+  it('uses the provided visibility', () => {
+    expect(defaultDraft('friends').visibility).toBe('friends');
+    expect(defaultDraft('private').visibility).toBe('private');
+    expect(defaultDraft('public').visibility).toBe('public');
+  });
+
+  it('starts with an empty title', () => {
+    expect(defaultDraft().title).toBe('');
   });
 });
 

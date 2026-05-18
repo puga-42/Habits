@@ -387,6 +387,19 @@ export function weekStart(d: Date): Date {
   return x;
 }
 
+// Sets visibility on every non-deleted habit owned by ownerId.
+export async function bulkUpdateHabitVisibility(
+  ownerId: string,
+  visibility: Visibility,
+): Promise<void> {
+  const { error } = await supabase
+    .from('habits')
+    .update({ visibility })
+    .eq('owner_id', ownerId)
+    .is('deleted_at', null);
+  if (error) throw error;
+}
+
 // ─── Swipe-action mutations ───────────────────────────────────────────────
 
 export async function skipOccurrence(

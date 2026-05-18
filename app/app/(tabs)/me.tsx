@@ -6,19 +6,29 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useAuth } from '@/lib/auth';
+import { bulkUpdateHabitVisibility } from '@/lib/habits';
 import {
   WEEKDAY_NAMES,
   fetchProfile,
+  updateDefaultVisibility,
   updateWeekStart,
   weekdayName,
   type Profile,
 } from '@/lib/profile';
+import type { Visibility } from '@/lib/habits';
+
+const VISIBILITY_OPTIONS: { value: Visibility; label: string }[] = [
+  { value: 'public', label: 'Public — anyone can see' },
+  { value: 'friends', label: 'Friends — only your friends' },
+  { value: 'private', label: 'Private — only you' },
+];
 
 export default function MeScreen() {
   const { session, signOut } = useAuth();
   const email = session?.user?.email ?? 'unknown';
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [pickerOpen, setPickerOpen] = useState(false);
+  const [weekPickerOpen, setWeekPickerOpen] = useState(false);
+  const [visPickerOpen, setVisPickerOpen] = useState(false);
 
   const load = useCallback(async () => {
     if (!session?.user.id) return;
@@ -38,13 +48,26 @@ export default function MeScreen() {
 
   async function onPickWeekStart(value: number) {
     if (!session?.user.id || !profile) return;
-    // Optimistic update
     setProfile({ ...profile, week_start: value });
     try {
       await updateWeekStart(session.user.id, value);
     } catch (err) {
-      // Revert on failure
       setProfile(profile);
+      Alert.alert('Could not save', err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function onPickDefaultVisibility(value: Visibility, applyToAll: boolean) {
+    if (!session?.user.id || !profile) return;
+    const prev = profile;
+    setProfile({ ...profile, default_visibility: value });
+    try {
+      await updateDefaultVisibility(session.user.id, value);
+      if (applyToAll) {
+        await bulkUpdateHabitVisibility(session.user.id, value);
+      }
+    } catch (err) {
+      setProfile(prev);
       Alert.alert('Could not save', err instanceof Error ? err.message : String(err));
     }
   }
@@ -65,11 +88,26 @@ export default function MeScreen() {
         <View style={styles.section}>
           <ThemedText style={styles.sectionTitle}>Calendar</ThemedText>
           <Pressable
-            onPress={() => setPickerOpen(true)}
+            onPress={() => setWeekPickerOpen(true)}
             style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}>
             <ThemedText style={styles.rowLabel}>Week starts on</ThemedText>
             <ThemedText style={styles.rowValue}>
               {profile ? weekdayName(profile.week_start) : '…'}
+            </ThemedText>
+          </Pressable>
+        </View>
+
+        <View style={styles.section}>
+          <ThemedText style={styles.sectionTitle}>Habits</ThemedText>
+          <Pressable
+            onPress={() => setVisPickerOpen(true)}
+            style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}>
+            <ThemedText style={styles.rowLabel}>Default visibility</ThemedText>
+            <ThemedText style={styles.rowValue}>
+              {profile
+                ? VISIBILITY_OPTIONS.find((o) => o.value === profile.default_visibility)
+                    ?.label.split(' — ')[0] ?? '…'
+                : '…'}
             </ThemedText>
           </Pressable>
         </View>
@@ -82,13 +120,23 @@ export default function MeScreen() {
       </SafeAreaView>
 
       <WeekStartPicker
-        visible={pickerOpen}
+        visible={weekPickerOpen}
         value={profile?.week_start ?? 0}
         onPick={(v) => {
           onPickWeekStart(v);
-          setPickerOpen(false);
+          setWeekPickerOpen(false);
         }}
-        onClose={() => setPickerOpen(false)}
+        onClose={() => setWeekPickerOpen(false)}
+      />
+
+      <DefaultVisibilityPicker
+        visible={visPickerOpen}
+        value={profile?.default_visibility ?? 'public'}
+        onPick={(v, applyToAll) => {
+          onPickDefaultVisibility(v, applyToAll);
+          setVisPickerOpen(false);
+        }}
+        onClose={() => setVisPickerOpen(false)}
       />
     </ThemedView>
   );
@@ -135,6 +183,65 @@ function WeekStartPicker({
                 <ThemedText style={pickerStyles.optionLabel}>{name}</ThemedText>
               </Pressable>
             ))}
+          </ScrollView>
+        </SafeAreaView>
+      </ThemedView>
+    </Modal>
+  );
+}
+
+function DefaultVisibilityPicker({
+  visible,
+  value,
+  onPick,
+  onClose,
+}: {
+  visible: boolean;
+  value: Visibility;
+  onPick: (v: Visibility, applyToAll: boolean) => void;
+  onClose: () => void;
+}) {
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={onClose}>
+      <ThemedView style={pickerStyles.root}>
+        <SafeAreaView edges={['top']} style={pickerStyles.content}>
+          <View style={pickerStyles.header}>
+            <View style={pickerStyles.headerSide} />
+            <ThemedText type="defaultSemiBold">Default visibility</ThemedText>
+            <Pressable onPress={onClose} hitSlop={12} style={pickerStyles.headerSide}>
+              <ThemedText style={pickerStyles.done}>Done</ThemedText>
+            </Pressable>
+          </View>
+          <ScrollView contentContainerStyle={pickerStyles.list}>
+            {VISIBILITY_OPTIONS.map((opt) => (
+              <Pressable
+                key={opt.value}
+                onPress={() => onPick(opt.value, false)}
+                style={({ pressed }) => [
+                  pickerStyles.option,
+                  pressed && pickerStyles.optionPressed,
+                ]}>
+                <ThemedText style={pickerStyles.radio}>
+                  {value === opt.value ? '●' : '○'}
+                </ThemedText>
+                <ThemedText style={pickerStyles.optionLabel}>{opt.label}</ThemedText>
+              </Pressable>
+            ))}
+            <View style={pickerStyles.divider} />
+            <Pressable
+              onPress={() => onPick(value, true)}
+              style={({ pressed }) => [
+                pickerStyles.applyAll,
+                pressed && pickerStyles.optionPressed,
+              ]}>
+              <ThemedText style={pickerStyles.applyAllText}>
+                Apply to all existing habits
+              </ThemedText>
+            </Pressable>
           </ScrollView>
         </SafeAreaView>
       </ThemedView>
@@ -203,4 +310,12 @@ const pickerStyles = StyleSheet.create({
   optionPressed: { opacity: 0.5 },
   radio: { fontSize: 18, width: 24 },
   optionLabel: { fontSize: 16 },
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(127,127,127,0.25)',
+    marginHorizontal: 20,
+    marginVertical: 8,
+  },
+  applyAll: { paddingVertical: 14, paddingHorizontal: 20 },
+  applyAllText: { fontSize: 16, color: '#7c3aed', fontWeight: '500' },
 });

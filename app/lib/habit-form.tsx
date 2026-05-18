@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 
 import {
   buildRrule,
@@ -26,7 +26,7 @@ export type HabitDraft = {
   visibility: Visibility;
 };
 
-function defaultDraft(): HabitDraft {
+export function defaultDraft(defaultVisibility: Visibility = 'public'): HabitDraft {
   return {
     title: '',
     description: '',
@@ -38,7 +38,7 @@ function defaultDraft(): HabitDraft {
     targetPeriod: 'week',
     color: '#7c3aed',
     icon: '✨',
-    visibility: 'private',
+    visibility: defaultVisibility,
   };
 }
 
@@ -118,18 +118,30 @@ type Ctx = {
 
 const HabitFormContext = createContext<Ctx | null>(null);
 
-export function HabitFormProvider({ children }: { children: ReactNode }) {
-  const [draft, setDraft] = useState<HabitDraft>(defaultDraft);
+export function HabitFormProvider({
+  children,
+  defaultVisibility = 'public',
+}: {
+  children: ReactNode;
+  defaultVisibility?: Visibility;
+}) {
+  const [draft, setDraft] = useState<HabitDraft>(() => defaultDraft(defaultVisibility));
+  const defaultVisRef = useRef(defaultVisibility);
 
-  const update = (patch: Partial<HabitDraft>) =>
-    setDraft((s) => ({ ...s, ...patch }));
+  useEffect(() => {
+    defaultVisRef.current = defaultVisibility;
+    // Apply to a fresh (untitled) draft when the profile preference loads.
+    setDraft((prev) =>
+      prev.title === '' ? { ...prev, visibility: defaultVisibility } : prev,
+    );
+  }, [defaultVisibility]);
 
   return (
     <HabitFormContext.Provider
       value={{
         draft,
-        update,
-        reset: () => setDraft(defaultDraft()),
+        update: (patch) => setDraft((s) => ({ ...s, ...patch })),
+        reset: () => setDraft(defaultDraft(defaultVisRef.current)),
         seedFromHabit: (habit) => setDraft(habitToDraft(habit)),
       }}>
       {children}
