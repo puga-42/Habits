@@ -31,7 +31,7 @@ jest.mock('../supabase', () => ({
   },
 }));
 
-const { signInWithApple, signInWithEmail, signUpWithEmail } =
+const { signInWithApple, signInWithEmail, signUpWithEmail, keyboardAvoidingBehavior } =
   require('../sign-in') as typeof import('../sign-in');
 
 // ---------------------------------------------------------------------------
@@ -186,5 +186,24 @@ describe('signUpWithEmail', () => {
       cancelled: false,
       message: 'Password should be at least 6 characters',
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// keyboardAvoidingBehavior
+// ---------------------------------------------------------------------------
+
+describe('keyboardAvoidingBehavior', () => {
+  it('returns "padding" for ios', () => {
+    expect(keyboardAvoidingBehavior('ios')).toBe('padding');
+  });
+
+  it('returns "height" for android', () => {
+    expect(keyboardAvoidingBehavior('android')).toBe('height');
+  });
+
+  it('returns undefined for other platforms', () => {
+    expect(keyboardAvoidingBehavior('web')).toBeUndefined();
+    expect(keyboardAvoidingBehavior('')).toBeUndefined();
   });
 });

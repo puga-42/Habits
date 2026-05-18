@@ -3,6 +3,14 @@ import * as Crypto from 'expo-crypto';
 
 import { supabase } from './supabase';
 
+export function keyboardAvoidingBehavior(
+  os: string,
+): 'padding' | 'height' | undefined {
+  if (os === 'ios') return 'padding';
+  if (os === 'android') return 'height';
+  return undefined;
+}
+
 export type SignInResult =
   | { ok: true }
   | { ok: false; cancelled: true }
