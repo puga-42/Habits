@@ -1,4 +1,4 @@
-import { validateHandle, type HandleValidation } from '../profile';
+import { validateHandle, validateDisplayName, type HandleValidation, type DisplayNameValidation } from '../profile';
 
 describe('validateHandle', () => {
   it('accepts a valid lowercase handle', () => {
@@ -58,5 +58,41 @@ describe('validateHandle', () => {
 
   it('accepts uppercase letters', () => {
     expect(validateHandle('Alice123')).toEqual({ ok: true });
+  });
+});
+
+describe('validateDisplayName', () => {
+  it('accepts a normal name', () => {
+    expect(validateDisplayName('Catherine')).toEqual<DisplayNameValidation>({ ok: true });
+  });
+
+  it('accepts a name with spaces', () => {
+    expect(validateDisplayName('Jane Doe')).toEqual({ ok: true });
+  });
+
+  it('accepts exactly 50 characters', () => {
+    expect(validateDisplayName('a'.repeat(50))).toEqual({ ok: true });
+  });
+
+  it('trims whitespace before validating', () => {
+    expect(validateDisplayName('  Alice  ')).toEqual({ ok: true });
+  });
+
+  it('rejects an empty string', () => {
+    const result = validateDisplayName('');
+    expect(result).toMatchObject({ ok: false });
+    expect((result as { ok: false; message: string }).message).toMatch(/cannot be empty/i);
+  });
+
+  it('rejects whitespace-only input', () => {
+    const result = validateDisplayName('   ');
+    expect(result).toMatchObject({ ok: false });
+    expect((result as { ok: false; message: string }).message).toMatch(/cannot be empty/i);
+  });
+
+  it('rejects a name longer than 50 characters', () => {
+    const result = validateDisplayName('a'.repeat(51));
+    expect(result).toMatchObject({ ok: false });
+    expect((result as { ok: false; message: string }).message).toMatch(/50 characters/);
   });
 });

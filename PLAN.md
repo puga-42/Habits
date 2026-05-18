@@ -1,32 +1,39 @@
-# Issue #7 — Custom handle
+# Plan: Allow users to set a display name; fix inconsistent name display
+
+Issue #9
 
 ## Problem
-Users cannot change their handle. Auto-generated handles (random strings) make it
-hard for friends to find each other by handle.
+- `profiles.display_name` is auto-generated (e.g. `user_d5xxxx`) on sign-in.
+- Users have no way to edit it.
+- Friend search shows the raw auto-generated display name above `@handle`,
+  which looks like an internal identifier.
+- The user's own profile page (Me tab) does not show the display name at all,
+  making the inconsistency visible: others see a weird name; you can't see or fix it.
 
 ## Approach
-Smallest viable slice: expose handle editing from the Me tab.
+No migration needed — `display_name text not null` already exists in `profiles`.
 
-## Files changed (≤ 10)
-1. `app/lib/profile.ts` — add `validateHandle` (pure) and `updateHandle` (mutation)
-2. `app/lib/__tests__/profile.test.ts` — new file; TDD `validateHandle`; smoke-tests `updateHandle`
-3. `app/app/(tabs)/me.tsx` — add an inline edit-handle row (same optimistic-update pattern as week_start)
+### 1. `lib/profile.ts` — add `validateDisplayName` + `updateDisplayName`
+- `validateDisplayName(name)`: trim, reject empty, cap at 50 chars.
+  Returns `DisplayNameValidation` discriminated union (mirrors `HandleValidation`).
+- `updateDisplayName(userId, name)`: calls `validateDisplayName`, then Supabase
+  `.update({ display_name })`.
 
-## No new migration needed
-The `handle` column already exists on `profiles` with:
-- `citext unique not null`
-- `CHECK (handle ~ '^[a-zA-Z0-9_]{3,30}$')`
+### 2. `lib/__tests__/profile.test.ts` — new tests (TDD first)
+- Empty / whitespace → error
+- > 50 chars → error
+- Valid name → ok
+- Trim before validating
 
-The DB enforces uniqueness and format server-side. The client adds a lightweight
-guard so the user sees a friendly message before the round-trip.
+### 3. `app/(tabs)/me.tsx`
+- Add "Display name" row to the Profile section (below Handle row).
+- Shows current `display_name` so users can see the auto-generated value.
+- Tapping opens new `DisplayNameEditor` modal (same pattern as `HandleEditor`).
+- Optimistic update + revert on error (same pattern as `onSaveHandle`).
 
-## Validation rules (mirrors DB CHECK constraint)
-- 3–30 characters (after trim)
-- Only `a-zA-Z0-9_`
-- Uniqueness is enforced by the DB; a Postgres 23505 error is surfaced as
-  "Handle already taken."
-
-## Constraints honoured
-- No streaks, no gamification.
+## Constraints
 - No new npm dependencies.
-- All new functions tested in `lib/__tests__/profile.test.ts`.
+- No streaks, gamification, or completion-rate copy.
+- Max 200 lines per file; me.tsx is currently ~337 lines — adding DisplayNameEditor
+  adds roughly 55 lines, staying within limit.
+- No migration files modified or created.
