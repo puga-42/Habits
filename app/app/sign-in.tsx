@@ -16,6 +16,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import {
+  keyboardAvoidingBehavior,
   signInWithApple,
   signInWithEmail,
   signUpWithEmail,
@@ -60,7 +61,7 @@ export default function SignInScreen() {
     <ThemedView style={styles.root}>
       <KeyboardAvoidingView
         style={styles.root}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={keyboardAvoidingBehavior(Platform.OS)}
       >
         <SafeAreaView edges={['top', 'bottom']} style={styles.root}>
           <ScrollView
