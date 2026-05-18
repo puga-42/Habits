@@ -1,48 +1,25 @@
-# Plan: Fix keyboard covering login fields on Android (Issue #1)
+# Fix: Habit detail view clips/crops selected habit icon
 
-## Problem
+## Issue
+#12 — When opening an existing habit's detail view, the habit icon (emoji) is
+partially clipped/cropped.
 
-On Android (reported: Pixel 10 Pro Fold), tapping the email or password input
-on the login screen causes the software keyboard to obscure the focused field.
-The user cannot see what they are typing.
-
-## Root Cause
-
-`sign-in.tsx` wraps content in `KeyboardAvoidingView` with:
-
-```tsx
-behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-```
-
-On Android the behavior is `undefined`, so `KeyboardAvoidingView` is a no-op.
-The `ScrollView` has nowhere to scroll because the container height never
-shrinks to account for the keyboard.
+## Root cause
+In `view.tsx`, `heroIcon` sets `fontSize: 40` with no explicit `lineHeight`.
+`ThemedText` with the default type applies `lineHeight: 24` from its base style
+— smaller than the 40 px font size. React Native clips text to the lineHeight
+bounding box, so tall emoji glyphs are cut off at the top or bottom.
 
 ## Fix
+Add `lineHeight: 52` to `heroIcon` (≈ 1.3 × fontSize). This gives emoji enough
+vertical room to render fully without clipping.
 
-1. Export a pure helper `keyboardAvoidingBehavior(os: string)` from
-   `app/lib/sign-in.ts` that returns `'padding'` on iOS, `'height'` on
-   Android, and `undefined` otherwise.
-
-2. Replace the inline ternary in `sign-in.tsx` with the helper.
-
-Using `'height'` on Android shrinks the `KeyboardAvoidingView` by the keyboard
-height, allowing the inner `ScrollView` to scroll the focused field into view.
+## Files changed
+- `app/app/habit/view.tsx` — `heroIcon` style: add `lineHeight: 52`
 
 ## Tests
+No new pure function is introduced; this is a layout-only style fix. The full
+test suite confirms no regressions.
 
-Add unit tests for `keyboardAvoidingBehavior` to
-`app/lib/__tests__/sign-in.test.ts` (covers ios / android / web).
-
-## Files Changed
-
-- `app/lib/sign-in.ts` — add `keyboardAvoidingBehavior`
-- `app/app/sign-in.tsx` — use the helper in `KeyboardAvoidingView`
-- `app/lib/__tests__/sign-in.test.ts` — new tests for the helper
-
-## Constraints Checked
-
-- No new npm dependencies.
-- No streaks, completion rates, or gamification.
-- Max 200 lines per file: all files remain well under the limit.
-- Existing migration files untouched.
+## Validation
+`cd app && npm run typecheck && npm run lint && npm run test`
