@@ -7,7 +7,7 @@ export type FeedbackValidationError =
   | { kind: 'too_long'; max: number; actual: number };
 
 export function validateFeedback(body: string): FeedbackValidationError | null {
-  const trimmed = body.trim();
+  const trimmed = (body ?? '').trim();
   if (trimmed.length === 0) return { kind: 'empty' };
   if (trimmed.length > MAX_FEEDBACK_LENGTH)
     return { kind: 'too_long', max: MAX_FEEDBACK_LENGTH, actual: trimmed.length };
@@ -15,6 +15,13 @@ export function validateFeedback(body: string): FeedbackValidationError | null {
 }
 
 export async function submitFeedback(body: string): Promise<void> {
+  const validationError = validateFeedback(body);
+  if (validationError) {
+    throw new Error(
+      validationError.kind === 'empty' ? 'Feedback cannot be empty.' : 'Feedback is too long.',
+    );
+  }
+
   const {
     data: { user },
   } = await supabase.auth.getUser();

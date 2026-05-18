@@ -54,6 +54,13 @@ serve(async (req) => {
     });
   }
 
+  if (!body || !body.trim()) {
+    await supabase.from("feedback").update({ status: "done" }).eq("id", id);
+    return new Response(JSON.stringify({ skipped: "empty body" }), {
+      status: 200,
+    });
+  }
+
   try {
     const triage = await triageFeedback(body);
     const issueNumber = await createGitHubIssue(triage, body);

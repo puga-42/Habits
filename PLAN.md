@@ -1,44 +1,49 @@
-# Plan: Fix keyboard covering login fields on Android (Issue #1)
+# Plan: Guard against null/empty feedback submissions (Issue #5)
 
 ## Problem
 
-On Android (reported: Pixel 10 Pro Fold), tapping the email or password input
-on the login screen causes the software keyboard to obscure the focused field.
-The user cannot see what they are typing.
+A feedback submission was received with body = the literal string `null`.
+The pipeline triaged it and created a GitHub issue with no actionable content.
 
-## Root Cause
+## Root Causes
 
-`sign-in.tsx` wraps content in `KeyboardAvoidingView` with:
+1. `submitFeedback` does not validate internally — it trusts the UI caller to
+   have run `validateFeedback` first. Any non-UI path (direct call, test,
+   automation) can bypass this and insert invalid data.
 
-```tsx
-behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-```
+2. `validateFeedback` does not guard against a runtime-null argument. If called
+   with `null` (e.g. via `as any` cast or from non-TypeScript code), it throws
+   instead of returning `{ kind: 'empty' }`.
 
-On Android the behavior is `undefined`, so `KeyboardAvoidingView` is a no-op.
-The `ScrollView` has nowhere to scroll because the container height never
-shrinks to account for the keyboard.
+3. `dispatch-feedback` does not skip records whose body is null or blank before
+   calling Claude. A null/empty body wastes API quota and creates noise issues.
 
 ## Fix
 
-1. Export a pure helper `keyboardAvoidingBehavior(os: string)` from
-   `app/lib/sign-in.ts` that returns `'padding'` on iOS, `'height'` on
-   Android, and `undefined` otherwise.
+1. **`lib/feedback.ts` — `validateFeedback`**: coerce `null`/`undefined` to `''`
+   via `(body ?? '').trim()` so a runtime-null returns `{ kind: 'empty' }`.
 
-2. Replace the inline ternary in `sign-in.tsx` with the helper.
+2. **`lib/feedback.ts` — `submitFeedback`**: call `validateFeedback` before
+   the DB insert and throw a descriptive error if invalid. Defense in depth.
 
-Using `'height'` on Android shrinks the `KeyboardAvoidingView` by the keyboard
-height, allowing the inner `ScrollView` to scroll the focused field into view.
+3. **`supabase/functions/dispatch-feedback/index.ts`**: after claiming the
+   record, check if `body` is falsy or blank and skip triage if so.
 
-## Tests
+## Tests (TDD — write failing tests first)
 
-Add unit tests for `keyboardAvoidingBehavior` to
-`app/lib/__tests__/sign-in.test.ts` (covers ios / android / web).
+New cases in `lib/__tests__/feedback.test.ts`:
+- `validateFeedback(null)` → `{ kind: 'empty' }`
+- `submitFeedback('')` → throws 'Feedback cannot be empty.'
+- `submitFeedback(body > 2000 chars)` → throws 'Feedback is too long.'
+- `submitFeedback` with unauthenticated user → throws 'Not authenticated'
+- `submitFeedback` valid input → calls `supabase.from('feedback').insert`
+- `submitFeedback` Supabase rate limit error → throws rate limit message
 
 ## Files Changed
 
-- `app/lib/sign-in.ts` — add `keyboardAvoidingBehavior`
-- `app/app/sign-in.tsx` — use the helper in `KeyboardAvoidingView`
-- `app/lib/__tests__/sign-in.test.ts` — new tests for the helper
+- `app/lib/feedback.ts`
+- `app/lib/__tests__/feedback.test.ts`
+- `supabase/functions/dispatch-feedback/index.ts`
 
 ## Constraints Checked
 
