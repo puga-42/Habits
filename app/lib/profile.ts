@@ -22,7 +22,6 @@ export function validateHandle(handle: string): HandleValidation {
 export type Profile = {
   id: string;
   handle: string;
-  display_name: string;
   avatar_url: string | null;
   week_start: number;
   created_at: string;
@@ -37,36 +36,6 @@ export async function fetchProfile(userId: string): Promise<Profile> {
     .single();
   if (error) throw error;
   return data as Profile;
-}
-
-// ─── Display name validation ──────────────────────────────────────────────
-
-const DISPLAY_NAME_MAX = 50;
-
-export type DisplayNameValidation =
-  | { ok: true }
-  | { ok: false; message: string };
-
-export function validateDisplayName(name: string): DisplayNameValidation {
-  const trimmed = name.trim();
-  if (trimmed.length === 0)
-    return { ok: false, message: 'Display name cannot be empty.' };
-  if (trimmed.length > DISPLAY_NAME_MAX)
-    return { ok: false, message: `Display name must be ${DISPLAY_NAME_MAX} characters or fewer.` };
-  return { ok: true };
-}
-
-export async function updateDisplayName(
-  userId: string,
-  name: string,
-): Promise<void> {
-  const validation = validateDisplayName(name);
-  if (!validation.ok) throw new Error(validation.message);
-  const { error } = await supabase
-    .from('profiles')
-    .update({ display_name: name.trim() })
-    .eq('id', userId);
-  if (error) throw error;
 }
 
 export async function updateHandle(

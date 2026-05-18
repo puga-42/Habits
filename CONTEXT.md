@@ -35,7 +35,7 @@ These are the load-bearing terms. Use them exactly.
 ## Data model (sketch)
 
 ```
-profiles(id, handle, display_name, avatar_url, created_at)
+profiles(id, handle, avatar_url, created_at)
 
 habits(
   id, owner_id, lineage_id, kind ('scheduled'|'flex'),
@@ -184,8 +184,8 @@ Hybrid delivery:
 ## Onboarding (resolved)
 
 - Sign in with Apple via Supabase Auth.
-- On first sign-in, **auto-generate a handle** (e.g., `purple-otter-3821`) and a placeholder display name from Apple-provided name.
-- User can edit handle and display name from profile. Handle uniqueness enforced at the DB level (unique index + reserved word list).
+- On first sign-in, **auto-generate a handle** (e.g., `user_d5xxxx`). Handle is the sole user name — there is no separate display name.
+- User can edit handle from profile. Handle uniqueness enforced at the DB level (unique index + reserved word list).
 
 ## Open questions (tracked for later)
 

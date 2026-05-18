@@ -14,7 +14,6 @@ export type FriendshipStatus =
 export type FriendProfile = {
   id: string;
   handle: string;
-  display_name: string;
   avatar_url: string | null;
 };
 
@@ -32,7 +31,7 @@ export type FriendRequest = {
   profile: FriendProfile;
 };
 
-export type FriendCursor = { display_name: string; id: string };
+export type FriendCursor = { handle: string; id: string };
 export type RequestCursor = { created_at: string; id: string };
 
 // ─── Queries (RPC-backed) ──────────────────────────────────────────────────
@@ -56,7 +55,7 @@ export async function fetchFriendsPage(
   limit = 30,
 ): Promise<FriendProfile[]> {
   const { data, error } = await supabase.rpc('fetch_friends_page', {
-    cursor_display_name: cursor?.display_name ?? null,
+    cursor_handle: cursor?.handle ?? null,
     cursor_id: cursor?.id ?? null,
     page_limit: limit,
   });
@@ -115,7 +114,7 @@ export async function sendFriendRequest(
     .insert({ from_user: fromUser, to_user: toUser })
     .select(
       `id, from_user, to_user, status, created_at, responded_at,
-       profiles:to_user (id, handle, display_name, avatar_url)`,
+       profiles:to_user (id, handle, avatar_url)`,
     )
     .single();
   if (error) throw error;
@@ -129,7 +128,6 @@ export async function sendFriendRequest(
     profiles: {
       id: string;
       handle: string;
-      display_name: string;
       avatar_url: string | null;
     };
   };
@@ -235,8 +233,8 @@ export function mergeFriendsPages(
   for (const p of existing) byId.set(p.id, p);
   for (const p of next) byId.set(p.id, p);
   return [...byId.values()].sort((a, b) => {
-    if (a.display_name !== b.display_name) {
-      return a.display_name < b.display_name ? -1 : 1;
+    if (a.handle !== b.handle) {
+      return a.handle < b.handle ? -1 : 1;
     }
     return a.id < b.id ? -1 : 1;
   });
@@ -270,7 +268,6 @@ function mapRequestRows(rows: unknown[]): FriendRequest[] {
       responded_at: string | null;
       profile_id: string;
       handle: string;
-      display_name: string;
       avatar_url: string | null;
     }>
   ).map((r) => ({
@@ -283,7 +280,6 @@ function mapRequestRows(rows: unknown[]): FriendRequest[] {
     profile: {
       id: r.profile_id,
       handle: r.handle,
-      display_name: r.display_name,
       avatar_url: r.avatar_url,
     },
   }));

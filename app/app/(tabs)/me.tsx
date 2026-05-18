@@ -9,10 +9,8 @@ import { useAuth } from '@/lib/auth';
 import {
   WEEKDAY_NAMES,
   fetchProfile,
-  updateDisplayName,
   updateHandle,
   updateWeekStart,
-  validateDisplayName,
   validateHandle,
   weekdayName,
   type Profile,
@@ -24,7 +22,6 @@ export default function MeScreen() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [handleEditorOpen, setHandleEditorOpen] = useState(false);
-  const [displayNameEditorOpen, setDisplayNameEditorOpen] = useState(false);
 
   const load = useCallback(async () => {
     if (!session?.user.id) return;
@@ -41,18 +38,6 @@ export default function MeScreen() {
       load();
     }, [load]),
   );
-
-  async function onSaveDisplayName(newName: string) {
-    if (!session?.user.id || !profile) return;
-    const prev = profile;
-    setProfile({ ...profile, display_name: newName.trim() });
-    try {
-      await updateDisplayName(session.user.id, newName);
-    } catch (err) {
-      setProfile(prev);
-      Alert.alert('Could not save', err instanceof Error ? err.message : String(err));
-    }
-  }
 
   async function onSaveHandle(newHandle: string) {
     if (!session?.user.id || !profile) return;
@@ -91,14 +76,6 @@ export default function MeScreen() {
 
         <View style={styles.section}>
           <ThemedText style={styles.sectionTitle}>Profile</ThemedText>
-          <Pressable
-            onPress={() => setDisplayNameEditorOpen(true)}
-            style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}>
-            <ThemedText style={styles.rowLabel}>Display name</ThemedText>
-            <ThemedText style={styles.rowValue} numberOfLines={1}>
-              {profile ? profile.display_name : '…'}
-            </ThemedText>
-          </Pressable>
           <Pressable
             onPress={() => setHandleEditorOpen(true)}
             style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}>
@@ -148,15 +125,6 @@ export default function MeScreen() {
         onClose={() => setHandleEditorOpen(false)}
       />
 
-      <DisplayNameEditor
-        visible={displayNameEditorOpen}
-        currentDisplayName={profile?.display_name ?? ''}
-        onSave={(n) => {
-          onSaveDisplayName(n);
-          setDisplayNameEditorOpen(false);
-        }}
-        onClose={() => setDisplayNameEditorOpen(false)}
-      />
     </ThemedView>
   );
 }
@@ -272,76 +240,6 @@ function HandleEditor({
             {error && <ThemedText style={editorStyles.error}>{error}</ThemedText>}
             <ThemedText style={editorStyles.hint}>
               3–30 characters: letters, numbers, and underscores only.
-            </ThemedText>
-          </View>
-        </SafeAreaView>
-      </ThemedView>
-    </Modal>
-  );
-}
-
-function DisplayNameEditor({
-  visible,
-  currentDisplayName,
-  onSave,
-  onClose,
-}: {
-  visible: boolean;
-  currentDisplayName: string;
-  onSave: (name: string) => void;
-  onClose: () => void;
-}) {
-  const [draft, setDraft] = useState(currentDisplayName);
-  const [error, setError] = useState<string | null>(null);
-
-  function handleOpen() {
-    setDraft(currentDisplayName);
-    setError(null);
-  }
-
-  function handleSave() {
-    const validation = validateDisplayName(draft);
-    if (!validation.ok) {
-      setError(validation.message);
-      return;
-    }
-    setError(null);
-    onSave(draft.trim());
-  }
-
-  return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={onClose}
-      onShow={handleOpen}>
-      <ThemedView style={editorStyles.root}>
-        <SafeAreaView edges={['top']} style={editorStyles.content}>
-          <View style={editorStyles.header}>
-            <Pressable onPress={onClose} hitSlop={12} style={editorStyles.headerSide}>
-              <ThemedText style={editorStyles.cancel}>Cancel</ThemedText>
-            </Pressable>
-            <ThemedText type="defaultSemiBold">Edit display name</ThemedText>
-            <Pressable onPress={handleSave} hitSlop={12} style={editorStyles.headerSide}>
-              <ThemedText style={editorStyles.save}>Save</ThemedText>
-            </Pressable>
-          </View>
-          <View style={editorStyles.body}>
-            <TextInput
-              style={editorStyles.input}
-              value={draft}
-              onChangeText={(t) => {
-                setDraft(t);
-                setError(null);
-              }}
-              autoCorrect={false}
-              maxLength={50}
-              placeholder="Your name"
-            />
-            {error && <ThemedText style={editorStyles.error}>{error}</ThemedText>}
-            <ThemedText style={editorStyles.hint}>
-              Up to 50 characters. Shown to friends when they search for you.
             </ThemedText>
           </View>
         </SafeAreaView>
