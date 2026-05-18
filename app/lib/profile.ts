@@ -22,7 +22,6 @@ export function validateHandle(handle: string): HandleValidation {
 export type Profile = {
   id: string;
   handle: string;
-  display_name: string;
   avatar_url: string | null;
   week_start: number;
   created_at: string;

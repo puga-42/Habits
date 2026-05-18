@@ -145,7 +145,7 @@ export default function FriendsScreen() {
     setPaging(true);
     try {
       const next = await fetchFriendsPage(
-        { display_name: last.display_name, id: last.id },
+        { handle: last.handle, id: last.id },
         FRIENDS_PAGE_SIZE,
       );
       setFriends((prev) => mergeFriendsPages(prev, next));

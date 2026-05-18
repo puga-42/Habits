@@ -31,13 +31,10 @@ export function FriendSearchResultRow({
     <View style={styles.row}>
       <FeedAvatar
         url={result.avatar_url}
-        displayName={result.display_name}
+        handle={result.handle}
         size={36}
       />
       <View style={styles.info}>
-        <ThemedText style={styles.displayName} numberOfLines={1}>
-          {result.display_name}
-        </ThemedText>
         <ThemedText style={styles.handle} numberOfLines={1}>
           @{result.handle}
         </ThemedText>
@@ -92,8 +89,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   info: { flex: 1 },
-  displayName: { fontSize: 15, fontWeight: '600' },
-  handle: { fontSize: 12, opacity: 0.55, marginTop: 1 },
+  handle: { fontSize: 15, fontWeight: '600' },
   button: {
     paddingHorizontal: 14,
     paddingVertical: 6,

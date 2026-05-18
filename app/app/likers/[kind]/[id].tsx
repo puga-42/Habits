@@ -92,14 +92,11 @@ export default function LikersScreen() {
             <View style={styles.row}>
               <FeedAvatar
                 url={item.avatar_url}
-                displayName={item.display_name}
+                handle={item.handle}
                 size={36}
               />
               <View style={styles.body}>
                 <ThemedText style={styles.name} numberOfLines={1}>
-                  {item.display_name}
-                </ThemedText>
-                <ThemedText style={styles.meta} numberOfLines={1}>
                   @{item.handle}
                 </ThemedText>
               </View>
@@ -139,7 +136,6 @@ const styles = StyleSheet.create({
   },
   body: { flex: 1 },
   name: { fontSize: 15, fontWeight: '600' },
-  meta: { fontSize: 13, opacity: 0.55, marginTop: 1 },
   time: { fontSize: 12, opacity: 0.5 },
   footer: { paddingVertical: 14, alignItems: 'center' },
 });

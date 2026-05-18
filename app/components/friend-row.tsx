@@ -13,7 +13,7 @@ type Props = {
 export function FriendRow({ friend, onUnfriend }: Props) {
   const openOverflow = () => {
     Alert.alert(
-      `Remove ${friend.display_name}?`,
+      `Remove @${friend.handle}?`,
       'You can send them a new request later.',
       [
         { text: 'Remove', style: 'destructive', onPress: onUnfriend },
@@ -26,13 +26,10 @@ export function FriendRow({ friend, onUnfriend }: Props) {
     <View style={styles.row}>
       <FeedAvatar
         url={friend.avatar_url}
-        displayName={friend.display_name}
+        handle={friend.handle}
         size={40}
       />
       <View style={styles.info}>
-        <ThemedText style={styles.displayName} numberOfLines={1}>
-          {friend.display_name}
-        </ThemedText>
         <ThemedText style={styles.handle} numberOfLines={1}>
           @{friend.handle}
         </ThemedText>
@@ -53,7 +50,6 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   info: { flex: 1 },
-  displayName: { fontSize: 15, fontWeight: '600' },
-  handle: { fontSize: 12, opacity: 0.55, marginTop: 1 },
+  handle: { fontSize: 15, fontWeight: '600' },
   menuButton: { padding: 4 },
 });

@@ -124,6 +124,7 @@ export default function MeScreen() {
         }}
         onClose={() => setHandleEditorOpen(false)}
       />
+
     </ThemedView>
   );
 }

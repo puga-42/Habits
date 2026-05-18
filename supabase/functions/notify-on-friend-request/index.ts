@@ -44,7 +44,7 @@ async function notifyNewRequest(
 ) {
   const { data: sender } = await supabase
     .from("profiles")
-    .select("display_name")
+    .select("handle")
     .eq("id", fromUserId)
     .single();
 
@@ -55,7 +55,7 @@ async function notifyNewRequest(
 
   if (!tokens?.length) return;
 
-  const name = sender?.display_name ?? "Someone";
+  const name = sender?.handle ? `@${sender.handle}` : "Someone";
   const messages = tokens.map((t: { token: string }) => ({
     to: t.token,
     title: "Friend request",
@@ -75,7 +75,7 @@ async function notifyAccepted(
 ) {
   const { data: accepter } = await supabase
     .from("profiles")
-    .select("display_name")
+    .select("handle")
     .eq("id", accepterId)
     .single();
 
@@ -86,7 +86,7 @@ async function notifyAccepted(
 
   if (!tokens?.length) return;
 
-  const name = accepter?.display_name ?? "Someone";
+  const name = accepter?.handle ? `@${accepter.handle}` : "Someone";
   const messages = tokens.map((t: { token: string }) => ({
     to: t.token,
     title: "Friend request accepted",

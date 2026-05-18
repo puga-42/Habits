@@ -30,7 +30,6 @@ export type FeedItem = {
   note: string | null;
   visibility_override: Visibility | null;
   owner_handle: string;
-  owner_display_name: string;
   owner_avatar_url: string | null;
   habit_title: string;
   habit_icon: string | null;
@@ -47,7 +46,6 @@ export type Comment = {
   completion_id: string;
   author_id: string;
   author_handle: string;
-  author_display_name: string;
   author_avatar_url: string | null;
   body: string;
   created_at: string;
@@ -59,7 +57,6 @@ export type Comment = {
 export type Liker = {
   user_id: string;
   handle: string;
-  display_name: string;
   avatar_url: string | null;
   liked_at: string;
 };
@@ -178,7 +175,7 @@ export async function postComment(
     })
     .select(
       `id, completion_id, author_id, body, created_at, updated_at,
-       profiles:author_id (handle, display_name, avatar_url)`,
+       profiles:author_id (handle, avatar_url)`,
     )
     .single();
   if (error) throw error;
@@ -191,7 +188,6 @@ export async function postComment(
     updated_at: string;
     profiles: {
       handle: string;
-      display_name: string;
       avatar_url: string | null;
     };
   };
@@ -200,7 +196,6 @@ export async function postComment(
     completion_id: row.completion_id,
     author_id: row.author_id,
     author_handle: row.profiles.handle,
-    author_display_name: row.profiles.display_name,
     author_avatar_url: row.profiles.avatar_url,
     body: row.body,
     created_at: row.created_at,
