@@ -1,48 +1,32 @@
-# Plan: Fix keyboard covering login fields on Android (Issue #1)
+# Issue #7 — Custom handle
 
 ## Problem
+Users cannot change their handle. Auto-generated handles (random strings) make it
+hard for friends to find each other by handle.
 
-On Android (reported: Pixel 10 Pro Fold), tapping the email or password input
-on the login screen causes the software keyboard to obscure the focused field.
-The user cannot see what they are typing.
+## Approach
+Smallest viable slice: expose handle editing from the Me tab.
 
-## Root Cause
+## Files changed (≤ 10)
+1. `app/lib/profile.ts` — add `validateHandle` (pure) and `updateHandle` (mutation)
+2. `app/lib/__tests__/profile.test.ts` — new file; TDD `validateHandle`; smoke-tests `updateHandle`
+3. `app/app/(tabs)/me.tsx` — add an inline edit-handle row (same optimistic-update pattern as week_start)
 
-`sign-in.tsx` wraps content in `KeyboardAvoidingView` with:
+## No new migration needed
+The `handle` column already exists on `profiles` with:
+- `citext unique not null`
+- `CHECK (handle ~ '^[a-zA-Z0-9_]{3,30}$')`
 
-```tsx
-behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-```
+The DB enforces uniqueness and format server-side. The client adds a lightweight
+guard so the user sees a friendly message before the round-trip.
 
-On Android the behavior is `undefined`, so `KeyboardAvoidingView` is a no-op.
-The `ScrollView` has nowhere to scroll because the container height never
-shrinks to account for the keyboard.
+## Validation rules (mirrors DB CHECK constraint)
+- 3–30 characters (after trim)
+- Only `a-zA-Z0-9_`
+- Uniqueness is enforced by the DB; a Postgres 23505 error is surfaced as
+  "Handle already taken."
 
-## Fix
-
-1. Export a pure helper `keyboardAvoidingBehavior(os: string)` from
-   `app/lib/sign-in.ts` that returns `'padding'` on iOS, `'height'` on
-   Android, and `undefined` otherwise.
-
-2. Replace the inline ternary in `sign-in.tsx` with the helper.
-
-Using `'height'` on Android shrinks the `KeyboardAvoidingView` by the keyboard
-height, allowing the inner `ScrollView` to scroll the focused field into view.
-
-## Tests
-
-Add unit tests for `keyboardAvoidingBehavior` to
-`app/lib/__tests__/sign-in.test.ts` (covers ios / android / web).
-
-## Files Changed
-
-- `app/lib/sign-in.ts` — add `keyboardAvoidingBehavior`
-- `app/app/sign-in.tsx` — use the helper in `KeyboardAvoidingView`
-- `app/lib/__tests__/sign-in.test.ts` — new tests for the helper
-
-## Constraints Checked
-
+## Constraints honoured
+- No streaks, no gamification.
 - No new npm dependencies.
-- No streaks, completion rates, or gamification.
-- Max 200 lines per file: all files remain well under the limit.
-- Existing migration files untouched.
+- All new functions tested in `lib/__tests__/profile.test.ts`.
