@@ -1,4 +1,4 @@
-import { applySectionReorder, canCompleteOn, type Habit } from '../habits';
+import { applySectionReorder, canCompleteOn, deleteUntilFromOccurrence, type Habit } from '../habits';
 
 function h(id: string, sort_index: number, created_at = '2026-05-01T00:00:00Z'): Habit {
   return {
@@ -82,6 +82,21 @@ describe('applySectionReorder', () => {
     // slot. Baseline ordering: H1, H2, H3.
     const result = applySectionReorder(habits, ['H1']);
     expect(result.map((x) => x.id)).toEqual(['H1', 'H2', 'H3']);
+  });
+});
+
+describe('deleteUntilFromOccurrence', () => {
+  it('returns one second before midnight of the occurrence date', () => {
+    // Deleting from 2026-05-18 means the habit should end at 2026-05-17T23:59:59.000Z
+    expect(deleteUntilFromOccurrence('2026-05-18')).toBe('2026-05-17T23:59:59.000Z');
+  });
+
+  it('handles month boundaries correctly', () => {
+    expect(deleteUntilFromOccurrence('2026-06-01')).toBe('2026-05-31T23:59:59.000Z');
+  });
+
+  it('handles year boundaries correctly', () => {
+    expect(deleteUntilFromOccurrence('2027-01-01')).toBe('2026-12-31T23:59:59.000Z');
   });
 });
 

@@ -387,6 +387,40 @@ export function weekStart(d: Date): Date {
   return x;
 }
 
+// ─── Delete mutations ──────────────────────────────────────────────────────
+
+// Pure: returns the `until` ISO string that caps a habit just before the given
+// occurrence date (i.e., one second before midnight of that date in UTC).
+export function deleteUntilFromOccurrence(occurrenceDate: string): string {
+  const [y, m, d] = occurrenceDate.split('-').map((n) => parseInt(n, 10));
+  const midnight = new Date(Date.UTC(y, m - 1, d, 0, 0, 0, 0));
+  const until = new Date(midnight.getTime() - 1000);
+  return until.toISOString();
+}
+
+// "All occurrences" — soft-delete by stamping deleted_at on the master row.
+export async function deleteHabitAll(habitId: string): Promise<void> {
+  const { error } = await supabase
+    .from('habits')
+    .update({ deleted_at: new Date().toISOString() })
+    .eq('id', habitId);
+  if (error) throw error;
+}
+
+// "This and future" — cap the habit's RRULE so it ends just before the
+// occurrence date. The occurrence and everything after it stops appearing.
+export async function deleteHabitFuture(
+  habitId: string,
+  occurrenceDate: string,
+): Promise<void> {
+  const until = deleteUntilFromOccurrence(occurrenceDate);
+  const { error } = await supabase
+    .from('habits')
+    .update({ until })
+    .eq('id', habitId);
+  if (error) throw error;
+}
+
 // ─── Swipe-action mutations ───────────────────────────────────────────────
 
 export async function skipOccurrence(

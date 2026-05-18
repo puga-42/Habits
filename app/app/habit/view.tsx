@@ -14,7 +14,14 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/lib/auth';
-import { fetchHabit, type Habit, type Visibility } from '@/lib/habits';
+import {
+  deleteHabitAll,
+  deleteHabitFuture,
+  fetchHabit,
+  skipOccurrence,
+  type Habit,
+  type Visibility,
+} from '@/lib/habits';
 import { describeRrule, parseRrule } from '@/lib/recurrence';
 
 const VISIBILITY_LABELS: Record<Visibility, string> = {
@@ -35,6 +42,7 @@ export default function HabitViewScreen() {
 
   const [habit, setHabit] = useState<Habit | null>(null);
   const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -55,6 +63,39 @@ export default function HabitViewScreen() {
     } else {
       router.push({ pathname: '/habit/[id]', params: { id: habit.id } });
     }
+  }, [habit, occurrenceDate, router]);
+
+  const handleDelete = useCallback(() => {
+    if (!habit) return;
+    const isRecurring =
+      habit.kind === 'scheduled' && !!habit.rrule && habit.rrule !== 'FREQ=DAILY;COUNT=1';
+
+    function runDelete(scope: 'this' | 'future' | 'all') {
+      setDeleting(true);
+      const op =
+        scope === 'this' && occurrenceDate ? skipOccurrence(habit!.id, occurrenceDate)
+        : scope === 'future' && occurrenceDate ? deleteHabitFuture(habit!.id, occurrenceDate)
+        : deleteHabitAll(habit!.id);
+      op.then(() => router.back())
+        .catch((err) =>
+          Alert.alert('Could not delete', err instanceof Error ? err.message : String(err)),
+        )
+        .finally(() => setDeleting(false));
+    }
+
+    if (!isRecurring || !occurrenceDate) {
+      Alert.alert(`Delete "${habit.title}"`, 'This habit will be permanently removed.', [
+        { text: 'Delete', style: 'destructive', onPress: () => runDelete('all') },
+        { text: 'Cancel', style: 'cancel' },
+      ]);
+      return;
+    }
+    Alert.alert(`Delete "${habit.title}"`, 'Remove:', [
+      { text: 'This occurrence only', onPress: () => runDelete('this') },
+      { text: 'This and future occurrences', style: 'destructive', onPress: () => runDelete('future') },
+      { text: 'All occurrences', style: 'destructive', onPress: () => runDelete('all') },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
   }, [habit, occurrenceDate, router]);
 
   if (loading || !habit) {
@@ -85,9 +126,14 @@ export default function HabitViewScreen() {
             {habit.title}
           </ThemedText>
           {isOwner ? (
-            <Pressable onPress={handleEdit} hitSlop={12}>
-              <ThemedText style={[styles.headerButton, styles.editButton]}>Edit</ThemedText>
-            </Pressable>
+            <View style={styles.headerActions}>
+              <Pressable onPress={handleDelete} disabled={deleting} hitSlop={12}>
+                <ThemedText style={[styles.headerButton, styles.deleteButton]}>Delete</ThemedText>
+              </Pressable>
+              <Pressable onPress={handleEdit} hitSlop={12}>
+                <ThemedText style={[styles.headerButton, styles.editButton]}>Edit</ThemedText>
+              </Pressable>
+            </View>
           ) : (
             <View style={styles.headerPlaceholder} />
           )}
@@ -147,6 +193,8 @@ const styles = StyleSheet.create({
   },
   headerButton: { fontSize: 16 },
   headerTitle: { flex: 1, textAlign: 'center', marginHorizontal: 8 },
+  headerActions: { flexDirection: 'row', gap: 12 },
+  deleteButton: { color: '#dc2626' },
   editButton: { fontWeight: '600', color: '#7c3aed' },
   headerPlaceholder: { width: 40 },
   scroll: { padding: 20 },
