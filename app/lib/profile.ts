@@ -1,5 +1,24 @@
 import { supabase } from './supabase';
 
+// ─── Handle validation ────────────────────────────────────────────────────
+
+const HANDLE_RE = /^[a-zA-Z0-9_]{3,30}$/;
+
+export type HandleValidation =
+  | { ok: true }
+  | { ok: false; message: string };
+
+export function validateHandle(handle: string): HandleValidation {
+  const trimmed = handle.trim();
+  if (trimmed.length < 3)
+    return { ok: false, message: 'Handle must be at least 3 characters.' };
+  if (trimmed.length > 30)
+    return { ok: false, message: 'Handle must be 30 characters or fewer.' };
+  if (!HANDLE_RE.test(trimmed))
+    return { ok: false, message: 'Handle may only contain letters, numbers, and underscores.' };
+  return { ok: true };
+}
+
 export type Profile = {
   id: string;
   handle: string;
@@ -18,6 +37,22 @@ export async function fetchProfile(userId: string): Promise<Profile> {
     .single();
   if (error) throw error;
   return data as Profile;
+}
+
+export async function updateHandle(
+  userId: string,
+  handle: string,
+): Promise<void> {
+  const validation = validateHandle(handle);
+  if (!validation.ok) throw new Error(validation.message);
+  const { error } = await supabase
+    .from('profiles')
+    .update({ handle: handle.trim() })
+    .eq('id', userId);
+  if (error) {
+    if (error.code === '23505') throw new Error('Handle already taken.');
+    throw error;
+  }
 }
 
 export async function updateWeekStart(
