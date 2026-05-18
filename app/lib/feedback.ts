@@ -23,5 +23,9 @@ export async function submitFeedback(body: string): Promise<void> {
   const { error } = await supabase
     .from('feedback')
     .insert({ user_id: user.id, body: body.trim() });
-  if (error) throw error;
+  if (error) {
+    if (error.message?.includes('rate limit'))
+      throw new Error('You can submit up to 5 feedback items per day.');
+    throw error;
+  }
 }
