@@ -25,13 +25,10 @@ export function FriendRequestRow({
     <View style={styles.row}>
       <FeedAvatar
         url={request.profile.avatar_url}
-        displayName={request.profile.display_name}
+        handle={request.profile.handle}
         size={40}
       />
       <View style={styles.info}>
-        <ThemedText style={styles.displayName} numberOfLines={1}>
-          {request.profile.display_name}
-        </ThemedText>
         <ThemedText style={styles.handle} numberOfLines={1}>
           @{request.profile.handle}
         </ThemedText>
@@ -71,8 +68,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   info: { flex: 1 },
-  displayName: { fontSize: 15, fontWeight: '600' },
-  handle: { fontSize: 12, opacity: 0.55, marginTop: 1 },
+  handle: { fontSize: 15, fontWeight: '600' },
   actions: { flexDirection: 'row', gap: 8 },
   button: {
     paddingHorizontal: 14,

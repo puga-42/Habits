@@ -53,7 +53,7 @@ export function FeedCommentRow({
     <Pressable onLongPress={handleLongPress} style={styles.row}>
       <FeedAvatar
         url={comment.author_avatar_url}
-        displayName={comment.author_display_name}
+        handle={comment.author_handle}
         size={32}
       />
       <View style={styles.body}>

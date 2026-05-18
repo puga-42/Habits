@@ -57,16 +57,16 @@ export function FeedCard({
       <View style={styles.header}>
         <FeedAvatar
           url={item.owner_avatar_url}
-          displayName={item.owner_display_name}
+          handle={item.owner_handle}
           size={36}
           tintColor={fallbackColor}
         />
         <View style={styles.headerText}>
-          <ThemedText style={styles.displayName} numberOfLines={1}>
-            {item.owner_display_name}
+          <ThemedText style={styles.handle} numberOfLines={1}>
+            @{item.owner_handle}
           </ThemedText>
           <ThemedText style={styles.meta} numberOfLines={1}>
-            @{item.owner_handle} · {formatRelativeTime(item.completed_at, now)}
+            {formatRelativeTime(item.completed_at, now)}
           </ThemedText>
         </View>
         {isSelf && onEdit && (
@@ -124,7 +124,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   headerText: { flex: 1 },
-  displayName: { fontSize: 15, fontWeight: '600' },
+  handle: { fontSize: 15, fontWeight: '600' },
   meta: { fontSize: 12, opacity: 0.55, marginTop: 1 },
   menuButton: { padding: 4 },
   habitLine: {
