@@ -27,14 +27,11 @@ User submits feedback (app/app/feedback.tsx)
         ▼
 ┌──────────────────────────────────────────┐
 │  Claude Code Scheduled Routine (Pro plan) │
-│  Polls GitHub for open "automated" issues │
+│  Serial queue — one open PR at a time     │
 │                                           │
-│  For each issue without a linked PR:      │
-│  1. Create branch                         │
-│  2. Write PLAN.md                         │
-│  3. Implement feature/fix                 │
-│  4. Run typecheck + lint + test           │
-│  5. Push + open PR                        │
+│  1. If automated PR open → exit           │
+│  2. Pick next issue (bugs first, FIFO)    │
+│  3. Create branch + implement + open PR   │
 └──────────────────────────────────────────┘
         │
         ▼
@@ -98,8 +95,8 @@ labeled GitHub issue. The routine (Component 3) picks up from there.
 ## Component 3: Claude Code Scheduled Routine
 
 Created via `/schedule` in Claude Code. Runs on Anthropic's cloud infrastructure.
-Polls GitHub for open issues labeled `automated` that have no linked PR, then
-implements each one.
+Operates as a **serial queue** — only one automated PR open at a time. This prevents
+multiple PRs from going stale when one merges and `main` moves forward.
 
 **No secrets needed** — the routine accesses GitHub via the Claude GitHub App.
 
@@ -109,34 +106,40 @@ implements each one.
 You are the feedback pipeline agent for the Habits app (github.com/puga-42/Habits).
 
 ## Your job
-Check GitHub for open issues labeled "automated" that do not yet have a linked PR.
-Use: gh issue list --label automated --state open --json number,title,body,labels
+Implement one feedback issue at a time as a serial queue.
 
-For each issue (process at most 3 per run):
+### Step 1: Check for open automated PRs
+Run: gh pr list --label automated --state open --json number,title,createdAt
 
-1. Check if a branch `feedback/{issue-number}-*` or a PR referencing the issue already
-   exists. If so, skip it.
+- If a PR exists and was created less than 24 hours ago → exit immediately (queue is busy).
+- If a PR exists and was created more than 24 hours ago → add the "needs-attention" label
+  to it (gh pr edit <number> --add-label needs-attention) and exit. A human needs to
+  review or close the stale PR before the queue resumes.
+- If no open automated PR exists → continue to Step 2.
 
-2. Create a branch: `feedback/{issue-number}-{title-slug}`
+### Step 2: Pick the next issue
+Run: gh issue list --label automated --state open --json number,title,body,labels
 
-3. Read CONTEXT.md and CLAUDE.md thoroughly.
+Sort by category: bugs first, then features. Within each category, pick the oldest
+(lowest issue number). Pick the single highest-priority issue that does not already
+have a branch `feedback/{issue-number}-*` or a PR referencing it.
 
-4. Write a concise PLAN.md (< 50 lines) at the repo root describing your approach.
+If no eligible issue exists, exit immediately.
 
-5. Implement the change following existing codebase patterns.
+### Step 3: Implement
+1. Create a branch: `feedback/{issue-number}-{title-slug}`
+2. Read CONTEXT.md and CLAUDE.md thoroughly.
+3. Write a concise PLAN.md (< 50 lines) at the repo root describing your approach.
+4. Implement the change following existing codebase patterns.
    - Write tests for every new function (colocate in app/lib/__tests__/).
    - Use TDD: write failing tests first, then implement until they pass.
-
-6. Run validation: cd app && npm run typecheck && npm run lint && npm run test
+5. Run validation: cd app && npm run typecheck && npm run lint && npm run test
    Fix failures (max 3 attempts). If stuck, note the blocker in PLAN.md.
-
-7. Commit and push the branch.
-
-8. Open a PR with `gh pr create` that closes the issue:
+6. Commit and push the branch.
+7. Open a PR with `gh pr create` that closes the issue:
    Title: the issue title
    Body: Closes #{issue-number}, summary of changes, verification checklist.
-
-If no open automated issues need work, exit immediately.
+   Labels: automated
 
 ## Constraints
 - Use CONTEXT.md vocabulary exactly.
@@ -152,7 +155,7 @@ If no open automated issues need work, exit immediately.
 ### Schedule
 
 Every hour (minimum allowed interval). The routine is idempotent — if no
-unlinked automated issues exist, it exits immediately.
+eligible issues exist or an automated PR is already open, it exits immediately.
 
 ---
 
@@ -212,6 +215,7 @@ The routine itself lives in Anthropic's cloud — no file in the repo.
    gh label create "priority:low" --color c5def5
    gh label create "priority:medium" --color fbca04
    gh label create "priority:high" --color b60205
+   gh label create "needs-attention" --color e4e669
    ```
 
 3. **Set Supabase Edge Function secrets:**
@@ -238,7 +242,10 @@ The routine itself lives in Anthropic's cloud — no file in the repo.
 | Test | How |
 |------|-----|
 | Edge Function | `supabase functions serve dispatch-feedback` + curl a test payload |
-| Routine | Insert test feedback → verify issue created → routine picks up → PR opened |
+| Serial gate | With an open automated PR, run routine → exits with no work |
+| Priority order | Create bug + feature issues → routine picks the bug first |
+| Stale detection | Leave automated PR open 24h+ → routine adds `needs-attention` label |
+| End-to-end | Merge PR, run routine → picks next issue from fresh `main` |
 | Guardrail | Submit "add streaks" → verify agent doesn't add gamification |
 | CI gate | Push branch with type error → CI fails |
 
@@ -261,4 +268,9 @@ The routine itself lives in Anthropic's cloud — no file in the repo.
 - Triage + issue creation: **~5 seconds**
 - Routine picks up issue: **0–60 minutes** (hourly poll)
 - Implementation + tests + PR: **5–30 minutes**
-- **Total end-to-end: ~5–90 minutes**
+- **First feedback end-to-end: ~5–90 minutes**
+
+Note: the routine operates as a serial queue (one PR at a time). If multiple
+feedbacks are submitted, the Nth item waits until the previous N-1 PRs are
+merged before getting a PR. This trades throughput for correctness — each PR
+is always branched from the latest `main`.

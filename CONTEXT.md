@@ -7,7 +7,7 @@ code, tests, and discussions.
 ## Stack
 
 - **Client:** React Native via Expo (TypeScript). Targets iOS first; App Store launch.
-- **Backend:** Supabase — Postgres, Auth (Sign in with Apple), Realtime, Storage, Edge Functions.
+- **Backend:** Supabase (remote project, not local) — Postgres, Auth (Sign in with Apple), Realtime, Storage, Edge Functions.
 - **Recurrence:** RFC 5545 RRULE strings, expanded client-side via `rrule.js`.
 - **Push:** Expo Notifications (local for reminders, push via Supabase Edge Function for social events).
 

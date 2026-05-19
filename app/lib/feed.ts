@@ -20,13 +20,17 @@ export type Attachment = {
   duration_seconds: number | null;
 };
 
+export type FeedKind = 'completion' | 'habit_created';
+
 export type FeedItem = {
-  id: string; // completion id
+  id: string;
   habit_id: string;
   owner_id: string;
+  feed_kind: FeedKind;
   occurrence_date: string | null;
   period_start: string | null;
-  completed_at: string;
+  completed_at: string | null;
+  created_at: string;
   note: string | null;
   visibility_override: Visibility | null;
   owner_handle: string;
@@ -61,7 +65,7 @@ export type Liker = {
   liked_at: string;
 };
 
-export type FeedCursor = { completed_at: string; id: string };
+export type FeedCursor = { sort_key: string; id: string };
 export type CommentCursor = { created_at: string; id: string };
 export type LikerCursor = { liked_at: string; user_id: string };
 
@@ -72,7 +76,7 @@ export async function fetchFeedPage(
   limit = 20,
 ): Promise<FeedItem[]> {
   const { data, error } = await supabase.rpc('fetch_feed_page', {
-    cursor_completed_at: cursor?.completed_at ?? null,
+    cursor_completed_at: cursor?.sort_key ?? null,
     cursor_id: cursor?.id ?? null,
     page_limit: limit,
   });
@@ -213,6 +217,127 @@ export async function deleteComment(commentId: string): Promise<void> {
   if (error) throw error;
 }
 
+// ─── Activity mutations ───────────────────────────────────────────────────
+
+export async function likeActivity(
+  activityId: string,
+  viewerId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from('activity_likes')
+    .insert({ activity_id: activityId, user_id: viewerId });
+  if (error && !isUniqueViolation(error)) throw error;
+}
+
+export async function unlikeActivity(
+  activityId: string,
+  viewerId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from('activity_likes')
+    .delete()
+    .eq('activity_id', activityId)
+    .eq('user_id', viewerId);
+  if (error) throw error;
+}
+
+export async function fetchActivityComments(
+  activityId: string,
+  cursor?: CommentCursor,
+  limit = 50,
+): Promise<Comment[]> {
+  const { data, error } = await supabase.rpc('fetch_activity_comments_page', {
+    target_activity_id: activityId,
+    cursor_created_at: cursor?.created_at ?? null,
+    cursor_id: cursor?.id ?? null,
+    page_limit: limit,
+  });
+  if (error) throw error;
+  return (data ?? []) as Comment[];
+}
+
+export async function postActivityComment(
+  activityId: string,
+  authorId: string,
+  body: string,
+): Promise<Comment> {
+  const trimmed = body.trim();
+  if (trimmed.length === 0 || trimmed.length > 500) {
+    throw new Error('Comment must be 1-500 characters');
+  }
+  const { data, error } = await supabase
+    .from('activity_comments')
+    .insert({
+      activity_id: activityId,
+      author_id: authorId,
+      body: trimmed,
+    })
+    .select(
+      `id, activity_id, author_id, body, created_at, updated_at,
+       profiles:author_id (handle, avatar_url)`,
+    )
+    .single();
+  if (error) throw error;
+  const row = data as unknown as {
+    id: string;
+    activity_id: string;
+    author_id: string;
+    body: string;
+    created_at: string;
+    updated_at: string;
+    profiles: {
+      handle: string;
+      avatar_url: string | null;
+    };
+  };
+  return {
+    id: row.id,
+    completion_id: row.activity_id,
+    author_id: row.author_id,
+    author_handle: row.profiles.handle,
+    author_avatar_url: row.profiles.avatar_url,
+    body: row.body,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+    like_count: 0,
+    viewer_liked: false,
+  };
+}
+
+export async function deleteActivityComment(
+  commentId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from('activity_comments')
+    .delete()
+    .eq('id', commentId);
+  if (error) throw error;
+}
+
+export async function likeActivityComment(
+  commentId: string,
+  viewerId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from('activity_comment_likes')
+    .insert({ comment_id: commentId, user_id: viewerId });
+  if (error && !isUniqueViolation(error)) throw error;
+}
+
+export async function unlikeActivityComment(
+  commentId: string,
+  viewerId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from('activity_comment_likes')
+    .delete()
+    .eq('comment_id', commentId)
+    .eq('user_id', viewerId);
+  if (error) throw error;
+}
+
+// ─── Moderation ───────────────────────────────────────────────────────────
+
 export async function reportContent(
   reporterId: string,
   target: { kind: 'completion' | 'comment'; id: string },
@@ -273,6 +398,7 @@ export async function signedUrlsForPaths(
 
 export type RealtimeHandlers = {
   onCompletion: (event: 'INSERT' | 'UPDATE' | 'DELETE', id: string) => void;
+  onActivity: (event: 'INSERT' | 'DELETE', id: string) => void;
   onLike: (event: 'INSERT' | 'DELETE', completionId: string) => void;
   onComment: (
     event: 'INSERT' | 'UPDATE' | 'DELETE',
@@ -300,6 +426,22 @@ export function subscribeToFeed(
         const id =
           payload.eventType === 'DELETE' ? payload.old.id : payload.new.id;
         if (id) handlers.onCompletion(payload.eventType, id);
+      },
+    )
+    .on(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      'postgres_changes' as any,
+      { event: '*', schema: 'public', table: 'habit_activity' },
+      (payload: {
+        eventType: 'INSERT' | 'UPDATE' | 'DELETE';
+        new: { id?: string };
+        old: { id?: string };
+      }) => {
+        const id =
+          payload.eventType === 'DELETE' ? payload.old.id : payload.new.id;
+        if (id && payload.eventType !== 'UPDATE') {
+          handlers.onActivity(payload.eventType, id);
+        }
       },
     )
     .on(
@@ -388,8 +530,12 @@ export function formatRelativeTime(timestampIso: string, now: Date): string {
   });
 }
 
-// Append the next page to the existing list. Dedupes by id (newer copy wins)
-// and re-sorts by completed_at desc, id desc for stable ordering across ties.
+export function feedItemSortKey(item: FeedItem): string {
+  return item.feed_kind === 'completion'
+    ? (item.completed_at ?? item.created_at)
+    : item.created_at;
+}
+
 export function mergeFeedPages(
   existing: FeedItem[],
   next: FeedItem[],
@@ -398,9 +544,9 @@ export function mergeFeedPages(
   for (const item of existing) byId.set(item.id, item);
   for (const item of next) byId.set(item.id, item);
   return [...byId.values()].sort((a, b) => {
-    if (a.completed_at !== b.completed_at) {
-      return a.completed_at < b.completed_at ? 1 : -1;
-    }
+    const aKey = feedItemSortKey(a);
+    const bKey = feedItemSortKey(b);
+    if (aKey !== bKey) return aKey < bKey ? 1 : -1;
     return a.id < b.id ? 1 : -1;
   });
 }

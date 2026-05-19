@@ -8,9 +8,11 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import type { FeedKind } from '@/lib/feed';
 
 type Props = {
-  completionId: string;
+  targetId: string;
+  targetKind: FeedKind;
   likeCount: number;
   commentCount: number;
   viewerLiked: boolean;
@@ -19,7 +21,8 @@ type Props = {
 };
 
 export function FeedActionBar({
-  completionId,
+  targetId,
+  targetKind,
   likeCount,
   commentCount,
   viewerLiked,
@@ -33,8 +36,9 @@ export function FeedActionBar({
     onToggleLike();
   };
 
+  const likersKind = targetKind === 'completion' ? 'completion' : 'activity';
   const openLikers = () => {
-    router.push(`/likers/completion/${completionId}`);
+    router.push(`/likers/${likersKind}/${targetId}`);
   };
 
   return (
