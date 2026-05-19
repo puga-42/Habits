@@ -26,19 +26,26 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useAuth } from '@/lib/auth';
 import {
   applyCommentLikeToggle,
+  deleteActivityComment,
   deleteComment,
+  fetchActivityComments,
   fetchComments,
+  likeActivityComment,
   likeComment,
+  postActivityComment,
   postComment,
   subscribeToFeed,
+  unlikeActivityComment,
   unlikeComment,
   type Comment,
+  type FeedKind,
 } from '@/lib/feed';
 
 type Props = {
   visible: boolean;
-  completionId: string | null;
-  completionOwnerId: string | null;
+  targetId: string | null;
+  targetKind: FeedKind;
+  targetOwnerId: string | null;
   onClose: () => void;
   onCountChange?: (delta: number) => void;
 };
@@ -47,8 +54,9 @@ const SHEET_HEIGHT_FRACTION = 0.75;
 
 export function FeedCommentsSheet({
   visible,
-  completionId,
-  completionOwnerId,
+  targetId,
+  targetKind,
+  targetOwnerId,
   onClose,
   onCountChange,
 }: Props) {
@@ -71,12 +79,17 @@ export function FeedCommentsSheet({
     }).start();
   }, [visible, translateY]);
 
-  // Load comments when the sheet opens for a completion.
+  const fetchFn = targetKind === 'completion' ? fetchComments : fetchActivityComments;
+  const postFn = targetKind === 'completion' ? postComment : postActivityComment;
+  const deleteFn = targetKind === 'completion' ? deleteComment : deleteActivityComment;
+  const likeFn = targetKind === 'completion' ? likeComment : likeActivityComment;
+  const unlikeFn = targetKind === 'completion' ? unlikeComment : unlikeActivityComment;
+
   useEffect(() => {
-    if (!visible || !completionId) return;
+    if (!visible || !targetId) return;
     let cancelled = false;
     setLoading(true);
-    fetchComments(completionId)
+    fetchFn(targetId)
       .then((rows) => {
         if (!cancelled) setComments(rows);
       })
@@ -86,48 +99,46 @@ export function FeedCommentsSheet({
     return () => {
       cancelled = true;
     };
-  }, [visible, completionId]);
+  }, [visible, targetId, fetchFn]);
 
-  // Realtime: keep comments + their like counts fresh while the sheet is open.
   useEffect(() => {
-    if (!visible || !completionId || !viewerId) return;
+    if (!visible || !targetId || !viewerId || targetKind !== 'completion') return;
     const unsub = subscribeToFeed(
       {
         onCompletion: () => {},
+        onActivity: () => {},
         onLike: () => {},
         onComment: (event, eventCompletionId, commentId) => {
-          if (eventCompletionId !== completionId) return;
+          if (eventCompletionId !== targetId) return;
           if (event === 'DELETE') {
             setComments((prev) => prev.filter((c) => c.id !== commentId));
           } else {
-            // Refetch on insert/update — cheap, and avoids partial-row state.
-            fetchComments(completionId).then(setComments);
+            fetchFn(targetId).then(setComments);
           }
         },
         onCommentLike: () => {
-          // Refetch to recompute like_count + viewer_liked accurately.
-          fetchComments(completionId).then(setComments);
+          fetchFn(targetId).then(setComments);
         },
       },
-      `comments-${completionId}`,
+      `comments-${targetId}`,
     );
     return unsub;
-  }, [visible, completionId, viewerId]);
+  }, [visible, targetId, targetKind, viewerId, fetchFn]);
 
   const send = useCallback(async () => {
-    if (!completionId || !viewerId) return;
+    if (!targetId || !viewerId) return;
     const body = input.trim();
     if (body.length === 0) return;
     setSending(true);
     try {
-      const c = await postComment(completionId, viewerId, body);
+      const c = await postFn(targetId, viewerId, body);
       setComments((prev) => [...prev, c]);
       setInput('');
       onCountChange?.(1);
     } finally {
       setSending(false);
     }
-  }, [completionId, viewerId, input, onCountChange]);
+  }, [targetId, viewerId, input, onCountChange, postFn]);
 
   const handleToggleLike = useCallback(
     async (comment: Comment) => {
@@ -139,10 +150,9 @@ export function FeedCommentsSheet({
         ),
       );
       try {
-        if (next) await likeComment(comment.id, viewerId);
-        else await unlikeComment(comment.id, viewerId);
+        if (next) await likeFn(comment.id, viewerId);
+        else await unlikeFn(comment.id, viewerId);
       } catch {
-        // Rollback on RLS rejection.
         setComments((prev) =>
           prev.map((c) =>
             c.id === comment.id ? applyCommentLikeToggle(c, !next) : c,
@@ -150,7 +160,7 @@ export function FeedCommentsSheet({
         );
       }
     },
-    [viewerId],
+    [viewerId, likeFn, unlikeFn],
   );
 
   const handleDelete = useCallback(
@@ -158,13 +168,12 @@ export function FeedCommentsSheet({
       setComments((prev) => prev.filter((c) => c.id !== comment.id));
       onCountChange?.(-1);
       try {
-        await deleteComment(comment.id);
+        await deleteFn(comment.id);
       } catch {
-        // On failure, refetch to restore truth.
-        if (completionId) fetchComments(completionId).then(setComments);
+        if (targetId) fetchFn(targetId).then(setComments);
       }
     },
-    [completionId, onCountChange],
+    [targetId, onCountChange, deleteFn, fetchFn],
   );
 
   return (
@@ -206,7 +215,7 @@ export function FeedCommentsSheet({
                       <FeedCommentRow
                         comment={item}
                         viewerId={viewerId ?? ''}
-                        completionOwnerId={completionOwnerId ?? ''}
+                        completionOwnerId={targetOwnerId ?? ''}
                         now={now}
                         onToggleLike={() => handleToggleLike(item)}
                         onDelete={() => handleDelete(item)}

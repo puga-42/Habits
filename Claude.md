@@ -22,6 +22,10 @@
 - No eval(), no dynamic SQL, no unsanitized interpolation.
 - Storage paths must follow `{owner_id}/{completion_id}/{uuid}.{ext}` pattern.
 
+## Database
+- Supabase runs as a **remote project** (not local). Use `npx supabase db push` to apply migrations.
+- `npx supabase db reset` only affects the local instance and will NOT update the remote database.
+
 ## Automated Agent Rules
 - Create PLAN.md before writing code.
 - Run `cd app && npm run typecheck && npm run lint && npm run test` before committing.

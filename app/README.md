@@ -17,7 +17,16 @@ npm run lint        # eslint
 
 ## Config
 
-Copy `.env.example` to `.env` and fill in your Supabase project's URL and anon key.
+Copy `.env.example` to `.env` and fill in your remote Supabase project's URL and anon key.
+
+## Database
+
+The app runs against a **remote Supabase project** (not local). To apply migrations:
+
+```bash
+npx supabase db push          # push pending migrations to the remote project
+npx supabase db push --dry-run  # preview what would run
+```
 
 ## Layout
 

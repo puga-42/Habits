@@ -2,7 +2,7 @@
 // visible completions. See /FEED_PLAN.md for the architectural details.
 
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { FeedActivityCard } from '@/components/feed-activity-card';
 import { FeedCard } from '@/components/feed-card';
 import { FeedCommentsSheet } from '@/components/feed-comments-sheet';
 import { FeedEmpty } from '@/components/feed-empty';
@@ -22,14 +23,18 @@ import { useAuth } from '@/lib/auth';
 import {
   applyLikeToggle,
   blockUser,
+  feedItemSortKey,
   fetchFeedPage,
+  likeActivity,
   likeCompletion,
   mergeFeedPages,
   muteHabit,
   reportContent,
   subscribeToFeed,
+  unlikeActivity,
   unlikeCompletion,
   type FeedItem,
+  type FeedKind,
 } from '@/lib/feed';
 
 const PAGE_SIZE = 20;
@@ -45,7 +50,8 @@ export default function FeedScreen() {
   const [paging, setPaging] = useState(false);
   const [pendingNew, setPendingNew] = useState(0);
   const [activeCommentTarget, setActiveCommentTarget] = useState<{
-    completionId: string;
+    targetId: string;
+    targetKind: FeedKind;
     ownerId: string;
   } | null>(null);
   const listRef = useRef<FlatList<FeedItem>>(null);
@@ -64,19 +70,13 @@ export default function FeedScreen() {
     }
   }, []);
 
-  useEffect(() => {
-    if (viewerId) loadFirstPage();
-  }, [viewerId, loadFirstPage]);
-
-  // Subscribe to Realtime while the feed screen is focused.
   useFocusEffect(
     useCallback(() => {
       if (!viewerId) return;
+      loadFirstPage();
       const unsub = subscribeToFeed({
         onCompletion: (event, id) => {
           if (event === 'INSERT') {
-            // We don't yet know if this is in-feed (friends-only RLS), so
-            // re-fetch only if user is at top, otherwise nudge the pill.
             if (isAtTopRef.current) {
               loadFirstPage();
             } else {
@@ -84,6 +84,15 @@ export default function FeedScreen() {
             }
           } else if (event === 'DELETE') {
             setItems((prev) => prev.filter((i) => i.id !== id));
+          }
+        },
+        onActivity: (event) => {
+          if (event === 'INSERT') {
+            if (isAtTopRef.current) {
+              loadFirstPage();
+            } else {
+              setPendingNew((n) => n + 1);
+            }
           }
         },
         onLike: (event, completionId) => {
@@ -137,7 +146,7 @@ export default function FeedScreen() {
     setPaging(true);
     try {
       const next = await fetchFeedPage(
-        { completed_at: last.completed_at, id: last.id },
+        { sort_key: feedItemSortKey(last), id: last.id },
         PAGE_SIZE,
       );
       setItems((prev) => mergeFeedPages(prev, next));
@@ -155,8 +164,10 @@ export default function FeedScreen() {
         prev.map((i) => (i.id === item.id ? applyLikeToggle(i, next) : i)),
       );
       try {
-        if (next) await likeCompletion(item.id, viewerId);
-        else await unlikeCompletion(item.id, viewerId);
+        const like = item.feed_kind === 'completion' ? likeCompletion : likeActivity;
+        const unlike = item.feed_kind === 'completion' ? unlikeCompletion : unlikeActivity;
+        if (next) await like(item.id, viewerId);
+        else await unlike(item.id, viewerId);
       } catch {
         setItems((prev) =>
           prev.map((i) => (i.id === item.id ? applyLikeToggle(i, !next) : i)),
@@ -201,37 +212,66 @@ export default function FeedScreen() {
             ref={listRef}
             data={items}
             keyExtractor={(i) => i.id}
-            renderItem={({ item }) => (
-              <FeedCard
-                item={item}
-                viewerId={viewerId}
-                now={now}
-                onToggleLike={() => handleToggleLike(item)}
-                onOpenComments={() =>
-                  setActiveCommentTarget({
-                    completionId: item.id,
-                    ownerId: item.owner_id,
-                  })
-                }
-                onEdit={
-                  item.owner_id === viewerId
-                    ? () => router.push(`/completion/${item.id}`)
-                    : undefined
-                }
-                onReport={() =>
-                  reportContent(viewerId, {
-                    kind: 'completion',
-                    id: item.id,
-                  })
-                }
-                onBlock={() =>
-                  blockUser(viewerId, item.owner_id).then(loadFirstPage)
-                }
-                onMute={() =>
-                  muteHabit(viewerId, item.habit_id).then(loadFirstPage)
-                }
-              />
-            )}
+            renderItem={({ item }) =>
+              item.feed_kind === 'habit_created' ? (
+                <FeedActivityCard
+                  item={item}
+                  viewerId={viewerId}
+                  now={now}
+                  onToggleLike={() => handleToggleLike(item)}
+                  onOpenComments={() =>
+                    setActiveCommentTarget({
+                      targetId: item.id,
+                      targetKind: 'habit_created',
+                      ownerId: item.owner_id,
+                    })
+                  }
+                  onReport={() =>
+                    reportContent(viewerId, {
+                      kind: 'completion',
+                      id: item.id,
+                    })
+                  }
+                  onBlock={() =>
+                    blockUser(viewerId, item.owner_id).then(loadFirstPage)
+                  }
+                  onMute={() =>
+                    muteHabit(viewerId, item.habit_id).then(loadFirstPage)
+                  }
+                />
+              ) : (
+                <FeedCard
+                  item={item}
+                  viewerId={viewerId}
+                  now={now}
+                  onToggleLike={() => handleToggleLike(item)}
+                  onOpenComments={() =>
+                    setActiveCommentTarget({
+                      targetId: item.id,
+                      targetKind: 'completion',
+                      ownerId: item.owner_id,
+                    })
+                  }
+                  onEdit={
+                    item.owner_id === viewerId
+                      ? () => router.push(`/completion/${item.id}`)
+                      : undefined
+                  }
+                  onReport={() =>
+                    reportContent(viewerId, {
+                      kind: 'completion',
+                      id: item.id,
+                    })
+                  }
+                  onBlock={() =>
+                    blockUser(viewerId, item.owner_id).then(loadFirstPage)
+                  }
+                  onMute={() =>
+                    muteHabit(viewerId, item.habit_id).then(loadFirstPage)
+                  }
+                />
+              )
+            }
             ItemSeparatorComponent={Separator}
             // Stories rail hook: an empty header today, slotted with a
             // <FeedStoriesRail /> in the follow-up plan.
@@ -259,14 +299,15 @@ export default function FeedScreen() {
 
         <FeedCommentsSheet
           visible={activeCommentTarget !== null}
-          completionId={activeCommentTarget?.completionId ?? null}
-          completionOwnerId={activeCommentTarget?.ownerId ?? null}
+          targetId={activeCommentTarget?.targetId ?? null}
+          targetKind={activeCommentTarget?.targetKind ?? 'completion'}
+          targetOwnerId={activeCommentTarget?.ownerId ?? null}
           onClose={() => setActiveCommentTarget(null)}
           onCountChange={(delta) => {
             if (!activeCommentTarget) return;
             setItems((prev) =>
               prev.map((i) =>
-                i.id === activeCommentTarget.completionId
+                i.id === activeCommentTarget.targetId
                   ? {
                       ...i,
                       comment_count: Math.max(0, i.comment_count + delta),

@@ -20,8 +20,15 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const GITHUB_API = "https://api.github.com";
 const CLAUDE_API = "https://api.anthropic.com/v1/messages";
 
-interface TriageResult {
+interface FeedbackRecord {
+  id: string;
   category: "bug" | "feature";
+  desired_behavior: string;
+  current_behavior: string | null;
+  screenshot_path: string | null;
+}
+
+interface TriageResult {
   title: string;
   priority: "low" | "medium" | "high";
   summary: string;
@@ -38,12 +45,12 @@ serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
 
-  const { id, body } = payload.record;
+  const record = payload.record as FeedbackRecord;
 
   const { data: claimed } = await supabase
     .from("feedback")
     .update({ status: "processing" })
-    .eq("id", id)
+    .eq("id", record.id)
     .eq("status", "pending")
     .select("id")
     .single();
@@ -55,19 +62,18 @@ serve(async (req) => {
   }
 
   try {
-    const triage = await triageFeedback(body);
-    const issueNumber = await createGitHubIssue(triage, body);
+    const triage = await triageFeedback(record);
+    const issueNumber = await createGitHubIssue(triage, record);
 
     await supabase
       .from("feedback")
       .update({
         status: "done",
-        category: triage.category,
         title: triage.title,
         github_issue_number: issueNumber,
         processed_at: new Date().toISOString(),
       })
-      .eq("id", id);
+      .eq("id", record.id);
 
     return new Response(JSON.stringify({ issueNumber }), {
       status: 200,
@@ -75,15 +81,24 @@ serve(async (req) => {
     });
   } catch (err) {
     console.error("dispatch-feedback error:", err);
-    await supabase.from("feedback").update({ status: "failed" }).eq("id", id);
+    await supabase.from("feedback").update({ status: "failed" }).eq("id", record.id);
     return new Response(JSON.stringify({ error: String(err) }), {
       status: 500,
     });
   }
 });
 
-async function triageFeedback(feedbackBody: string): Promise<TriageResult> {
+async function triageFeedback(record: FeedbackRecord): Promise<TriageResult> {
   const apiKey = Deno.env.get("ANTHROPIC_API_KEY")!;
+
+  let feedbackText = `Category: ${record.category}\n\nDesired behavior:\n${record.desired_behavior}`;
+  if (record.current_behavior) {
+    feedbackText += `\n\nCurrent behavior:\n${record.current_behavior}`;
+  }
+  if (record.screenshot_path) {
+    feedbackText += `\n\n[Screenshot attached: ${record.screenshot_path}]`;
+  }
+
   const res = await fetch(CLAUDE_API, {
     method: "POST",
     headers: {
@@ -98,12 +113,12 @@ async function triageFeedback(feedbackBody: string): Promise<TriageResult> {
         {
           role: "user",
           content: `You are triaging user feedback for a habit-tracking iOS app.
+The user has already classified this as a ${record.category === "bug" ? "bug report" : "feature request"}.
 
-Feedback: "${feedbackBody}"
+${feedbackText}
 
 Respond with JSON only, no markdown fences:
 {
-  "category": "bug" | "feature",
   "title": "<concise issue title, under 70 chars>",
   "priority": "low" | "medium" | "high",
   "summary": "<2-3 sentence description for a GitHub issue body>"
@@ -130,11 +145,25 @@ Context:
 
 async function createGitHubIssue(
   triage: TriageResult,
-  originalBody: string,
+  record: FeedbackRecord,
 ): Promise<number> {
   const token = Deno.env.get("GITHUB_TOKEN")!;
   const owner = Deno.env.get("GITHUB_OWNER")!;
   const repo = Deno.env.get("GITHUB_REPO")!;
+
+  const sectionHeader = record.category === "bug"
+    ? "Expected behavior"
+    : "Desired feature";
+
+  let issueBody = `## ${sectionHeader}\n\n${record.desired_behavior}`;
+  if (record.current_behavior) {
+    issueBody += `\n\n## Current behavior\n\n${record.current_behavior}`;
+  }
+  if (record.screenshot_path) {
+    issueBody += `\n\n## Screenshot\n\n_Attached in Supabase Storage: \`${record.screenshot_path}\`_`;
+  }
+  issueBody += `\n\n## Triage\n\n${triage.summary}\n\n**Priority:** ${triage.priority}`;
+  issueBody += `\n\n---\n_Auto-triaged by feedback pipeline_`;
 
   const res = await fetch(`${GITHUB_API}/repos/${owner}/${repo}/issues`, {
     method: "POST",
@@ -145,8 +174,8 @@ async function createGitHubIssue(
     },
     body: JSON.stringify({
       title: triage.title,
-      body: `## User Feedback\n\n> ${originalBody}\n\n## Triage\n\n${triage.summary}\n\n**Category:** ${triage.category}\n**Priority:** ${triage.priority}\n\n---\n_Auto-triaged by feedback pipeline_`,
-      labels: ["automated", triage.category, `priority:${triage.priority}`],
+      body: issueBody,
+      labels: ["automated", record.category, `priority:${triage.priority}`],
     }),
   });
 

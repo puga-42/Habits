@@ -1,6 +1,7 @@
 import {
   applyCommentLikeToggle,
   applyLikeToggle,
+  feedItemSortKey,
   formatRelativeTime,
   mergeFeedPages,
   type Comment,
@@ -12,9 +13,11 @@ function makeItem(overrides: Partial<FeedItem> = {}): FeedItem {
     id: 'c1',
     habit_id: 'h1',
     owner_id: 'u1',
+    feed_kind: 'completion',
     occurrence_date: '2026-05-14',
     period_start: null,
     completed_at: '2026-05-14T07:00:00Z',
+    created_at: '2026-05-14T07:00:00Z',
     note: null,
     visibility_override: null,
     owner_handle: 'maya_b',
@@ -23,6 +26,32 @@ function makeItem(overrides: Partial<FeedItem> = {}): FeedItem {
     habit_icon: '🧘',
     habit_color: '#aaa',
     habit_kind: 'scheduled',
+    attachments: [],
+    like_count: 0,
+    comment_count: 0,
+    viewer_liked: false,
+    ...overrides,
+  };
+}
+
+function makeActivityItem(overrides: Partial<FeedItem> = {}): FeedItem {
+  return {
+    id: 'a1',
+    habit_id: 'h2',
+    owner_id: 'u2',
+    feed_kind: 'habit_created',
+    occurrence_date: null,
+    period_start: null,
+    completed_at: null,
+    created_at: '2026-05-14T09:00:00Z',
+    note: null,
+    visibility_override: null,
+    owner_handle: 'tomc',
+    owner_avatar_url: null,
+    habit_title: 'Run',
+    habit_icon: '🏃',
+    habit_color: '#f00',
+    habit_kind: 'flex',
     attachments: [],
     like_count: 0,
     comment_count: 0,
@@ -155,5 +184,48 @@ describe('applyCommentLikeToggle', () => {
   it('is idempotent when already in the target state', () => {
     const liked = makeComment({ like_count: 1, viewer_liked: true });
     expect(applyCommentLikeToggle(liked, true)).toEqual(liked);
+  });
+});
+
+describe('feedItemSortKey', () => {
+  it('returns completed_at for completion items', () => {
+    const item = makeItem({ completed_at: '2026-05-14T10:00:00Z' });
+    expect(feedItemSortKey(item)).toBe('2026-05-14T10:00:00Z');
+  });
+
+  it('returns created_at for habit_created items', () => {
+    const item = makeActivityItem({ created_at: '2026-05-14T09:00:00Z' });
+    expect(feedItemSortKey(item)).toBe('2026-05-14T09:00:00Z');
+  });
+});
+
+describe('mergeFeedPages (mixed kinds)', () => {
+  it('interleaves completions and activities by sort key', () => {
+    const existing = [
+      makeItem({ id: 'c1', completed_at: '2026-05-14T10:00:00Z', created_at: '2026-05-14T10:00:00Z' }),
+    ];
+    const next = [
+      makeActivityItem({ id: 'a1', created_at: '2026-05-14T09:30:00Z' }),
+      makeItem({ id: 'c2', completed_at: '2026-05-14T09:00:00Z', created_at: '2026-05-14T09:00:00Z' }),
+    ];
+    const merged = mergeFeedPages(existing, next);
+    expect(merged.map((i) => i.id)).toEqual(['c1', 'a1', 'c2']);
+  });
+
+  it('dedupes activity items by id just like completions', () => {
+    const existing = [makeActivityItem({ id: 'a1', like_count: 0 })];
+    const next = [makeActivityItem({ id: 'a1', like_count: 3 })];
+    const merged = mergeFeedPages(existing, next);
+    expect(merged).toHaveLength(1);
+    expect(merged[0].like_count).toBe(3);
+  });
+});
+
+describe('applyLikeToggle on activity items', () => {
+  it('toggles like on an activity item', () => {
+    const item = makeActivityItem({ like_count: 1, viewer_liked: false });
+    const result = applyLikeToggle(item, true);
+    expect(result.like_count).toBe(2);
+    expect(result.viewer_liked).toBe(true);
   });
 });
