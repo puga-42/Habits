@@ -1,141 +1,151 @@
-# Plan: Show habit creation in the social feed
+# Plan: User Profile Page
 
-**Issue:** The social feed only surfaces completions. Friends don't know when
-someone starts a new habit. Adding a "habit created" feed event improves social
-visibility and encourages engagement.
-
-**Decisions (confirmed):**
-- Full interactions (likes + comments) on habit-created cards.
-- Creator sees their own card in the feed.
-- Always insert the activity row, even for private habits — RLS hides it.
-- Postgres trigger on `habits` INSERT creates the activity row automatically.
+**Goal:** When a user taps an avatar or handle anywhere in the app, navigate to
+a profile page showing that user's enlarged avatar, habits (as filter chips),
+mutual friends, and completion feed. Viewing your own profile shows the same
+page others see (Me tab remains for settings).
 
 ---
 
-## Architecture
+## Design
 
-### Current state
+### Layout (ScrollView header + FlatList)
 
-The feed is completion-only. `fetch_feed_page` queries `habit_completions`
-joined to `habits` and `profiles`. Likes and comments FK to `completion_id`.
-The client `FeedItem` type is completion-shaped. `FeedCard` renders a single
-layout: "@handle completed Habit".
+```
+┌─────────────────────────────┐
+│        ┌──────────┐         │
+│        │  Avatar  │  96px   │
+│        └──────────┘         │
+│         @handle             │
+│     [ Friends ✓ ]           │  ← status badge + action btn
+│    3 mutual friends ○○○     │  ← overlapping avatars
+├─────────────────────────────┤
+│  6 habits                   │
+│ [All] [Meditate🧘] [Gym💪]… │  ← horizontal chip scroll
+├─────────────────────────────┤
+│  ┌─ FeedCard ─────────────┐ │
+│  │ completed Meditate 🧘  │ │  ← reuses existing FeedCard
+│  │ 📸 attachment carousel │ │
+│  │ ❤ 3   💬 1             │ │
+│  └────────────────────────┘ │
+│  ┌─ FeedCard ─────────────┐ │
+│  │ ...                    │ │
+│  └────────────────────────┘ │
+│         ⏳ load more        │
+└─────────────────────────────┘
+```
 
-### New state
+### Sections
 
-The feed becomes a **union of two event kinds**: completions and habit-created
-activities. A `feed_kind` discriminator (`'completion' | 'habit_created'`)
-tells the client which card to render.
+1. **Hero** — enlarged `FeedAvatar` (96px), `@handle`, friendship
+   status/action button, overflow menu (block/report for non-self).
+2. **Mutual friends** — overlapping avatar row + count label. Hidden when
+   viewing self or when no mutual friends exist.
+3. **Habit chips** — horizontal FlatList. First chip is "All" (selected by
+   default). Each subsequent chip shows habit icon + title, colored by the
+   habit's color. Tapping a chip filters the feed to that habit's lineage.
+4. **Completion feed** — paginated, reverse-chronological. Reuses
+   `FeedCard` / `FeedActivityCard`. Same like/comment/report interactions.
+   Filtered by selected chip (or all if "All" selected).
 
-Because activity items need their own likes/comments, we add parallel
-`activity_likes` and `activity_comments` tables (same shape as the completion
-versions). This avoids touching existing completion interaction tables or
-their RLS policies.
+### Key interactions
 
----
-
-## Steps (7 files changed)
-
-### 1. Migration: expand `20260518400000_habit_created_activity.sql`
-
-The draft migration already creates `habit_activity` with RLS. Extend it with:
-
-- **Trigger** `trg_habit_created_activity` on `public.habits` AFTER INSERT:
-  inserts one row into `habit_activity` with `event_type = 'created'`.
-- **`activity_likes`** table — mirrors `completion_likes` schema and RLS
-  (FK to `habit_activity(id)` instead of `habit_completions(id)`).
-  RLS: can like if `can_view_activity(uid, activity_id)`; delete own likes.
-- **`activity_comments`** table — mirrors `completion_comments` schema and
-  RLS. Same 1-500 char constraint. Author + activity-owner can delete.
-- **Helper function** `can_view_activity(viewer_id, activity_id)` — returns
-  true when the viewer is allowed to see the activity row (reuses the
-  visibility + friendship + block logic from the existing RLS policy, but
-  extracted so likes/comments can reference it).
-- **Updated `fetch_feed_page` RPC** — change the CTE to `UNION ALL`
-  completions and activities, ordered by `created_at desc, id desc`. Add a
-  `feed_kind text` output column (`'completion'` or `'habit_created'`).
-  Activity rows return `NULL` for completion-specific fields
-  (`occurrence_date`, `period_start`, `completed_at`, `note`,
-  `visibility_override`, `attachments`). They carry `like_count`,
-  `comment_count`, and `viewer_liked` from the activity tables.
-- **`fetch_activity_comments_page` RPC** — same shape as
-  `fetch_comments_page` but queries `activity_comments`.
-- **Update `fetch_likers_page`** — extend `like_target_kind` enum with
-  `'activity'` and add a third UNION arm for `activity_likes`.
-
-### 2. Client types — `app/lib/feed.ts`
-
-- Add `feed_kind: 'completion' | 'habit_created'` to `FeedItem`. Make
-  completion-specific fields (`completed_at`, `occurrence_date`, etc.)
-  nullable to accommodate activity items.
-- Add `created_at: string` field (used as the sort key for activity items;
-  completions already have `completed_at`).
-- Add a pure helper `feedItemSortKey(item): string` that returns
-  `completed_at` for completions or `created_at` for activities. Update
-  `mergeFeedPages` to use it instead of raw `completed_at`.
-- Add mutation wrappers: `likeActivity`, `unlikeActivity`,
-  `postActivityComment`, `deleteActivityComment`, `fetchActivityComments`.
-- Update `FeedCursor` to use the generic sort key.
-
-### 3. Client tests — `app/lib/__tests__/feed.test.ts`
-
-- Test `feedItemSortKey` for both kinds.
-- Test `mergeFeedPages` with mixed completion + activity items.
-- Test that `applyLikeToggle` works on activity items.
-
-### 4. New component — `app/components/feed-activity-card.tsx`
-
-- Same header layout as `FeedCard` (avatar, handle, relative time, overflow).
-- Habit line reads: **"started \<Habit Title\> \<icon\>"** (instead of
-  "completed").
-- No attachment carousel, no note excerpt (activities have neither).
-- Full action bar (likes + comments) — reuses `FeedActionBar`.
-- Overflow menu: report, block, mute (same as `FeedCard` minus edit).
-
-### 5. Feed screen — `app/app/(tabs)/feed.tsx`
-
-- `renderItem` checks `item.feed_kind`:
-  - `'completion'` → `<FeedCard />`
-  - `'habit_created'` → `<FeedActivityCard />`
-- Update `subscribeToFeed` to also listen to `habit_activity` inserts for
-  the new-item pill.
-- `FeedCommentsSheet` needs to accept either a `completionId` or an
-  `activityId` and call the right comment-fetch/post functions.
-
-### 6. Action bar — `app/components/feed-action-bar.tsx`
-
-- Rename `completionId` prop to a generic `targetId` + `targetKind`
-  (`'completion' | 'activity'`). Call the right like/unlike function based
-  on kind.
-
-### 7. Comments sheet — `app/components/feed-comments-sheet.tsx`
-
-- Accept `targetKind` + `targetId` instead of only `completionId`.
-- Dispatch to `fetchComments` or `fetchActivityComments` based on kind.
-- Same for `postComment` / `postActivityComment`.
+- **Friendship button** — states: "Add friend" / "Request sent" (cancel) /
+  "Friends" (remove). Hidden when viewing self.
+- **Chip filter** — selecting a chip re-fetches feed filtered to that
+  habit's `lineage_id`. "All" resets to unfiltered.
+- **Self-view** — same page layout, no friendship controls. Gives users a
+  preview of how they appear to friends.
+- **Overflow** — block user, report user (non-self only).
 
 ---
 
-## What this plan does NOT include
+## Data Requirements
 
-- **Push notifications** for habit creation events — can be added later via
-  an edge function similar to `notify-on-friend-request`.
-- **Realtime for activity likes/comments** — the existing Realtime
-  subscription pattern can be extended in a follow-up.
-- **Activity card editing** — there's nothing to edit on a "started X" card.
-- **Backfilling** existing habits — only new habits created after the
-  migration will appear in the feed.
+### New Supabase RPCs
+
+1. **`get_user_profile_page(p_target_id, p_viewer_id)`** — returns profile
+   row + friendship status enum (`'none' | 'friends' | 'request_sent' |
+   'request_received'`) + friends_since timestamp + mutual friend count.
+   Returns empty if blocked.
+
+2. **`get_user_visible_habits(p_target_id, p_viewer_id)`** — habits the
+   viewer can see. Self: all non-deleted. Friend: public + friends-only.
+   Non-friend: public only. Blocked: empty. Returns: id, lineage_id,
+   title, icon, color, kind.
+
+3. **`get_user_feed_page(p_target_id, p_cursor, p_limit,
+   p_habit_lineage_id)`** — like `fetch_feed_page` but scoped to one
+   owner. Optional lineage filter for chip selection. Same visibility/RLS
+   rules as the main feed.
+
+4. **`get_mutual_friends(p_user_a, p_user_b, p_limit)`** — returns profile
+   rows (id, handle, avatar_url) of users who are friends with both.
+
+### Existing code reused (no changes)
+
+- `likeCompletion / unlikeCompletion / likeActivity / unlikeActivity`
+- `postComment / fetchComments`
+- `sendFriendRequest / acceptFriendRequest / removeFriend / blockUser`
+- `FeedCard`, `FeedActivityCard`, `FeedActionBar`, `FeedCommentsSheet`
+- `FeedAvatar` (used at larger size)
 
 ---
 
-## File count: 7
+## Implementation — Single PR (14 files, exceeds 10-file limit by design)
 
-| # | File | Change |
-|---|------|--------|
-| 1 | `supabase/migrations/20260518400000_habit_created_activity.sql` | Expand |
-| 2 | `app/lib/feed.ts` | Edit |
-| 3 | `app/lib/__tests__/feed.test.ts` | Edit |
-| 4 | `app/components/feed-activity-card.tsx` | **New** |
-| 5 | `app/app/(tabs)/feed.tsx` | Edit |
-| 6 | `app/components/feed-action-bar.tsx` | Edit |
-| 7 | `app/components/feed-comments-sheet.tsx` | Edit |
+> **Note:** Combined into one PR for end-to-end testability. The page is
+> not useful without navigation hookups, and the hookups can't be tested
+> without the page.
+
+### New files (7)
+
+| # | File | Description |
+|---|------|-------------|
+| 1 | `supabase/migrations/2026XXXX_user_profile_rpcs.sql` | All four RPCs above |
+| 2 | `app/lib/user-profile.ts` | TS wrappers + types: `fetchUserProfile()`, `fetchUserHabits()`, `fetchUserFeedPage()`, `fetchMutualFriends()`, friendship status type |
+| 3 | `app/lib/__tests__/user-profile.test.ts` | Tests for pure helpers (cursor building, type narrowing, empty-state guards) |
+| 4 | `app/components/user-hero.tsx` | Large avatar, handle, friendship badge + action button, overflow menu |
+| 5 | `app/components/user-habit-chips.tsx` | Horizontal chip row with "All" default, colored per-habit chips, selection state |
+| 6 | `app/components/mutual-friends-row.tsx` | Overlapping avatars + "N mutual friends" label |
+| 7 | `app/app/user/[id].tsx` | Screen: orchestrates hero + chips + feed FlatList, pagination, chip filtering, comments sheet |
+
+### Modified files (7)
+
+| # | File | Description |
+|---|------|-------------|
+| 8 | `app/app/_layout.tsx` | Add `user/[id]` to root stack navigator |
+| 9 | `app/components/feed-avatar.tsx` | Add optional `onPress` prop, wrap in `Pressable` when set |
+| 10 | `app/components/feed-card.tsx` | Pass `onPress` to avatar + make handle tappable → `router.push(/user/${id})` |
+| 11 | `app/components/feed-activity-card.tsx` | Same avatar/handle tap → user page |
+| 12 | `app/components/feed-comment-row.tsx` | Avatar/handle tap → user page |
+| 13 | `app/components/friend-row.tsx` | Row tap → user page |
+| 14 | `app/components/friend-search-result-row.tsx` | Row tap → user page |
+
+---
+
+## Risks & Mitigations
+
+- **200-line file limit:** Screen file is the most at risk. Mitigated by
+  extracting hero, chips, and mutual-friends into dedicated components.
+  The screen orchestrates state + renders a FlatList with header.
+- **RPC complexity:** `get_user_feed_page` mirrors existing `fetch_feed_page`
+  with an added `owner_id` filter. Copy-and-modify, not generalize.
+- **No new npm deps:** All UI uses RN primitives + expo-image.
+- **Visibility correctness:** All filtering is server-side in RPCs + RLS.
+  The client never sees data the viewer shouldn't access.
+- **Gamification guard:** No stats, streaks, or completion rates on the
+  profile page. Chips show only title + icon + color. Feed shows
+  individual completions as discrete events.
+- **Blocked users:** RPCs return empty result sets for blocked users. The
+  screen shows an empty/not-found state.
+
+---
+
+## Open Questions
+
+1. Should the profile show "Joined [date]" metadata? (Answer: no)
+2. Tapping the mutual friends row — open a full list modal, or just show
+   names inline as a tooltip? (Answer: open a full list modal and allow for tapping on those users)
+3. When viewing yourself, should there be a small "Settings" link to the
+   Me tab? (Answer: no)

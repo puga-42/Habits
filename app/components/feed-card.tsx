@@ -2,6 +2,7 @@
 // the habit line ("completed Meditate 🧘"), optional attachment carousel,
 // optional note excerpt, action bar.
 
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
@@ -36,8 +37,10 @@ export function FeedCard({
   onBlock,
   onMute,
 }: Props) {
+  const router = useRouter();
   const [noteExpanded, setNoteExpanded] = useState(false);
   const isSelf = item.owner_id === viewerId;
+  const goToUser = () => router.push(`/user/${item.owner_id}`);
 
   const openOverflow = () => {
     const buttons: { text: string; onPress?: () => void; style?: 'destructive' | 'cancel' }[] = [];
@@ -60,11 +63,14 @@ export function FeedCard({
           handle={item.owner_handle}
           size={36}
           tintColor={fallbackColor}
+          onPress={goToUser}
         />
         <View style={styles.headerText}>
-          <ThemedText style={styles.handle} numberOfLines={1}>
-            @{item.owner_handle}
-          </ThemedText>
+          <Pressable onPress={goToUser}>
+            <ThemedText style={styles.handle} numberOfLines={1}>
+              @{item.owner_handle}
+            </ThemedText>
+          </Pressable>
           <ThemedText style={styles.meta} numberOfLines={1}>
             {formatRelativeTime(feedItemSortKey(item), now)}
           </ThemedText>

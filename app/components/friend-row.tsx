@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
 import { FeedAvatar } from '@/components/feed-avatar';
@@ -11,6 +12,8 @@ type Props = {
 };
 
 export function FriendRow({ friend, onUnfriend }: Props) {
+  const router = useRouter();
+  const goToUser = () => router.push(`/user/${friend.id}`);
   const openOverflow = () => {
     Alert.alert(
       `Remove @${friend.handle}?`,
@@ -24,16 +27,18 @@ export function FriendRow({ friend, onUnfriend }: Props) {
 
   return (
     <View style={styles.row}>
-      <FeedAvatar
-        url={friend.avatar_url}
-        handle={friend.handle}
-        size={40}
-      />
-      <View style={styles.info}>
-        <ThemedText style={styles.handle} numberOfLines={1}>
-          @{friend.handle}
-        </ThemedText>
-      </View>
+      <Pressable onPress={goToUser} style={styles.rowMain}>
+        <FeedAvatar
+          url={friend.avatar_url}
+          handle={friend.handle}
+          size={40}
+        />
+        <View style={styles.info}>
+          <ThemedText style={styles.handle} numberOfLines={1}>
+            @{friend.handle}
+          </ThemedText>
+        </View>
+      </Pressable>
       <Pressable onPress={openOverflow} hitSlop={10} style={styles.menuButton}>
         <IconSymbol name="ellipsis" color="rgba(127,127,127,0.9)" size={20} />
       </Pressable>
@@ -49,6 +54,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     gap: 10,
   },
+  rowMain: { flexDirection: 'row', alignItems: 'center', flex: 1, gap: 10 },
   info: { flex: 1 },
   handle: { fontSize: 15, fontWeight: '600' },
   menuButton: { padding: 4 },

@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { FeedAvatar } from '@/components/feed-avatar';
@@ -17,6 +18,8 @@ export function FriendSearchResultRow({
   onAcceptRequest,
   loading,
 }: Props) {
+  const router = useRouter();
+  const goToUser = () => router.push(`/user/${result.id}`);
   const { label, onPress, accent } = buttonConfig(
     result.friendship_status,
     onSendRequest,
@@ -29,16 +32,18 @@ export function FriendSearchResultRow({
 
   return (
     <View style={styles.row}>
-      <FeedAvatar
-        url={result.avatar_url}
-        handle={result.handle}
-        size={36}
-      />
-      <View style={styles.info}>
-        <ThemedText style={styles.handle} numberOfLines={1}>
-          @{result.handle}
-        </ThemedText>
-      </View>
+      <Pressable onPress={goToUser} style={styles.rowMain}>
+        <FeedAvatar
+          url={result.avatar_url}
+          handle={result.handle}
+          size={36}
+        />
+        <View style={styles.info}>
+          <ThemedText style={styles.handle} numberOfLines={1}>
+            @{result.handle}
+          </ThemedText>
+        </View>
+      </Pressable>
       <Pressable
         onPress={onPress}
         disabled={disabled}
@@ -88,6 +93,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     gap: 10,
   },
+  rowMain: { flexDirection: 'row', alignItems: 'center', flex: 1, gap: 10 },
   info: { flex: 1 },
   handle: { fontSize: 15, fontWeight: '600' },
   button: {

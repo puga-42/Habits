@@ -2,7 +2,7 @@
 // initial-bubble (first letter of handle) when no avatar_url is set.
 
 import { Image } from 'expo-image';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 
@@ -11,24 +11,22 @@ type Props = {
   handle: string;
   size?: number;
   tintColor?: string;
+  onPress?: () => void;
 };
 
-export function FeedAvatar({ url, handle, size = 36, tintColor }: Props) {
+export function FeedAvatar({ url, handle, size = 36, tintColor, onPress }: Props) {
   const radius = size / 2;
   const initial = (handle || '?').trim().charAt(0).toUpperCase();
   const bg = tintColor ?? 'rgba(127,127,127,0.45)';
 
-  if (url) {
-    return (
-      <Image
-        source={{ uri: url }}
-        style={[styles.avatar, { width: size, height: size, borderRadius: radius }]}
-        contentFit="cover"
-        transition={150}
-      />
-    );
-  }
-  return (
+  const content = url ? (
+    <Image
+      source={{ uri: url }}
+      style={[styles.avatar, { width: size, height: size, borderRadius: radius }]}
+      contentFit="cover"
+      transition={150}
+    />
+  ) : (
     <View
       style={[
         styles.fallback,
@@ -44,6 +42,11 @@ export function FeedAvatar({ url, handle, size = 36, tintColor }: Props) {
       </ThemedText>
     </View>
   );
+
+  if (onPress) {
+    return <Pressable onPress={onPress}>{content}</Pressable>;
+  }
+  return content;
 }
 
 const styles = StyleSheet.create({

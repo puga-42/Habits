@@ -31,6 +31,7 @@ export function FeedCommentRow({
   const router = useRouter();
   const canDelete =
     viewerId === comment.author_id || viewerId === completionOwnerId;
+  const goToUser = () => router.push(`/user/${comment.author_id}`);
 
   const handleLike = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -55,10 +56,13 @@ export function FeedCommentRow({
         url={comment.author_avatar_url}
         handle={comment.author_handle}
         size={32}
+        onPress={goToUser}
       />
       <View style={styles.body}>
         <ThemedText style={styles.text}>
-          <ThemedText style={styles.author}>{comment.author_handle}</ThemedText>
+          <ThemedText style={styles.author} onPress={goToUser}>
+            {comment.author_handle}
+          </ThemedText>
           <ThemedText style={styles.meta}>
             {' '}
             · {formatRelativeTime(comment.created_at, now)}

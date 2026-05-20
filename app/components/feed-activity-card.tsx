@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
 import { FeedActionBar } from '@/components/feed-action-bar';
@@ -28,7 +29,9 @@ export function FeedActivityCard({
   onBlock,
   onMute,
 }: Props) {
+  const router = useRouter();
   const isSelf = item.owner_id === viewerId;
+  const goToUser = () => router.push(`/user/${item.owner_id}`);
 
   const openOverflow = () => {
     const buttons: {
@@ -59,11 +62,14 @@ export function FeedActivityCard({
           handle={item.owner_handle}
           size={36}
           tintColor={fallbackColor}
+          onPress={goToUser}
         />
         <View style={styles.headerText}>
-          <ThemedText style={styles.handle} numberOfLines={1}>
-            @{item.owner_handle}
-          </ThemedText>
+          <Pressable onPress={goToUser}>
+            <ThemedText style={styles.handle} numberOfLines={1}>
+              @{item.owner_handle}
+            </ThemedText>
+          </Pressable>
           <ThemedText style={styles.meta} numberOfLines={1}>
             {formatRelativeTime(feedItemSortKey(item), now)}
           </ThemedText>
