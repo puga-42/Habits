@@ -8,16 +8,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Calendar3DayView } from '@/components/calendar-3day-view';
 import { CalendarDayView } from '@/components/calendar-day-view';
+import type { ViewMode } from '@/components/calendar-menu-drawer';
+import { CompletionToast } from '@/components/completion-toast';
+import { useDrawer } from '@/components/drawer-provider';
 import { FabSpeedDial } from '@/components/fab-speed-dial';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import {
-  CalendarMenuDrawer,
-  type ViewMode,
-} from '@/components/calendar-menu-drawer';
 import { CalendarMonthView } from '@/components/calendar-month-view';
 import { CalendarScheduleView } from '@/components/calendar-schedule-view';
 import { CalendarWeekView } from '@/components/calendar-week-view';
-import { CompletionToast } from '@/components/completion-toast';
+import { TabTopBar } from '@/components/tab-top-bar';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { WeekStrip } from '@/components/week-strip';
@@ -54,9 +53,6 @@ import {
 } from '@/lib/history';
 import { fetchProfile, type Profile } from '@/lib/profile';
 
-// Schedule view temporarily disabled — the agenda swipe + drag combo has
-// outstanding bugs there. Re-add 'schedule' when it's ready.
-const AVAILABLE_VIEWS: ViewMode[] = ['day', '3day', 'week', 'month'];
 const SCHEDULE_INITIAL_HALF_WINDOW = 7; // days each direction
 const SCHEDULE_EXTEND_BY = 7;
 
@@ -65,12 +61,10 @@ export default function CalendarScreen() {
   const { session } = useAuth();
   const userId = session?.user.id;
 
+  const { view, setView, openDrawer } = useDrawer();
   const today = useMemo(() => new Date(), []);
-  const [view, setView] = useState<ViewMode>('day');
   const [previousView, setPreviousView] = useState<ViewMode | null>(null);
   const [anchorDate, setAnchorDate] = useState(today);
-  const [filterHabitId, setFilterHabitId] = useState<string | null>(null);
-  const [menuOpen, setMenuOpen] = useState(false);
 
   // Schedule view tracks its own loaded window (today ± 7 days initially).
   const [scheduleWindow, setScheduleWindow] = useState(() => {
@@ -129,26 +123,6 @@ export default function CalendarScreen() {
     }, [userId, load]),
   );
 
-  // Apply the habit filter across habits + completions + overrides.
-  const filteredHabits = useMemo(
-    () => (filterHabitId ? habits.filter((h) => h.id === filterHabitId) : habits),
-    [filterHabitId, habits],
-  );
-  const filteredCompletions = useMemo(
-    () =>
-      filterHabitId
-        ? completions.filter((c) => c.habit_id === filterHabitId)
-        : completions,
-    [filterHabitId, completions],
-  );
-  const filteredOverrides = useMemo(
-    () =>
-      filterHabitId
-        ? overrides.filter((o) => o.habit_id === filterHabitId)
-        : overrides,
-    [filterHabitId, overrides],
-  );
-
   // The days the active view needs to render.
   const daysInRange = useMemo(() => {
     if (view === 'month') {
@@ -193,27 +167,27 @@ export default function CalendarScreen() {
     () =>
       buildDayGroups(
         daysInRange,
-        filteredHabits,
-        filteredCompletions,
-        filteredOverrides,
+        habits,
+        completions,
+        overrides,
         today,
       ),
-    [daysInRange, filteredHabits, filteredCompletions, filteredOverrides, today],
+    [daysInRange, habits, completions, overrides, today],
   );
 
   // Day-by-day completion counts across the fetched window, used to fill the
   // week-strip cells. Computed directly from completions so we don't need to
   // build DayGroups for the 21-day strip range separately.
   const completionCountByIso = useMemo(
-    () => countCompletionsByDate(filteredCompletions),
-    [filteredCompletions],
+    () => countCompletionsByDate(completions),
+    [completions],
   );
 
   // Per-flex-habit progress through the current period (day/week/month). Drives
   // the trailing mini ring on flex completion pills.
   const flexProgressByHabitId = useMemo(
-    () => flexProgressByHabit(filteredHabits, filteredCompletions, today),
-    [filteredHabits, filteredCompletions, today],
+    () => flexProgressByHabit(habits, completions, today),
+    [habits, completions, today],
   );
 
   const groupByIso = useMemo(() => {
@@ -245,11 +219,6 @@ export default function CalendarScreen() {
     setAnchorDate(d);
   }
 
-  function pickView(next: ViewMode) {
-    setPreviousView(null);
-    setView(next);
-  }
-
   function jumpToToday() {
     setPreviousView(null);
     setAnchorDate(new Date());
@@ -278,10 +247,6 @@ export default function CalendarScreen() {
     if (!previousView) return;
     setView(previousView);
     setPreviousView(null);
-  }
-
-  function openSettings() {
-    router.push('/me');
   }
 
   async function handleTrailingPress(row: AgendaRow, dateIso: string) {
@@ -386,27 +351,17 @@ export default function CalendarScreen() {
   return (
     <ThemedView style={styles.root}>
       <SafeAreaView edges={['top']} style={styles.content}>
-        {/* Top bar */}
-        <View style={styles.topBar}>
-          <Pressable
-            onPress={() => setMenuOpen(true)}
-            hitSlop={12}
-            style={styles.topSide}>
-            <ThemedText style={styles.menuIcon}>☰</ThemedText>
-          </Pressable>
-          <View style={styles.titleWrap}>
-            <ThemedText type="defaultSemiBold" style={styles.title} numberOfLines={1}>
-              {headerLabel(view, anchorDate, weekStart)}
-            </ThemedText>
-          </View>
-          <View style={styles.topSideRight}>
-            {!isOnToday && (
+        <TabTopBar
+          title={headerLabel(view, anchorDate, weekStart)}
+          onMenuPress={openDrawer}
+          rightSlot={
+            !isOnToday ? (
               <Pressable onPress={jumpToToday} hitSlop={8}>
                 <ThemedText style={styles.todayBtn}>Today</ThemedText>
               </Pressable>
-            )}
-          </View>
-        </View>
+            ) : undefined
+          }
+        />
 
         {/* Day view: optional back-to-prev-view affordance, then the week strip. */}
         {view === 'day' && showBack && (
@@ -527,18 +482,6 @@ export default function CalendarScreen() {
         />
       </SafeAreaView>
 
-      <CalendarMenuDrawer
-        visible={menuOpen}
-        view={view}
-        available={AVAILABLE_VIEWS}
-        onPickView={pickView}
-        habits={habits}
-        filterHabitId={filterHabitId}
-        onPickFilter={setFilterHabitId}
-        onOpenSettings={openSettings}
-        onClose={() => setMenuOpen(false)}
-      />
-
       <CompletionToast
         visible={toastVisible}
         onPress={() => {
@@ -596,18 +539,6 @@ function parseIsoLocal(iso: string): Date {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   content: { flex: 1 },
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingTop: 8,
-    paddingBottom: 4,
-  },
-  topSide: { width: 80, alignItems: 'flex-start' },
-  topSideRight: { width: 80, alignItems: 'flex-end' },
-  menuIcon: { fontSize: 24, paddingHorizontal: 6, paddingVertical: 4 },
-  titleWrap: { flex: 1, alignItems: 'center' },
-  title: { fontSize: 18 },
   todayBtn: { fontSize: 14, color: '#7c3aed', fontWeight: '600' },
   subBar: {
     flexDirection: 'row',

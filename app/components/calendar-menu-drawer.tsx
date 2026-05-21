@@ -1,7 +1,4 @@
-// Slide-from-left drawer (Google Calendar style). Hosts view-mode picks, the
-// habit filter (collapsible dropdown), and future settings/links.
-
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import {
   Animated,
   Easing,
@@ -15,7 +12,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import type { Habit } from '@/lib/habits';
 
 export type ViewMode = 'day' | '3day' | 'week' | 'month' | 'schedule';
 
@@ -24,9 +20,6 @@ type Props = {
   view: ViewMode;
   available: ViewMode[];
   onPickView: (v: ViewMode) => void;
-  habits: Habit[];
-  filterHabitId: string | null;
-  onPickFilter: (id: string | null) => void;
   onOpenSettings: () => void;
   onClose: () => void;
 };
@@ -47,14 +40,10 @@ export function CalendarMenuDrawer({
   view,
   available,
   onPickView,
-  habits,
-  filterHabitId,
-  onPickFilter,
   onOpenSettings,
   onClose,
 }: Props) {
   const translateX = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
-  const [filterExpanded, setFilterExpanded] = useState(false);
 
   useEffect(() => {
     Animated.timing(translateX, {
@@ -63,10 +52,7 @@ export function CalendarMenuDrawer({
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start();
-    if (!visible) setFilterExpanded(false);
   }, [visible, translateX]);
-
-  const currentFilterLabel = filterLabelFor(habits, filterHabitId);
 
   return (
     <Modal
@@ -117,49 +103,6 @@ export function CalendarMenuDrawer({
                   })}
                 </Section>
 
-                <Section title="Filter">
-                  <Pressable
-                    onPress={() => setFilterExpanded((v) => !v)}
-                    style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}>
-                    <View
-                      style={[
-                        styles.bullet,
-                        filterHabitId !== null && styles.bulletActive,
-                      ]}
-                    />
-                    <ThemedText style={styles.rowText} numberOfLines={1}>
-                      {currentFilterLabel}
-                    </ThemedText>
-                    <ThemedText style={styles.chevron}>
-                      {filterExpanded ? '▾' : '▸'}
-                    </ThemedText>
-                  </Pressable>
-                  {filterExpanded && (
-                    <View style={styles.subList}>
-                      <FilterOption
-                        label="All habits"
-                        active={filterHabitId === null}
-                        onPress={() => {
-                          onPickFilter(null);
-                          onClose();
-                        }}
-                      />
-                      {habits.map((h) => (
-                        <FilterOption
-                          key={h.id}
-                          label={`${h.icon ? h.icon + '  ' : ''}${h.title}`}
-                          color={h.color}
-                          active={filterHabitId === h.id}
-                          onPress={() => {
-                            onPickFilter(h.id);
-                            onClose();
-                          }}
-                        />
-                      ))}
-                    </View>
-                  )}
-                </Section>
-
                 <Section title="More">
                   <Pressable
                     onPress={() => {
@@ -187,45 +130,6 @@ function Section({ title, children }: { title: string; children: React.ReactNode
       {children}
     </View>
   );
-}
-
-function FilterOption({
-  label,
-  active,
-  color,
-  onPress,
-}: {
-  label: string;
-  active: boolean;
-  color?: string | null;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [styles.subRow, pressed && styles.rowPressed]}>
-      <View
-        style={[
-          styles.subBullet,
-          color ? { backgroundColor: color } : null,
-          !color && active && styles.bulletActive,
-          !color && !active && styles.subBulletFallback,
-        ]}
-      />
-      <ThemedText
-        style={[styles.subRowText, active && styles.rowTextActive]}
-        numberOfLines={1}>
-        {label}
-      </ThemedText>
-    </Pressable>
-  );
-}
-
-function filterLabelFor(habits: Habit[], id: string | null): string {
-  if (!id) return 'All habits';
-  const h = habits.find((x) => x.id === id);
-  if (!h) return 'All habits';
-  return `${h.icon ? h.icon + ' ' : ''}${h.title}`;
 }
 
 const styles = StyleSheet.create({
@@ -274,21 +178,4 @@ const styles = StyleSheet.create({
   rowText: { fontSize: 16, flex: 1 },
   rowTextActive: { fontWeight: '600' },
   soon: { fontSize: 13, opacity: 0.55, fontStyle: 'italic' },
-  chevron: { fontSize: 12, opacity: 0.55, width: 14, textAlign: 'right' },
-  subList: { paddingLeft: 22, marginTop: 2 },
-  subRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderRadius: 8,
-  },
-  subBullet: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  subBulletFallback: { backgroundColor: 'rgba(127,127,127,0.4)' },
-  subRowText: { fontSize: 14, flex: 1, opacity: 0.85 },
 });

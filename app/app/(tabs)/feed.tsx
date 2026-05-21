@@ -12,12 +12,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useDrawer } from '@/components/drawer-provider';
 import { FeedActivityCard } from '@/components/feed-activity-card';
 import { FeedCard } from '@/components/feed-card';
 import { FeedCommentsSheet } from '@/components/feed-comments-sheet';
 import { FeedEmpty } from '@/components/feed-empty';
 import { FeedNewPill } from '@/components/feed-new-pill';
-import { ThemedText } from '@/components/themed-text';
+import { TabTopBar } from '@/components/tab-top-bar';
 import { ThemedView } from '@/components/themed-view';
 import { useAuth } from '@/lib/auth';
 import {
@@ -42,6 +43,7 @@ const PAGE_SIZE = 20;
 export default function FeedScreen() {
   const { session } = useAuth();
   const router = useRouter();
+  const { openDrawer } = useDrawer();
   const viewerId = session?.user.id ?? null;
   const [items, setItems] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -186,7 +188,7 @@ export default function FeedScreen() {
     return (
       <ThemedView style={styles.root}>
         <SafeAreaView edges={['top']} style={styles.content}>
-          <ThemedText type="title">Feed</ThemedText>
+          <TabTopBar title="Feed" onMenuPress={openDrawer} />
         </SafeAreaView>
       </ThemedView>
     );
@@ -197,9 +199,7 @@ export default function FeedScreen() {
   return (
     <ThemedView style={styles.root}>
       <SafeAreaView edges={['top']} style={styles.safe}>
-        <View style={styles.header}>
-          <ThemedText type="title">Feed</ThemedText>
-        </View>
+        <TabTopBar title="Feed" onMenuPress={openDrawer} />
 
         {loading && items.length === 0 ? (
           <View style={styles.center}>
@@ -330,11 +330,6 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   safe: { flex: 1 },
   content: { flex: 1, paddingHorizontal: 20, paddingTop: 16 },
-  header: {
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 6,
-  },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   separator: {
     height: StyleSheet.hairlineWidth,

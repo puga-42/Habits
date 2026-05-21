@@ -10,10 +10,12 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useDrawer } from '@/components/drawer-provider';
 import { FriendRequestRow } from '@/components/friend-request-row';
 import { FriendRow } from '@/components/friend-row';
 import { FriendSearchBar } from '@/components/friend-search-bar';
 import { FriendSearchResultRow } from '@/components/friend-search-result-row';
+import { TabTopBar } from '@/components/tab-top-bar';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -39,6 +41,7 @@ const FRIENDS_PAGE_SIZE = 30;
 
 export default function FriendsScreen() {
   const { session } = useAuth();
+  const { openDrawer } = useDrawer();
   const viewerId = session?.user.id ?? null;
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -268,7 +271,7 @@ export default function FriendsScreen() {
     return (
       <ThemedView style={styles.root}>
         <SafeAreaView edges={['top']} style={styles.content}>
-          <ThemedText type="title">Friends</ThemedText>
+          <TabTopBar title="Friends" onMenuPress={openDrawer} />
         </SafeAreaView>
       </ThemedView>
     );
@@ -281,9 +284,7 @@ export default function FriendsScreen() {
   return (
     <ThemedView style={styles.root}>
       <SafeAreaView edges={['top']} style={styles.safe}>
-        <View style={styles.header}>
-          <ThemedText type="title">Friends</ThemedText>
-        </View>
+        <TabTopBar title="Friends" onMenuPress={openDrawer} />
 
         <FriendSearchBar
           value={searchQuery}
@@ -447,11 +448,6 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   safe: { flex: 1 },
   content: { flex: 1, paddingHorizontal: 20, paddingTop: 16 },
-  header: {
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 2,
-  },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   emptyContainer: {
     flex: 1,
