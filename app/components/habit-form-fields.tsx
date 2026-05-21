@@ -26,9 +26,10 @@ const VISIBILITY_LABELS: Record<Visibility, string> = {
 
 type Props = {
   lockKind?: boolean;
+  onDelete?: () => void;
 };
 
-export function HabitFormFields({ lockKind = false }: Props) {
+export function HabitFormFields({ lockKind = false, onDelete }: Props) {
   const router = useRouter();
   const { draft, update } = useHabitForm();
   const textColor = useThemeColor({}, 'text');
@@ -185,6 +186,12 @@ export function HabitFormFields({ lockKind = false }: Props) {
           </Pressable>
         ))}
       </View>
+
+      {onDelete && (
+        <Pressable onPress={onDelete} style={styles.deleteButton}>
+          <ThemedText style={styles.deleteText}>Delete Habit</ThemedText>
+        </Pressable>
+      )}
     </ScrollView>
   );
 }
@@ -323,4 +330,16 @@ const styles = StyleSheet.create({
   },
   radio: { fontSize: 18, width: 24 },
   visibilityText: { fontSize: 15, flex: 1 },
+  deleteButton: {
+    marginTop: 16,
+    paddingVertical: 14,
+    borderRadius: 8,
+    backgroundColor: 'rgba(239,68,68,0.1)',
+    alignItems: 'center',
+  },
+  deleteText: {
+    color: '#ef4444',
+    fontSize: 16,
+    fontWeight: '600',
+  },
 });

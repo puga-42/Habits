@@ -336,6 +336,59 @@ export async function applyEditThis(
   if (error) throw error;
 }
 
+// ─── Deletion mutations ───────────────────────────────────────────────────
+
+export async function deleteHabitAll(habitId: string): Promise<void> {
+  const { error } = await supabase
+    .from('habits')
+    .update({ deleted_at: new Date().toISOString() })
+    .eq('id', habitId);
+  if (error) throw error;
+}
+
+export async function deleteHabitFuture(habit: Habit, now = new Date()): Promise<void> {
+  const untilDate =
+    habit.kind === 'flex'
+      ? flexPeriodEnd(habit, now)
+      : endOfDay(now);
+
+  const { error } = await supabase
+    .from('habits')
+    .update({ until: untilDate.toISOString() })
+    .eq('id', habit.id);
+  if (error) throw error;
+}
+
+export function flexPeriodEnd(habit: Habit, now: Date): Date {
+  let end: Date;
+  switch (habit.target_period) {
+    case 'day':
+      end = endOfDay(now);
+      break;
+    case 'week': {
+      const day = now.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+      const daysUntilSunday = day === 0 ? 0 : 7 - day;
+      end = new Date(now);
+      end.setDate(end.getDate() + daysUntilSunday);
+      end.setHours(23, 59, 59, 999);
+      break;
+    }
+    case 'month': {
+      end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+      break;
+    }
+    default:
+      end = endOfDay(now);
+  }
+
+  if (habit.until) {
+    const existing = new Date(habit.until);
+    if (existing.getTime() < end.getTime()) return existing;
+  }
+
+  return end;
+}
+
 // ─── Time helpers for overrides ────────────────────────────────────────────
 
 export function formatTime(d: Date): string {
@@ -385,6 +438,24 @@ export function weekStart(d: Date): Date {
   const shift = day === 0 ? -6 : 1 - day;
   x.setDate(x.getDate() + shift);
   return x;
+}
+
+// ─── Edit helpers ─────────────────────────────────────────────────────────
+
+export function buildPatch(
+  original: Habit,
+  draft: { title: string; icon: string; color: string },
+): OccurrencePatch {
+  const patch: OccurrencePatch = {};
+  if (draft.title.trim() !== original.title) patch.title = draft.title.trim();
+  if (draft.icon !== original.icon) patch.icon = draft.icon;
+  if (draft.color !== original.color) patch.color = draft.color;
+  return patch;
+}
+
+export function occurrenceMidnight(occurrenceDate: string): Date {
+  const [y, m, d] = occurrenceDate.split('-').map((n) => parseInt(n, 10));
+  return new Date(y, m - 1, d, 0, 0, 0, 0);
 }
 
 // ─── Swipe-action mutations ───────────────────────────────────────────────

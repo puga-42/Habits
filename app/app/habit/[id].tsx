@@ -18,9 +18,12 @@ import {
   applyEditAll,
   applyEditFuture,
   applyEditThis,
+  buildPatch,
+  deleteHabitAll,
+  deleteHabitFuture,
   fetchHabit,
   type Habit,
-  type OccurrencePatch,
+  occurrenceMidnight,
 } from '@/lib/habits';
 
 type EditScope = 'this' | 'future' | 'all';
@@ -37,6 +40,7 @@ export default function EditHabitScreen() {
   const [habit, setHabit] = useState<Habit | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -75,24 +79,15 @@ export default function EditHabitScreen() {
         }
         await applyEditFuture(session.user.id, habit, splitTime, newInsert);
       } else {
-        // 'this'
-        if (!occurrenceDate) {
-          throw new Error('"This occurrence only" needs an occurrence date.');
-        }
+        if (!occurrenceDate) throw new Error('"This occurrence only" needs an occurrence date.');
         const patch = buildPatch(habit, draft);
-        if (Object.keys(patch).length === 0) {
-          // Nothing actually changed in per-occurrence fields. Bail out gracefully.
-          router.back();
-          return;
-        }
+        if (Object.keys(patch).length === 0) { router.back(); return; }
         await applyEditThis(habit.id, occurrenceDate, patch);
       }
       reset();
       router.back();
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : (err as any)?.message ?? JSON.stringify(err);
-      Alert.alert('Could not save', message);
+      Alert.alert('Could not save', err instanceof Error ? err.message : String(err));
     } finally {
       setSaving(false);
     }
@@ -109,8 +104,6 @@ export default function EditHabitScreen() {
       Alert.alert('Target required', 'Flex habits need at least 1 per period.');
       return;
     }
-    // Flex habits and one-off scheduled habits have no per-occurrence semantics
-    // — there's only one row/state to update.
     const isOneOff = habit.rrule === 'FREQ=DAILY;COUNT=1';
     if (habit.kind === 'flex' || isOneOff) {
       apply('all');
@@ -126,6 +119,38 @@ export default function EditHabitScreen() {
         { text: 'Cancel', style: 'cancel' },
       ],
     );
+  }
+
+  async function execDelete(scope: 'all' | 'future') {
+    if (!habit) return;
+    setDeleting(true);
+    try {
+      if (scope === 'all') await deleteHabitAll(habit.id);
+      else await deleteHabitFuture(habit);
+      reset();
+      router.back();
+    } catch (err) {
+      Alert.alert('Could not delete', err instanceof Error ? err.message : String(err));
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  function onDelete() {
+    if (!habit) return;
+    const isOneOff = habit.rrule === 'FREQ=DAILY;COUNT=1';
+    if (isOneOff) {
+      Alert.alert('Delete habit?', 'Past completions will be kept.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: () => execDelete('all') },
+      ]);
+      return;
+    }
+    Alert.alert(`Delete "${habit.title}"`, 'Past completions will be kept.', [
+      { text: 'Delete all occurences', style: 'destructive', onPress: () => execDelete('all') },
+      { text: 'Delete all future occurences', onPress: () => execDelete('future') },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
   }
 
   if (loading || !habit) {
@@ -146,34 +171,17 @@ export default function EditHabitScreen() {
             <ThemedText style={styles.headerButton}>Cancel</ThemedText>
           </Pressable>
           <ThemedText type="defaultSemiBold">Edit habit</ThemedText>
-          <Pressable onPress={onSave} disabled={saving} hitSlop={12}>
+          <Pressable onPress={onSave} disabled={saving || deleting} hitSlop={12}>
             <ThemedText
-              style={[styles.headerButton, styles.save, saving && styles.disabled]}>
+              style={[styles.headerButton, styles.save, (saving || deleting) && styles.disabled]}>
               {saving ? 'Saving…' : 'Save'}
             </ThemedText>
           </Pressable>
         </View>
-        <HabitFormFields lockKind />
+        <HabitFormFields lockKind onDelete={onDelete} />
       </SafeAreaView>
     </ThemedView>
   );
-}
-
-// Build the per-occurrence patch by diffing the draft against the original
-// habit. Only fields that make sense per-occurrence are included.
-function buildPatch(original: Habit, draft: ReturnType<typeof useHabitForm>['draft']): OccurrencePatch {
-  const patch: OccurrencePatch = {};
-  if (draft.title.trim() !== original.title) patch.title = draft.title.trim();
-  if (draft.icon !== original.icon) patch.icon = draft.icon;
-  if (draft.color !== original.color) patch.color = draft.color;
-  return patch;
-}
-
-// Local midnight on the occurrence date — used as the split point for
-// "this and future" edits now that habits don't carry a time-of-day.
-function occurrenceMidnight(occurrenceDate: string): Date {
-  const [y, m, d] = occurrenceDate.split('-').map((n) => parseInt(n, 10));
-  return new Date(y, m - 1, d, 0, 0, 0, 0);
 }
 
 const styles = StyleSheet.create({

@@ -1,151 +1,160 @@
-# Plan: User Profile Page
+# Plan: Delete Habit
 
-**Goal:** When a user taps an avatar or handle anywhere in the app, navigate to
-a profile page showing that user's enlarged avatar, habits (as filter chips),
-mutual friends, and completion feed. Viewing your own profile shows the same
-page others see (Me tab remains for settings).
+**Goal:** Add a "Delete Habit" button at the bottom of the edit screen. When
+pressed, the user chooses a deletion scope, confirms via Alert, and the habit
+is soft-deleted (all past completions preserved).
 
 ---
 
-## Design
+## Scope options by habit kind
 
-### Layout (ScrollView header + FlatList)
+### Scheduled habits (recurring)
+
+| Option | Label | Behavior |
+|--------|-------|----------|
+| **Delete All** | "Delete all occurrences" | Set `deleted_at = now()` on the master `habits` row. Habit disappears everywhere. Past completions remain in DB and feed. |
+| **Delete Future** | "Delete future occurrences" | Set `until` on the current master habit to today (end of day). Today's occurrence still exists; tomorrow onward is gone. No new habit row created (unlike "edit future" which creates a continuation). |
+
+One-off scheduled habits (`FREQ=DAILY;COUNT=1`) skip scope choice — go
+straight to "Delete All" with confirmation.
+
+### Flex habits
+
+| Option | Label | Behavior |
+|--------|-------|----------|
+| **Delete All** | "Delete all occurrences" | Set `deleted_at = now()` on the master `habits` row. Past completions remain. |
+| **Delete Future** | "Delete future occurrences" | Set `until` to end of the current period (e.g., end of this week for a weekly habit). Current period stays active; habit won't appear in future periods. |
+
+---
+
+## UX flow
+
+1. User opens habit edit screen (`/habit/[id]`)
+2. Scrolls to bottom of `HabitFormFields` — sees red "Delete Habit" button
+3. Taps button →
+   - **Recurring scheduled / flex:** `Alert.alert` with three buttons:
+     "Delete all occurrences", "Delete future occurrences", "Cancel"
+   - **One-off scheduled:** `Alert.alert` with two buttons:
+     "Delete Habit", "Cancel"
+4. On confirm → execute mutation → navigate back (router.back)
+5. On cancel → dismiss alert, stay on edit screen
+
+### Button placement
+
+The delete button lives **inside `HabitFormFields`**, rendered at the very
+bottom of the ScrollView after the Visibility section. This keeps the edit
+screen file (`habit/[id].tsx`) clean — it just passes an `onDelete` callback
+prop. The button is only shown in edit mode (not on create).
+
+---
+
+## Data changes
+
+**No schema changes.** All required columns already exist:
+- `habits.deleted_at` (timestamptz, nullable) — used for "Delete All"
+- `habits.until` (timestamptz, nullable) — used for "Delete Future"
+- `habit_overrides.kind = 'skip'` — not needed (we dropped "delete current")
+
+**Past completions are preserved.** `habit_completions` rows are untouched by
+any deletion scope. Friends continue to see past completions in their feed.
+
+---
+
+## Implementation — files touched
+
+### Modified files (3)
+
+| # | File | Change |
+|---|------|--------|
+| 1 | `app/lib/habits.ts` | Add `deleteHabitAll(habitId)` and `deleteHabitFuture(habit)` functions |
+| 2 | `app/lib/__tests__/habits.test.ts` | Tests for the pure helper `flexPeriodEnd(habit)` that computes the `until` date for flex "delete future" |
+| 3 | `app/components/habit-form-fields.tsx` | Add optional `onDelete` prop. Render red "Delete Habit" button at bottom of ScrollView when provided |
+| 4 | `app/app/habit/[id].tsx` | Add `onDelete` handler: scope selection Alert → confirmation Alert → call mutation → navigate back |
+
+### No new files
+
+Everything fits within existing modules. No new dependencies.
+
+---
+
+## Mutation details
+
+### `deleteHabitAll(habitId: string)`
 
 ```
-┌─────────────────────────────┐
-│        ┌──────────┐         │
-│        │  Avatar  │  96px   │
-│        └──────────┘         │
-│         @handle             │
-│     [ Friends ✓ ]           │  ← status badge + action btn
-│    3 mutual friends ○○○     │  ← overlapping avatars
-├─────────────────────────────┤
-│  6 habits                   │
-│ [All] [Meditate🧘] [Gym💪]… │  ← horizontal chip scroll
-├─────────────────────────────┤
-│  ┌─ FeedCard ─────────────┐ │
-│  │ completed Meditate 🧘  │ │  ← reuses existing FeedCard
-│  │ 📸 attachment carousel │ │
-│  │ ❤ 3   💬 1             │ │
-│  └────────────────────────┘ │
-│  ┌─ FeedCard ─────────────┐ │
-│  │ ...                    │ │
-│  └────────────────────────┘ │
-│         ⏳ load more        │
-└─────────────────────────────┘
+UPDATE habits SET deleted_at = now() WHERE id = habitId
 ```
 
-### Sections
+Simple soft-delete. RLS ensures only the owner can do this.
 
-1. **Hero** — enlarged `FeedAvatar` (96px), `@handle`, friendship
-   status/action button, overflow menu (block/report for non-self).
-2. **Mutual friends** — overlapping avatar row + count label. Hidden when
-   viewing self or when no mutual friends exist.
-3. **Habit chips** — horizontal FlatList. First chip is "All" (selected by
-   default). Each subsequent chip shows habit icon + title, colored by the
-   habit's color. Tapping a chip filters the feed to that habit's lineage.
-4. **Completion feed** — paginated, reverse-chronological. Reuses
-   `FeedCard` / `FeedActivityCard`. Same like/comment/report interactions.
-   Filtered by selected chip (or all if "All" selected).
+### `deleteHabitFuture(habit: Habit)`
 
-### Key interactions
+**Scheduled habits:**
+```
+UPDATE habits SET until = endOfToday WHERE id = habit.id
+```
 
-- **Friendship button** — states: "Add friend" / "Request sent" (cancel) /
-  "Friends" (remove). Hidden when viewing self.
-- **Chip filter** — selecting a chip re-fetches feed filtered to that
-  habit's `lineage_id`. "All" resets to unfiltered.
-- **Self-view** — same page layout, no friendship controls. Gives users a
-  preview of how they appear to friends.
-- **Overflow** — block user, report user (non-self only).
+Where `endOfToday` is today at 23:59:59.999 in the habit's timezone, converted
+to UTC. This allows today's occurrence to still appear but blocks all future
+RRULE expansion.
 
----
+**Flex habits:**
+```
+UPDATE habits SET until = endOfCurrentPeriod WHERE id = habit.id
+```
 
-## Data Requirements
+Where `endOfCurrentPeriod` depends on `target_period`:
+- `day` → end of today
+- `week` → end of Sunday (Monday-first weeks, so Sunday 23:59:59)
+- `month` → end of last day of current month
 
-### New Supabase RPCs
+### Pure helper: `flexPeriodEnd(habit: Habit): Date`
 
-1. **`get_user_profile_page(p_target_id, p_viewer_id)`** — returns profile
-   row + friendship status enum (`'none' | 'friends' | 'request_sent' |
-   'request_received'`) + friends_since timestamp + mutual friend count.
-   Returns empty if blocked.
-
-2. **`get_user_visible_habits(p_target_id, p_viewer_id)`** — habits the
-   viewer can see. Self: all non-deleted. Friend: public + friends-only.
-   Non-friend: public only. Blocked: empty. Returns: id, lineage_id,
-   title, icon, color, kind.
-
-3. **`get_user_feed_page(p_target_id, p_cursor, p_limit,
-   p_habit_lineage_id)`** — like `fetch_feed_page` but scoped to one
-   owner. Optional lineage filter for chip selection. Same visibility/RLS
-   rules as the main feed.
-
-4. **`get_mutual_friends(p_user_a, p_user_b, p_limit)`** — returns profile
-   rows (id, handle, avatar_url) of users who are friends with both.
-
-### Existing code reused (no changes)
-
-- `likeCompletion / unlikeCompletion / likeActivity / unlikeActivity`
-- `postComment / fetchComments`
-- `sendFriendRequest / acceptFriendRequest / removeFriend / blockUser`
-- `FeedCard`, `FeedActivityCard`, `FeedActionBar`, `FeedCommentsSheet`
-- `FeedAvatar` (used at larger size)
+Computes the end-of-period timestamp for a flex habit based on its
+`target_period`. This is the testable pure function.
 
 ---
 
-## Implementation — Single PR (14 files, exceeds 10-file limit by design)
+## Edge cases
 
-> **Note:** Combined into one PR for end-to-end testability. The page is
-> not useful without navigation hookups, and the hookups can't be tested
-> without the page.
-
-### New files (7)
-
-| # | File | Description |
-|---|------|-------------|
-| 1 | `supabase/migrations/2026XXXX_user_profile_rpcs.sql` | All four RPCs above |
-| 2 | `app/lib/user-profile.ts` | TS wrappers + types: `fetchUserProfile()`, `fetchUserHabits()`, `fetchUserFeedPage()`, `fetchMutualFriends()`, friendship status type |
-| 3 | `app/lib/__tests__/user-profile.test.ts` | Tests for pure helpers (cursor building, type narrowing, empty-state guards) |
-| 4 | `app/components/user-hero.tsx` | Large avatar, handle, friendship badge + action button, overflow menu |
-| 5 | `app/components/user-habit-chips.tsx` | Horizontal chip row with "All" default, colored per-habit chips, selection state |
-| 6 | `app/components/mutual-friends-row.tsx` | Overlapping avatars + "N mutual friends" label |
-| 7 | `app/app/user/[id].tsx` | Screen: orchestrates hero + chips + feed FlatList, pagination, chip filtering, comments sheet |
-
-### Modified files (7)
-
-| # | File | Description |
-|---|------|-------------|
-| 8 | `app/app/_layout.tsx` | Add `user/[id]` to root stack navigator |
-| 9 | `app/components/feed-avatar.tsx` | Add optional `onPress` prop, wrap in `Pressable` when set |
-| 10 | `app/components/feed-card.tsx` | Pass `onPress` to avatar + make handle tappable → `router.push(/user/${id})` |
-| 11 | `app/components/feed-activity-card.tsx` | Same avatar/handle tap → user page |
-| 12 | `app/components/feed-comment-row.tsx` | Avatar/handle tap → user page |
-| 13 | `app/components/friend-row.tsx` | Row tap → user page |
-| 14 | `app/components/friend-search-result-row.tsx` | Row tap → user page |
+1. **Habit with existing `until`**: "Delete Future" should only narrow, never
+   extend. If `until` is already set and is before our computed value, keep the
+   existing `until`.
+2. **Lineage chains**: "Delete All" only soft-deletes the specific `habits` row
+   being edited, not the entire lineage. Other rows in the lineage (from prior
+   "this and future" edits) are unaffected — they already have their own `until`
+   bounds.
+3. **Flex habit already past target**: Doesn't matter — deletion is about
+   whether the habit appears going forward, not about completions.
+4. **Concurrent completions**: No conflict — completions reference `habit_id`,
+   and soft-deleted habits still exist in the DB. The completion is still valid.
+5. **Feed visibility**: Existing `fetchHabits()` already filters
+   `.is('deleted_at', null)`, so deleted habits won't appear in the user's
+   habit list. Feed RPCs that join on habits should also respect `deleted_at`
+   for habit-level display, but individual completions remain visible.
+6. **Undo**: No undo. The confirmation Alert is the safety net. A future
+   "restore deleted habits" feature could leverage `deleted_at` being a
+   soft-delete, but that's out of scope.
 
 ---
 
-## Risks & Mitigations
+## Test plan
 
-- **200-line file limit:** Screen file is the most at risk. Mitigated by
-  extracting hero, chips, and mutual-friends into dedicated components.
-  The screen orchestrates state + renders a FlatList with header.
-- **RPC complexity:** `get_user_feed_page` mirrors existing `fetch_feed_page`
-  with an added `owner_id` filter. Copy-and-modify, not generalize.
-- **No new npm deps:** All UI uses RN primitives + expo-image.
-- **Visibility correctness:** All filtering is server-side in RPCs + RLS.
-  The client never sees data the viewer shouldn't access.
-- **Gamification guard:** No stats, streaks, or completion rates on the
-  profile page. Chips show only title + icon + color. Feed shows
-  individual completions as discrete events.
-- **Blocked users:** RPCs return empty result sets for blocked users. The
-  screen shows an empty/not-found state.
+- **Unit (pure):** `flexPeriodEnd` returns correct end-of-period for day/week/month
+- **Unit (pure):** `flexPeriodEnd` respects existing `until` (no extension)
+- **Integration (manual):**
+  - Delete all on a scheduled habit → habit disappears from today view and habit list
+  - Delete future on a scheduled habit → today still shows, tomorrow doesn't
+  - Delete all on a flex habit → habit disappears
+  - Delete future on a flex habit → current period still active, next period habit is gone
+  - Past completions remain visible in feed after any deletion
+  - One-off scheduled habit skips scope choice
+  - Cancel at either Alert dismisses without changes
 
 ---
 
-## Open Questions
+## Open questions
 
-1. Should the profile show "Joined [date]" metadata? (Answer: no)
-2. Tapping the mutual friends row — open a full list modal, or just show
-   names inline as a tooltip? (Answer: open a full list modal and allow for tapping on those users)
-3. When viewing yourself, should there be a small "Settings" link to the
-   Me tab? (Answer: no)
+1. Should "Delete future" on a flex habit with `target_period: 'day'` behave
+   identically to "Delete all"? (Both would effectively stop the habit after
+   today.) — **Proposed: yes, but still show both options for consistency.**

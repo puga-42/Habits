@@ -1,4 +1,4 @@
-import { applySectionReorder, canCompleteOn, type Habit } from '../habits';
+import { applySectionReorder, canCompleteOn, flexPeriodEnd, type Habit } from '../habits';
 
 function h(id: string, sort_index: number, created_at = '2026-05-01T00:00:00Z'): Habit {
   return {
@@ -102,5 +102,100 @@ describe('canCompleteOn', () => {
 
   it('rejects completing on a date far in the future', () => {
     expect(canCompleteOn('2027-01-01', today)).toBe(false);
+  });
+});
+
+function flexHabit(
+  targetPeriod: 'day' | 'week' | 'month',
+  until: string | null = null,
+): Habit {
+  return {
+    id: 'flex1',
+    lineage_id: 'flex1',
+    owner_id: 'u1',
+    kind: 'flex',
+    title: 'Gym',
+    description: null,
+    color: null,
+    icon: null,
+    visibility: 'private',
+    timezone: 'UTC',
+    dtstart: null,
+    rrule: null,
+    until,
+    target_count: 3,
+    target_period: targetPeriod,
+    sort_index: 1,
+    created_at: '2026-05-01T00:00:00Z',
+    updated_at: '2026-05-01T00:00:00Z',
+    deleted_at: null,
+  };
+}
+
+describe('flexPeriodEnd', () => {
+  it('returns end of today for daily habits', () => {
+    const now = new Date(2026, 4, 19, 14, 30); // May 19, 2026 2:30pm
+    const result = flexPeriodEnd(flexHabit('day'), now);
+    expect(result.getFullYear()).toBe(2026);
+    expect(result.getMonth()).toBe(4);
+    expect(result.getDate()).toBe(19);
+    expect(result.getHours()).toBe(23);
+    expect(result.getMinutes()).toBe(59);
+    expect(result.getSeconds()).toBe(59);
+  });
+
+  it('returns end of Sunday for weekly habits (Monday-first weeks)', () => {
+    // May 19, 2026 is a Tuesday → week ends Sunday May 24
+    const now = new Date(2026, 4, 19, 10, 0);
+    const result = flexPeriodEnd(flexHabit('week'), now);
+    expect(result.getFullYear()).toBe(2026);
+    expect(result.getMonth()).toBe(4);
+    expect(result.getDate()).toBe(24); // Sunday
+    expect(result.getHours()).toBe(23);
+    expect(result.getMinutes()).toBe(59);
+  });
+
+  it('returns end of Sunday when today is Monday', () => {
+    const now = new Date(2026, 4, 18, 8, 0); // Monday May 18
+    const result = flexPeriodEnd(flexHabit('week'), now);
+    expect(result.getDate()).toBe(24); // Sunday May 24
+  });
+
+  it('returns end of Sunday when today is Sunday', () => {
+    const now = new Date(2026, 4, 24, 8, 0); // Sunday May 24
+    const result = flexPeriodEnd(flexHabit('week'), now);
+    expect(result.getDate()).toBe(24); // still this Sunday
+  });
+
+  it('returns end of last day of month for monthly habits', () => {
+    const now = new Date(2026, 4, 19, 10, 0); // May 19
+    const result = flexPeriodEnd(flexHabit('month'), now);
+    expect(result.getMonth()).toBe(4);
+    expect(result.getDate()).toBe(31); // May has 31 days
+    expect(result.getHours()).toBe(23);
+  });
+
+  it('handles February correctly for monthly habits', () => {
+    const now = new Date(2026, 1, 15, 10, 0); // Feb 15
+    const result = flexPeriodEnd(flexHabit('month'), now);
+    expect(result.getMonth()).toBe(1);
+    expect(result.getDate()).toBe(28); // 2026 is not a leap year
+  });
+
+  it('does not extend past an existing until date', () => {
+    const existingUntil = '2026-05-20T23:59:59.000Z';
+    const now = new Date(2026, 4, 19, 10, 0);
+    const result = flexPeriodEnd(flexHabit('week', existingUntil), now);
+    // Week would end May 24, but existing until is May 20 — keep earlier
+    expect(result.getTime()).toBe(new Date(existingUntil).getTime());
+  });
+
+  it('uses computed end when existing until is later', () => {
+    const laterUntil = '2026-06-30T23:59:59.000Z';
+    const now = new Date(2026, 4, 19, 10, 0);
+    const result = flexPeriodEnd(flexHabit('week', laterUntil), now);
+    // Week ends May 24, which is before June 30 — use computed
+    expect(result.getDate()).toBe(24);
+    expect(result.getMonth()).toBe(4);
   });
 });
