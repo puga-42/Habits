@@ -66,7 +66,7 @@ export function CompletionToast({ visible, onPress, onDismiss }: Props) {
       >
         <ThemedText style={[styles.icon]}>📷</ThemedText>
         <ThemedText style={[styles.text, { color: textColor }]}>
-          Add a note or photo?
+          Add a note or photo? (You can always add this later)
         </ThemedText>
         <ThemedText style={[styles.chevron, { color: textColor }]}>›</ThemedText>
       </Pressable>

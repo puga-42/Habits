@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Keyboard,
   Pressable,
   RefreshControl,
   StyleSheet,
@@ -17,7 +18,7 @@ import { FriendSearchBar } from '@/components/friend-search-bar';
 import { FriendSearchResultRow } from '@/components/friend-search-result-row';
 import { TabTopBar } from '@/components/tab-top-bar';
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
+import { useThemeColor } from '@/hooks/use-theme-color';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useAuth } from '@/lib/auth';
 import {
@@ -42,6 +43,7 @@ const FRIENDS_PAGE_SIZE = 30;
 export default function FriendsScreen() {
   const { session } = useAuth();
   const { openDrawer } = useDrawer();
+  const backgroundColor = useThemeColor({}, 'background');
   const viewerId = session?.user.id ?? null;
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -269,11 +271,11 @@ export default function FriendsScreen() {
 
   if (!viewerId) {
     return (
-      <ThemedView style={styles.root}>
+      <Pressable style={[styles.root, { backgroundColor }]} onPress={Keyboard.dismiss}>
         <SafeAreaView edges={['top']} style={styles.content}>
           <TabTopBar title="Friends" onMenuPress={openDrawer} />
         </SafeAreaView>
-      </ThemedView>
+      </Pressable>
     );
   }
 
@@ -282,7 +284,7 @@ export default function FriendsScreen() {
   const showEmpty = !loading && friends.length === 0 && !hasRequests;
 
   return (
-    <ThemedView style={styles.root}>
+    <Pressable style={[styles.root, { backgroundColor }]} onPress={Keyboard.dismiss}>
       <SafeAreaView edges={['top']} style={styles.safe}>
         <TabTopBar title="Friends" onMenuPress={openDrawer} />
 
@@ -366,7 +368,7 @@ export default function FriendsScreen() {
           />
         )}
       </SafeAreaView>
-    </ThemedView>
+    </Pressable>
   );
 }
 

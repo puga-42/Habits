@@ -95,7 +95,7 @@ export default function HabitViewScreen() {
 
         <ScrollView contentContainerStyle={styles.scroll}>
           <View style={styles.heroRow}>
-            {habit.icon && <ThemedText style={styles.heroIcon}>{habit.icon}</ThemedText>}
+            {habit.icon && <ThemedText type="icon" style={styles.heroIcon}>{habit.icon}</ThemedText>}
             <View style={styles.heroText}>
               <ThemedText type="title" style={styles.title}>
                 {habit.title}

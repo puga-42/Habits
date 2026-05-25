@@ -37,7 +37,7 @@ export function FeedAvatar({ url, handle, size = 36, tintColor, onPress }: Props
           backgroundColor: bg,
         },
       ]}>
-      <ThemedText style={[styles.initial, { fontSize: size * 0.45 }]}>
+      <ThemedText type="icon" style={[styles.initial, { fontSize: size * 0.45 }]}>
         {initial}
       </ThemedText>
     </View>
