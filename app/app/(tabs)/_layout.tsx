@@ -1,22 +1,24 @@
 import { useRouter, Tabs } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 
 import { CalendarMenuDrawer } from '@/components/calendar-menu-drawer';
 import { DrawerProvider, useDrawer } from '@/components/drawer-provider';
 import { HapticTab } from '@/components/haptic-tab';
+import { PendingCountProvider, usePendingCount } from '@/components/pending-count-provider';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/lib/auth';
-import { fetchPendingRequestCount } from '@/lib/friends';
 
-const BADGE_POLL_MS = 30_000;
 const AVAILABLE_VIEWS = ['day', '3day', 'week', 'month'] as const;
 
 export default function TabLayout() {
+  const { session } = useAuth();
   return (
     <DrawerProvider>
-      <TabLayoutInner />
+      <PendingCountProvider userId={session?.user.id ?? null}>
+        <TabLayoutInner />
+      </PendingCountProvider>
     </DrawerProvider>
   );
 }
@@ -24,20 +26,9 @@ export default function TabLayout() {
 function TabLayoutInner() {
   const colorScheme = useColorScheme();
   const tint = Colors[colorScheme ?? 'light'].tint;
-  const { session } = useAuth();
   const router = useRouter();
-  const [pendingCount, setPendingCount] = useState(0);
+  const { pendingCount } = usePendingCount();
   const { menuOpen, closeDrawer, view, setView } = useDrawer();
-
-  useEffect(() => {
-    const userId = session?.user.id;
-    if (!userId) return;
-    const load = () =>
-      fetchPendingRequestCount(userId).then(setPendingCount).catch(() => {});
-    load();
-    const interval = setInterval(load, BADGE_POLL_MS);
-    return () => clearInterval(interval);
-  }, [session?.user.id]);
 
   return (
     <>

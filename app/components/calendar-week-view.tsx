@@ -3,7 +3,7 @@
 // is rendered compactly (marker + emoji only).
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { GestureResponderEvent, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import PagerView from 'react-native-pager-view';
 
 import { ThemedText } from '@/components/themed-text';
@@ -22,6 +22,7 @@ type Props = {
   dayGroups: DayGroup[];
   onAnchorChange: (date: Date) => void;
   onColumnPress: (iso: string) => void;
+  onRowPress: (row: AgendaRowT, dateIso: string) => void;
 };
 
 export function CalendarWeekView({
@@ -31,6 +32,7 @@ export function CalendarWeekView({
   dayGroups,
   onAnchorChange,
   onColumnPress,
+  onRowPress,
 }: Props) {
   const pagerRef = useRef<PagerView>(null);
   const pendingIdx = useRef<number | null>(null);
@@ -88,6 +90,7 @@ export function CalendarWeekView({
             groupByIso={groupByIso}
             habitMap={habitMap}
             onColumnPress={onColumnPress}
+            onRowPress={onRowPress}
           />
         </View>
       ))}
@@ -100,11 +103,13 @@ function WeekColumns({
   groupByIso,
   habitMap,
   onColumnPress,
+  onRowPress,
 }: {
   weekDays: string[];
   groupByIso: Map<string, DayGroup>;
   habitMap: Map<string, Habit>;
   onColumnPress: (iso: string) => void;
+  onRowPress: (row: AgendaRowT, dateIso: string) => void;
 }) {
   const todayIso = isoDate(new Date());
   return (
@@ -119,6 +124,7 @@ function WeekColumns({
           group={groupByIso.get(iso)}
           habitMap={habitMap}
           onColumnPress={onColumnPress}
+          onRowPress={onRowPress}
         />
       ))}
     </View>
@@ -132,6 +138,7 @@ function WeekColumn({
   group,
   habitMap,
   onColumnPress,
+  onRowPress,
 }: {
   iso: string;
   isFirst: boolean;
@@ -140,6 +147,7 @@ function WeekColumn({
   group: DayGroup | undefined;
   habitMap: Map<string, Habit>;
   onColumnPress: (iso: string) => void;
+  onRowPress: (row: AgendaRowT, dateIso: string) => void;
 }) {
   const [y, m, d] = iso.split('-').map((n) => parseInt(n, 10));
   const date = new Date(y, m - 1, d);
@@ -173,33 +181,48 @@ function WeekColumn({
         scrollEnabled={scrollEnabled}
         contentContainerStyle={styles.cellContent}>
         {sortedRows.map((row, ri) => (
-          <CompactRow key={ri} row={row} />
+          <CompactRow key={ri} row={row} onPress={onRowPress} dateIso={iso} />
         ))}
       </ScrollView>
     </Pressable>
   );
 }
 
-function CompactRow({ row }: { row: AgendaRowT }) {
+function CompactRow({
+  row,
+  dateIso,
+  onPress,
+}: {
+  row: AgendaRowT;
+  dateIso: string;
+  onPress: (row: AgendaRowT, dateIso: string) => void;
+}) {
   const isSkip = row.kind === 'skip';
   const isCompletion = row.kind === 'completion';
-  const isFlex = row.kind === 'flex';
-  const marker = isSkip ? '—' : isCompletion ? '✓' : isFlex ? '◔' : '○';
   return (
-    <View
+    <Pressable
+      onPress={(e: GestureResponderEvent) => {
+        e.stopPropagation();
+        onPress(row, dateIso);
+      }}
       style={[
         styles.compactRow,
         row.habit.color ? { borderLeftColor: row.habit.color } : null,
         (isCompletion || isSkip) && styles.compactRowMuted,
       ]}>
-      <ThemedText
-        style={[
-          styles.marker,
-          (isSkip || isCompletion) && styles.markerDim,
-        ]}>
-        {marker}
-      </ThemedText>
-    </View>
+      {row.habit.icon ? (
+        <ThemedText style={styles.icon}>{row.habit.icon}</ThemedText>
+      ) : (
+        <View
+          style={[
+            styles.dot,
+            row.habit.color
+              ? { backgroundColor: row.habit.color }
+              : styles.dotFallback,
+          ]}
+        />
+      )}
+    </Pressable>
   );
 }
 
@@ -235,6 +258,7 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   compactRowMuted: { opacity: 0.5 },
-  marker: { fontSize: 11, opacity: 0.75 },
-  markerDim: { opacity: 0.45 },
+  icon: { fontSize: 14 },
+  dot: { width: 6, height: 6, borderRadius: 3 },
+  dotFallback: { backgroundColor: 'rgba(127,127,127,0.5)' },
 });

@@ -1,5 +1,5 @@
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -12,6 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useDrawer } from '@/components/drawer-provider';
+import { usePendingCount } from '@/components/pending-count-provider';
 import { FriendRequestRow } from '@/components/friend-request-row';
 import { FriendRow } from '@/components/friend-row';
 import { FriendSearchBar } from '@/components/friend-search-bar';
@@ -43,6 +44,7 @@ const FRIENDS_PAGE_SIZE = 30;
 export default function FriendsScreen() {
   const { session } = useAuth();
   const { openDrawer } = useDrawer();
+  const { refreshPendingCount } = usePendingCount();
   const backgroundColor = useThemeColor({}, 'background');
   const viewerId = session?.user.id ?? null;
 
@@ -83,15 +85,12 @@ export default function FriendsScreen() {
     }
   }, []);
 
-  useEffect(() => {
-    if (viewerId) loadAll();
-  }, [viewerId, loadAll]);
-
-  // ─── Realtime ────────────────────────────────────────────────────────
+  // ─── Refetch on focus + Realtime while focused ───────────────────────
 
   useFocusEffect(
     useCallback(() => {
       if (!viewerId) return;
+      loadAll();
       const unsub = subscribeToFriendEvents({
         onRequestChange: () => {
           fetchIncomingRequests().then(setIncoming);
@@ -102,7 +101,7 @@ export default function FriendsScreen() {
         },
       });
       return unsub;
-    }, [viewerId]),
+    }, [viewerId, loadAll]),
   );
 
   // ─── Search ──────────────────────────────────────────────────────────
@@ -191,8 +190,13 @@ export default function FriendsScreen() {
 
   const handleAcceptFromSearch = useCallback(
     async (result: SearchResult) => {
-      const req = incoming.find((r) => r.profile.id === result.id);
-      if (!req) return;
+      let req = incoming.find((r) => r.profile.id === result.id);
+      if (!req) {
+        const fresh = await fetchIncomingRequests();
+        setIncoming(fresh);
+        req = fresh.find((r) => r.profile.id === result.id);
+        if (!req) return;
+      }
       setLoadingAction(result.id);
       try {
         await acceptFriendRequest(req.id);
@@ -205,13 +209,14 @@ export default function FriendsScreen() {
           ),
         );
         fetchFriendsPage(undefined, FRIENDS_PAGE_SIZE).then(setFriends);
+        refreshPendingCount();
       } catch {
         fetchIncomingRequests().then(setIncoming);
       } finally {
         setLoadingAction(null);
       }
     },
-    [incoming],
+    [incoming, refreshPendingCount],
   );
 
   const handleAcceptRequest = useCallback(
@@ -221,13 +226,14 @@ export default function FriendsScreen() {
         await acceptFriendRequest(requestId);
         setIncoming((prev) => prev.filter((r) => r.id !== requestId));
         fetchFriendsPage(undefined, FRIENDS_PAGE_SIZE).then(setFriends);
+        refreshPendingCount();
       } catch {
         fetchIncomingRequests().then(setIncoming);
       } finally {
         setLoadingAction(null);
       }
     },
-    [],
+    [refreshPendingCount],
   );
 
   const handleDeclineRequest = useCallback(async (requestId: string) => {
@@ -235,12 +241,13 @@ export default function FriendsScreen() {
     setIncoming((prev) => prev.filter((r) => r.id !== requestId));
     try {
       await declineFriendRequest(requestId);
+      refreshPendingCount();
     } catch {
       fetchIncomingRequests().then(setIncoming);
     } finally {
       setLoadingAction(null);
     }
-  }, []);
+  }, [refreshPendingCount]);
 
   const handleCancelRequest = useCallback(async (requestId: string) => {
     setLoadingAction(requestId);

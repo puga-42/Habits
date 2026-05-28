@@ -448,6 +448,7 @@ export default function CalendarScreen() {
             dayGroups={dayGroups}
             onAnchorChange={setAnchorDate}
             onColumnPress={onWeekColumnTap}
+            onRowPress={handlePillPress}
           />
         ) : view === 'month' ? (
           <CalendarMonthView

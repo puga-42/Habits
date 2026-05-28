@@ -1413,3 +1413,9 @@ comment on function public.fetch_friends_page(citext, uuid, int) is
   'Paginated friends list ordered by handle. Keyset cursor on (handle, id).';
 comment on function public.fetch_friend_requests_page(text, timestamptz, uuid, int) is
   'Paginated pending friend requests (incoming or outgoing), most recent first.';
+
+
+-- ─── Realtime ───────────────────────────────────────────────────────────────
+
+alter publication supabase_realtime add table public.friend_requests;
+alter publication supabase_realtime add table public.friendships;

@@ -10,6 +10,7 @@ import type { DayGroup, MonthCell } from '@/lib/history';
 type CellHabit = {
   id: string;
   title: string;
+  icon: string | null;
   color: string | null;
 };
 
@@ -110,15 +111,21 @@ function MonthCellView({
         {cell.date.getDate()}
       </ThemedText>
       <View style={styles.chips}>
-        {visible.map((h) => (
-          <View
-            key={h.id}
-            style={[
-              styles.chip,
-              h.color ? { backgroundColor: h.color } : styles.chipFallback,
-            ]}
-          />
-        ))}
+        {visible.map((h) =>
+          h.icon ? (
+            <ThemedText key={h.id} style={styles.chipIcon}>
+              {h.icon}
+            </ThemedText>
+          ) : (
+            <View
+              key={h.id}
+              style={[
+                styles.dot,
+                h.color ? { backgroundColor: h.color } : styles.dotFallback,
+              ]}
+            />
+          ),
+        )}
         {overflow > 0 && (
           <ThemedText style={styles.overflow}>+{overflow}</ThemedText>
         )}
@@ -138,6 +145,7 @@ function uniqueHabits(rows: DayGroup['rows']): CellHabit[] {
     out.push({
       id,
       title: row.habit.title,
+      icon: row.habit.icon,
       color: row.habit.color,
     });
   }
@@ -173,11 +181,9 @@ const styles = StyleSheet.create({
   dayNumberOutside: { opacity: 0.25 },
   dayNumberFuture: { opacity: 0.6 },
   dayNumberEmphasis: { fontWeight: '600', opacity: 1 },
-  chips: { marginTop: 4, gap: 2 },
-  chip: {
-    height: 4,
-    borderRadius: 2,
-  },
-  chipFallback: { backgroundColor: 'rgba(127,127,127,0.5)' },
+  chips: { marginTop: 4, gap: 2, flexDirection: 'row', flexWrap: 'wrap' },
+  chipIcon: { fontSize: 12, lineHeight: 16 },
+  dot: { width: 6, height: 6, borderRadius: 3, marginTop: 4 },
+  dotFallback: { backgroundColor: 'rgba(127,127,127,0.5)' },
   overflow: { fontSize: 10, opacity: 0.5, marginTop: 2 },
 });
