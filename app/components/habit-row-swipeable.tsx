@@ -41,7 +41,7 @@ type Props = {
   onDrawerClose?: () => void;
   onLongPress?: () => void;
   flexProgress?: { count: number; target: number };
-  compact?: boolean;
+  compact?: boolean | 'tight';
   isActive?: boolean;
 };
 

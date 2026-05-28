@@ -33,11 +33,12 @@ export function CalendarWeekView({
   onColumnPress,
 }: Props) {
   const pagerRef = useRef<PagerView>(null);
+  const pendingIdx = useRef<number | null>(null);
+  const scrollState = useRef('idle');
 
-  // Three weeks: previous, current (containing anchor), next.
   const weekStarts = useMemo(() => {
     const out: Date[] = [];
-    for (let weekOffset = -1; weekOffset <= 1; weekOffset++) {
+    for (let weekOffset = -5; weekOffset <= 5; weekOffset++) {
       const d = new Date(anchorDate);
       d.setDate(anchorDate.getDate() + weekOffset * 7);
       d.setHours(0, 0, 0, 0);
@@ -47,7 +48,9 @@ export function CalendarWeekView({
   }, [anchorDate]);
 
   useEffect(() => {
-    pagerRef.current?.setPageWithoutAnimation(1);
+    if (scrollState.current === 'idle') {
+      pagerRef.current?.setPageWithoutAnimation(5);
+    }
   }, [anchorDate]);
 
   const groupByIso = useMemo(() => {
@@ -65,12 +68,18 @@ export function CalendarWeekView({
   return (
     <PagerView
       ref={pagerRef}
-      initialPage={1}
+      initialPage={5}
       style={styles.pager}
       onPageSelected={(e) => {
-        const idx = e.nativeEvent.position;
-        if (idx === 1) return;
-        onAnchorChange(weekStarts[idx]);
+        pendingIdx.current = e.nativeEvent.position;
+      }}
+      onPageScrollStateChanged={(e) => {
+        scrollState.current = e.nativeEvent.pageScrollState;
+        if (scrollState.current === 'idle' && pendingIdx.current !== null) {
+          const idx = pendingIdx.current;
+          pendingIdx.current = null;
+          if (idx !== 5) onAnchorChange(weekStarts[idx]);
+        }
       }}>
       {weekStarts.map((anchorForPage, pageIdx) => (
         <View key={pageIdx} style={styles.page}>
@@ -190,7 +199,6 @@ function CompactRow({ row }: { row: AgendaRowT }) {
         ]}>
         {marker}
       </ThemedText>
-      <ThemedText style={styles.emoji}>{row.habit.icon ?? '·'}</ThemedText>
     </View>
   );
 }
@@ -229,5 +237,4 @@ const styles = StyleSheet.create({
   compactRowMuted: { opacity: 0.5 },
   marker: { fontSize: 11, opacity: 0.75 },
   markerDim: { opacity: 0.45 },
-  emoji: { fontSize: 12 },
 });

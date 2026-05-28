@@ -31,9 +31,7 @@ type Props = {
   // Period progress for flex rows. When provided on a flex completion row,
   // the trailing area renders a quarter-step ring chart filled toward target.
   flexProgress?: { count: number; target: number };
-  // Compact mode for narrow surfaces. Hides description, shrinks the leading
-  // icon, and reduces pill padding.
-  compact?: boolean;
+  compact?: boolean | 'tight';
   // Accepted for API compatibility with DraggableFlatList's RenderItemParams;
   // the row's appearance never changes — finger on the moving row is enough
   // visual feedback.
@@ -52,10 +50,11 @@ export function AgendaRow({
   const isCompletion = row.kind === 'completion';
   const isFlex = row.kind === 'flex';
   const isFlexCompletion = isCompletion && row.isFlex;
+  const isTight = compact === 'tight';
 
   const habitColor = row.habit.color ?? FALLBACK_COLOR;
-  const iconSize = compact ? 32 : 40;
-  const emojiSize = compact ? 18 : 22;
+  const iconSize = isTight ? 24 : compact ? 32 : 40;
+  const emojiSize = isTight ? 14 : compact ? 18 : 22;
 
   // Subtitle text shown under the title for flex log-it rows: "2 / 3 this week".
   const flexSubtitle = isFlex ? formatFlexProgress(row.count, row.target, row.period) : null;
@@ -79,7 +78,8 @@ export function AgendaRow({
       delayLongPress={LONG_PRESS_MS}
       style={({ pressed }) => [
         styles.pill,
-        compact && styles.pillCompact,
+        compact && !isTight && styles.pillCompact,
+        isTight && styles.pillTight,
         pressed && (onLongPress || onPress) && styles.pillPressed,
         isSkip && styles.pillSkipped,
       ]}>
@@ -100,6 +100,7 @@ export function AgendaRow({
         <ThemedText
           style={[
             styles.title,
+            isTight && styles.titleTight,
             isCompletion && !isFlexCompletion && styles.titleCompleted,
             isSkip && styles.titleSkipped,
           ]}
@@ -119,25 +120,27 @@ export function AgendaRow({
         ) : null}
       </View>
 
-      <Pressable
-        onPress={handleTrailingPress}
-        hitSlop={{ top: 11, bottom: 11, left: 11, right: 11 }}
-        accessibilityRole="button"
-        accessibilityLabel={trailingA11yLabel(row)}
-        accessibilityHint={trailingActionable ? trailingA11yHint(row) : undefined}
-        style={({ pressed }) => [
-          styles.trailing,
-          pressed && trailingActionable && styles.trailingPressed,
-          !trailingActionable && styles.trailingInert,
-        ]}>
-        {isFlex ? (
-          <FlexRing count={row.count} target={row.target} color={habitColor} />
-        ) : isFlexCompletion && flexProgress ? (
-          <FlexRing count={flexProgress.count} target={flexProgress.target} color={habitColor} />
-        ) : (
-          <Marker kind={row.kind} color={habitColor} />
-        )}
-      </Pressable>
+      {!isTight && (
+        <Pressable
+          onPress={handleTrailingPress}
+          hitSlop={{ top: 11, bottom: 11, left: 11, right: 11 }}
+          accessibilityRole="button"
+          accessibilityLabel={trailingA11yLabel(row)}
+          accessibilityHint={trailingActionable ? trailingA11yHint(row) : undefined}
+          style={({ pressed }) => [
+            styles.trailing,
+            pressed && trailingActionable && styles.trailingPressed,
+            !trailingActionable && styles.trailingInert,
+          ]}>
+          {isFlex ? (
+            <FlexRing count={row.count} target={row.target} color={habitColor} />
+          ) : isFlexCompletion && flexProgress ? (
+            <FlexRing count={flexProgress.count} target={flexProgress.target} color={habitColor} />
+          ) : (
+            <Marker kind={row.kind} color={habitColor} />
+          )}
+        </Pressable>
+      )}
     </Pressable>
   );
 }
@@ -226,6 +229,12 @@ const styles = StyleSheet.create({
     gap: 8,
     borderRadius: 14,
   },
+  pillTight: {
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    gap: 6,
+    borderRadius: 10,
+  },
   pillPressed: { opacity: 0.6 },
   pillSkipped: { opacity: 0.5 },
   leading: {
@@ -235,6 +244,7 @@ const styles = StyleSheet.create({
   emoji: { textAlign: 'center' },
   body: { flex: 1 },
   title: { fontSize: 16, fontWeight: '600' },
+  titleTight: { fontSize: 13 },
   titleCompleted: { opacity: 0.7 },
   titleSkipped: { textDecorationLine: 'line-through' },
   description: { fontSize: 13, opacity: 0.55, marginTop: 2 },

@@ -3,18 +3,17 @@
 // open habits on top and completed/skipped below (muted). No drag-reorder
 // in this view — the columns are too tight for the handle.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import PagerView from 'react-native-pager-view';
 
-import { HabitRowSwipeable } from '@/components/habit-row-swipeable';
+import { AgendaRow } from '@/components/agenda-row';
 import { ThemedText } from '@/components/themed-text';
 import { isoDate, type Habit } from '@/lib/habits';
 import {
   partitionRows,
   type AgendaRow as AgendaRowT,
   type DayGroup,
-  type SwipeAction,
 } from '@/lib/history';
 
 type Props = {
@@ -23,9 +22,6 @@ type Props = {
   dayGroups: DayGroup[];
   onAnchorChange: (date: Date) => void;
   onRowPress: (row: AgendaRowT, dateIso: string) => void;
-  onPillPress?: (row: AgendaRowT, dateIso: string) => void;
-  onSwipeAction: (row: AgendaRowT, dateIso: string, action: SwipeAction) => void;
-  flexProgressByHabitId: Map<string, { count: number; target: number }>;
 };
 
 export function Calendar3DayView({
@@ -34,15 +30,14 @@ export function Calendar3DayView({
   dayGroups,
   onAnchorChange,
   onRowPress,
-  onPillPress,
-  onSwipeAction,
-  flexProgressByHabitId,
 }: Props) {
   const pagerRef = useRef<PagerView>(null);
+  const pendingIdx = useRef<number | null>(null);
+  const scrollState = useRef('idle');
 
   const windowStarts = useMemo(() => {
     const out: Date[] = [];
-    for (let pageOffset = -1; pageOffset <= 1; pageOffset++) {
+    for (let pageOffset = -5; pageOffset <= 5; pageOffset++) {
       const d = new Date(anchorDate);
       d.setDate(anchorDate.getDate() + pageOffset * 3);
       d.setHours(0, 0, 0, 0);
@@ -52,7 +47,9 @@ export function Calendar3DayView({
   }, [anchorDate]);
 
   useEffect(() => {
-    pagerRef.current?.setPageWithoutAnimation(1);
+    if (scrollState.current === 'idle') {
+      pagerRef.current?.setPageWithoutAnimation(5);
+    }
   }, [anchorDate]);
 
   const groupByIso = useMemo(() => {
@@ -70,12 +67,18 @@ export function Calendar3DayView({
   return (
     <PagerView
       ref={pagerRef}
-      initialPage={1}
+      initialPage={5}
       style={styles.pager}
       onPageSelected={(e) => {
-        const idx = e.nativeEvent.position;
-        if (idx === 1) return;
-        onAnchorChange(windowStarts[idx]);
+        pendingIdx.current = e.nativeEvent.position;
+      }}
+      onPageScrollStateChanged={(e) => {
+        scrollState.current = e.nativeEvent.pageScrollState;
+        if (scrollState.current === 'idle' && pendingIdx.current !== null) {
+          const idx = pendingIdx.current;
+          pendingIdx.current = null;
+          if (idx !== 5) onAnchorChange(windowStarts[idx]);
+        }
       }}>
       {windowStarts.map((start, pageIdx) => (
         <View key={pageIdx} style={styles.page}>
@@ -84,9 +87,6 @@ export function Calendar3DayView({
             groupByIso={groupByIso}
             habitMap={habitMap}
             onRowPress={onRowPress}
-            onPillPress={onPillPress}
-            onSwipeAction={onSwipeAction}
-            flexProgressByHabitId={flexProgressByHabitId}
           />
         </View>
       ))}
@@ -99,33 +99,17 @@ function ColumnsPage({
   groupByIso,
   habitMap,
   onRowPress,
-  onPillPress,
-  onSwipeAction,
-  flexProgressByHabitId,
 }: {
   start: Date;
   groupByIso: Map<string, DayGroup>;
   habitMap: Map<string, Habit>;
   onRowPress: (row: AgendaRowT, dateIso: string) => void;
-  onPillPress?: (row: AgendaRowT, dateIso: string) => void;
-  onSwipeAction: (row: AgendaRowT, dateIso: string, action: SwipeAction) => void;
-  flexProgressByHabitId: Map<string, { count: number; target: number }>;
 }) {
   const days = [0, 1, 2].map((off) => {
     const d = new Date(start);
     d.setDate(start.getDate() + off);
     return d;
   });
-
-  // Shared drawer coordination across the three columns.
-  const closeCurrentDrawer = useRef<(() => void) | null>(null);
-  const handleDrawerOpen = useCallback((closeFn: () => void) => {
-    closeCurrentDrawer.current?.();
-    closeCurrentDrawer.current = closeFn;
-  }, []);
-  const handleDrawerClose = useCallback(() => {
-    closeCurrentDrawer.current = null;
-  }, []);
 
   return (
     <View style={styles.columnsRow}>
@@ -137,11 +121,6 @@ function ColumnsPage({
             group={groupByIso.get(isoDate(d))}
             habitMap={habitMap}
             onRowPress={onRowPress}
-            onPillPress={onPillPress}
-            onSwipeAction={onSwipeAction}
-            onDrawerOpen={handleDrawerOpen}
-            onDrawerClose={handleDrawerClose}
-            flexProgressByHabitId={flexProgressByHabitId}
           />
         </View>
       ))}
@@ -154,21 +133,11 @@ function DayColumn({
   group,
   habitMap,
   onRowPress,
-  onPillPress,
-  onSwipeAction,
-  onDrawerOpen,
-  onDrawerClose,
-  flexProgressByHabitId,
 }: {
   date: Date;
   group: DayGroup | undefined;
   habitMap: Map<string, Habit>;
   onRowPress: (row: AgendaRowT, dateIso: string) => void;
-  onPillPress?: (row: AgendaRowT, dateIso: string) => void;
-  onSwipeAction: (row: AgendaRowT, dateIso: string, action: SwipeAction) => void;
-  onDrawerOpen: (closeFn: () => void) => void;
-  onDrawerClose: () => void;
-  flexProgressByHabitId: Map<string, { count: number; target: number }>;
 }) {
   const iso = isoDate(date);
   const rows = group?.rows ?? [];
@@ -185,31 +154,21 @@ function DayColumn({
     return <ThemedText style={styles.emptyText}>—</ThemedText>;
   }
 
-  const renderRow = (row: AgendaRowT, idx: number) => {
-    const habitId = row.kind === 'completion' ? row.habit.id : row.habitId;
-    return (
-      <View key={`${row.kind}-${idx}`} style={styles.rowWrap}>
-        <HabitRowSwipeable
-          row={row}
-          dateIso={iso}
-          onPress={onPillPress ? () => onPillPress(row, iso) : undefined}
-          onTrailingPress={() => onRowPress(row, iso)}
-          onSwipeAction={(action) => onSwipeAction(row, iso, action)}
-          onDrawerOpen={onDrawerOpen}
-          onDrawerClose={onDrawerClose}
-          compact
-          flexProgress={flexProgressByHabitId.get(habitId)}
-        />
-      </View>
-    );
-  };
+  const renderRow = (row: AgendaRowT, idx: number) => (
+    <View key={`${row.kind}-${idx}`} style={styles.rowWrap}>
+      <AgendaRow
+        row={row}
+        onPress={() => onRowPress(row, iso)}
+        compact="tight"
+      />
+    </View>
+  );
 
   return (
     <ScrollView
       onLayout={(e) => setContainerH(e.nativeEvent.layout.height)}
       onContentSizeChange={(_w, h) => setContentH(h)}
       scrollEnabled={scrollEnabled}
-      onScrollBeginDrag={() => onDrawerOpen(() => {})}
       contentContainerStyle={styles.columnContent}>
       {notCompleted.map(renderRow)}
       {completed.length > 0 && notCompleted.length > 0 && (

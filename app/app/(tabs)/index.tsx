@@ -92,15 +92,27 @@ export default function CalendarScreen() {
   // Decide what date range to fetch from the server based on the active view.
   const dataRange = useMemo(() => {
     if (view === 'schedule') return scheduleWindow;
-    // Day / 3-day / Week / Month: the anchor month's 6-week grid covers the
-    // common case. Cross-month edges may briefly under-fetch — accepted in
-    // this phase.
-    const grid = buildMonthGrid(anchorYear, anchorMonth, today);
-    const from = grid[0].iso;
-    const last = new Date(grid[grid.length - 1].date);
-    last.setDate(last.getDate() + 1);
-    return { from, to: isoDate(last) };
-  }, [view, anchorYear, anchorMonth, scheduleWindow, today]);
+    if (view === 'month') {
+      const grid = buildMonthGrid(anchorYear, anchorMonth, today);
+      const from = grid[0].iso;
+      const last = new Date(grid[grid.length - 1].date);
+      last.setDate(last.getDate() + 1);
+      return { from, to: isoDate(last) };
+    }
+    const earliest = new Date(anchorDate);
+    const latest = new Date(anchorDate);
+    if (view === 'week') {
+      earliest.setDate(earliest.getDate() - 5 * 7 - 7);
+      latest.setDate(latest.getDate() + 5 * 7 + 7);
+    } else if (view === '3day') {
+      earliest.setDate(earliest.getDate() - 18);
+      latest.setDate(latest.getDate() + 18);
+    } else {
+      earliest.setDate(earliest.getDate() - 6);
+      latest.setDate(latest.getDate() + 6);
+    }
+    return { from: isoDate(earliest), to: isoDate(latest) };
+  }, [view, anchorDate, anchorYear, anchorMonth, today, scheduleWindow]);
 
   const load = useCallback(async () => {
     if (!userId) return;
@@ -130,22 +142,20 @@ export default function CalendarScreen() {
       return grid.map((c) => c.iso);
     }
     if (view === 'day') {
-      const prevDay = new Date(anchorDate);
-      prevDay.setDate(anchorDate.getDate() - 1);
-      return nDayRange(prevDay, 3);
+      const start = new Date(anchorDate);
+      start.setDate(anchorDate.getDate() - 5);
+      return nDayRange(start, 11);
     }
     if (view === '3day') {
-      // 9 days: previous triple + current + next
       const start = new Date(anchorDate);
-      start.setDate(start.getDate() - 3);
-      return nDayRange(start, 9);
+      start.setDate(start.getDate() - 15);
+      return nDayRange(start, 33);
     }
     if (view === 'week') {
-      // 3 weeks of data: prev, current, next
       const out: string[] = [];
-      for (const off of [-7, 0, 7]) {
+      for (let off = -5; off <= 5; off++) {
         const a = new Date(anchorDate);
-        a.setDate(a.getDate() + off);
+        a.setDate(a.getDate() + off * 7);
         out.push(...weekDatesFrom(a, weekStart));
       }
       return out;
@@ -161,7 +171,7 @@ export default function CalendarScreen() {
       return days;
     }
     return [];
-  }, [view, anchorYear, anchorMonth, anchorDate, today, weekStart, scheduleWindow]);
+  }, [view, anchorDate, anchorYear, anchorMonth, today, weekStart, scheduleWindow]);
 
   const dayGroups = useMemo(
     () =>
@@ -427,11 +437,8 @@ export default function CalendarScreen() {
             anchorDate={anchorDate}
             habits={habits}
             dayGroups={dayGroups}
-            flexProgressByHabitId={flexProgressByHabitId}
             onAnchorChange={setAnchorDate}
-            onRowPress={handleTrailingPress}
-            onPillPress={handlePillPress}
-            onSwipeAction={handleSwipeAction}
+            onRowPress={handlePillPress}
           />
         ) : view === 'week' ? (
           <CalendarWeekView

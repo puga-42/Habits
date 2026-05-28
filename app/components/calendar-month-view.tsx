@@ -1,4 +1,4 @@
-// Month view: Google Calendar-style 6×7 grid with habit chips per cell.
+// Month view: Google Calendar-style 6x7 grid with habit chips per cell.
 // Tap a cell to switch to Day view anchored on that date.
 
 import { useMemo, useState } from 'react';
@@ -127,8 +127,6 @@ function MonthCellView({
   );
 }
 
-// Collect unique habits from a day's rows (preserves order; first
-// occurrence wins).
 function uniqueHabits(rows: DayGroup['rows']): CellHabit[] {
   const seen = new Set<string>();
   const out: CellHabit[] = [];

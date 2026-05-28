@@ -69,7 +69,7 @@ export function CalendarDayView({
 
   const pageDates = useMemo(() => {
     const out: Date[] = [];
-    for (let offset = -1; offset <= 1; offset++) {
+    for (let offset = -5; offset <= 5; offset++) {
       const d = new Date(anchorDate);
       d.setDate(anchorDate.getDate() + offset);
       d.setHours(0, 0, 0, 0);
@@ -79,7 +79,7 @@ export function CalendarDayView({
   }, [anchorDate]);
 
   useEffect(() => {
-    scrollRef.current?.scrollTo({ x: SCREEN_WIDTH, animated: false });
+    scrollRef.current?.scrollTo({ x: SCREEN_WIDTH * 5, animated: false });
   }, [anchorDate]);
 
   const handleScrollEnd = useCallback(
@@ -90,11 +90,10 @@ export function CalendarDayView({
       }
       const x = e.nativeEvent.contentOffset.x;
       const page = Math.round(x / SCREEN_WIDTH);
-      if (page === 1) return;
+      if (page === 5) return;
       isResetting.current = true;
-      const direction = page === 0 ? -1 : 1;
       const next = new Date(anchorDate);
-      next.setDate(anchorDate.getDate() + direction);
+      next.setDate(anchorDate.getDate() + (page - 5));
       next.setHours(0, 0, 0, 0);
       onAnchorChange(next);
     },
@@ -124,7 +123,7 @@ export function CalendarDayView({
       showsHorizontalScrollIndicator={false}
       scrollEventThrottle={16}
       onMomentumScrollEnd={handleScrollEnd}
-      contentOffset={{ x: SCREEN_WIDTH, y: 0 }}
+      contentOffset={{ x: SCREEN_WIDTH * 5, y: 0 }}
       bounces={false}
       waitFor={[]}
     >
