@@ -11,7 +11,11 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.joshbernd.habits",
-      "usesAppleSignIn": true
+      "appleTeamId": "4TR73V342N",
+      "usesAppleSignIn": true,
+      "entitlements": {
+        "com.apple.security.application-groups": ["group.com.joshbernd.habits"]
+      }
     },
     "android": {
       "package": "com.joshbernd.habits",
@@ -43,7 +47,8 @@
         }
       ],
       "expo-secure-store",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "@bacons/apple-targets"
     ],
     "experiments": {
       "typedRoutes": true,

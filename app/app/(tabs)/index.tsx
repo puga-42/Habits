@@ -52,6 +52,7 @@ import {
   type SwipeAction,
 } from '@/lib/history';
 import { fetchProfile, type Profile } from '@/lib/profile';
+import { syncWidgetData } from '@/lib/widget-sync';
 
 const SCHEDULE_INITIAL_HALF_WINDOW = 7; // days each direction
 const SCHEDULE_EXTEND_BY = 7;
@@ -132,6 +133,7 @@ export default function CalendarScreen() {
     useCallback(() => {
       if (!userId) return;
       load().finally(() => setLoading(false));
+      syncWidgetData(userId);
     }, [userId, load]),
   );
 

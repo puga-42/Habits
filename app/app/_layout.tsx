@@ -2,11 +2,13 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
+import { AppState } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AuthProvider, useAuth } from '@/lib/auth';
+import { syncWidgetData } from '@/lib/widget-sync';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -26,6 +28,15 @@ function AuthGate() {
       router.replace('/(tabs)');
     }
   }, [session, loading, segments, router]);
+
+  useEffect(() => {
+    const userId = session?.user.id;
+    if (!userId) return;
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') syncWidgetData(userId);
+    });
+    return () => sub.remove();
+  }, [session?.user.id]);
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
