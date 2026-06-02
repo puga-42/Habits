@@ -32,6 +32,7 @@ function AuthGate() {
   useEffect(() => {
     const userId = session?.user.id;
     if (!userId) return;
+    syncWidgetData(userId);
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active') syncWidgetData(userId);
     });

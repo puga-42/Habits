@@ -1,5 +1,4 @@
 import { Platform } from 'react-native';
-import { rrulestr } from 'rrule';
 
 import {
   fetchHabits,
@@ -11,6 +10,7 @@ import {
   type Habit,
   type HabitOverride,
 } from './habits';
+import { expandHabit } from './history';
 import { writeWidgetData, reloadWidget } from './widget-sync-bridge';
 
 export type WidgetHabitEntry = {
@@ -50,30 +50,24 @@ export function buildWidgetPayload(
   dayEnd.setHours(23, 59, 59, 999);
 
   for (const habit of habits) {
-    if (habit.kind !== 'scheduled' || !habit.rrule || !habit.dtstart) continue;
-    try {
-      const dtstart = new Date(habit.dtstart);
-      const rule = rrulestr(habit.rrule, { dtstart });
-      const dates = rule.between(dayStart, dayEnd, true);
-      for (const d of dates) {
-        const occDate = isoDate(d);
-        if (skippedKeys.has(`${habit.id}:${occDate}`)) continue;
-        const isCompleted = completions.some(
-          (c) => c.habit_id === habit.id && c.occurrence_date === occDate,
-        );
-        entries.push({
-          id: habit.id,
-          title: habit.title,
-          icon: habit.icon,
-          color: habit.color,
-          kind: 'scheduled',
-          isCompleted,
-          targetCount: null,
-          completedCount: null,
-        });
-      }
-    } catch {
-      // Skip habits with invalid RRULE
+    if (habit.kind !== 'scheduled') continue;
+    const dates = expandHabit(habit, dayStart, dayEnd);
+    for (const d of dates) {
+      const occDate = isoDate(d);
+      if (skippedKeys.has(`${habit.id}:${occDate}`)) continue;
+      const isCompleted = completions.some(
+        (c) => c.habit_id === habit.id && c.occurrence_date === occDate,
+      );
+      entries.push({
+        id: habit.id,
+        title: habit.title,
+        icon: habit.icon,
+        color: habit.color,
+        kind: 'scheduled',
+        isCompleted,
+        targetCount: null,
+        completedCount: null,
+      });
     }
   }
 
@@ -99,7 +93,7 @@ export function buildWidgetPayload(
   return { updatedAt: new Date().toISOString(), habits: entries };
 }
 
-export async function syncWidgetData(userId: string): Promise<void> {
+async function performSync(userId: string): Promise<void> {
   if (Platform.OS !== 'ios') return;
   try {
     const [habits, completions, overrides] = await Promise.all([
@@ -113,4 +107,15 @@ export async function syncWidgetData(userId: string): Promise<void> {
   } catch (err) {
     console.warn('Widget sync failed:', err);
   }
+}
+
+let syncTimer: ReturnType<typeof setTimeout> | null = null;
+const SYNC_DEBOUNCE_MS = 500;
+
+export function syncWidgetData(userId: string): void {
+  if (syncTimer) clearTimeout(syncTimer);
+  syncTimer = setTimeout(() => {
+    syncTimer = null;
+    performSync(userId);
+  }, SYNC_DEBOUNCE_MS);
 }

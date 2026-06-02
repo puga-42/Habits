@@ -1,5 +1,18 @@
-import { buildWidgetPayload } from '../widget-sync';
 import type { Completion, Habit, HabitOverride } from '../habits';
+import { fetchHabits } from '../habits';
+import { buildWidgetPayload, syncWidgetData } from '../widget-sync';
+
+jest.mock('../habits', () => ({
+  ...jest.requireActual('../habits'),
+  fetchHabits: jest.fn().mockResolvedValue([]),
+  fetchTodayCompletions: jest.fn().mockResolvedValue([]),
+  fetchTodayOverrides: jest.fn().mockResolvedValue([]),
+}));
+
+jest.mock('../widget-sync-bridge', () => ({
+  writeWidgetData: jest.fn(),
+  reloadWidget: jest.fn(),
+}));
 
 function scheduled(id: string, overrides?: Partial<Habit>): Habit {
   return {
@@ -116,6 +129,12 @@ describe('buildWidgetPayload', () => {
     expect(result.habits[0].isCompleted).toBe(true);
   });
 
+  it('excludes habits with until in the past', () => {
+    const habits = [scheduled('h1', { until: '2026-05-27T23:59:59.999Z' })];
+    const result = buildWidgetPayload(habits, [], [], TODAY);
+    expect(result.habits).toHaveLength(0);
+  });
+
   it('excludes skipped occurrences', () => {
     const habits = [scheduled('h1')];
     const overrides = [override('h1', TODAY_ISO, 'skip')];
@@ -180,5 +199,35 @@ describe('buildWidgetPayload', () => {
     const habits = [flex('f1', { target_count: null })];
     const result = buildWidgetPayload(habits, [], [], TODAY);
     expect(result.habits).toHaveLength(0);
+  });
+});
+
+describe('syncWidgetData debounce', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+    (fetchHabits as jest.Mock).mockClear();
+  });
+  afterEach(() => jest.useRealTimers());
+
+  it('delays sync by 500ms', () => {
+    syncWidgetData('u1');
+    expect(fetchHabits).not.toHaveBeenCalled();
+    jest.advanceTimersByTime(500);
+    expect(fetchHabits).toHaveBeenCalledTimes(1);
+  });
+
+  it('collapses rapid calls into one sync', () => {
+    syncWidgetData('u1');
+    syncWidgetData('u1');
+    syncWidgetData('u1');
+    jest.advanceTimersByTime(500);
+    expect(fetchHabits).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses the latest userId', () => {
+    syncWidgetData('u1');
+    syncWidgetData('u2');
+    jest.advanceTimersByTime(500);
+    expect(fetchHabits).toHaveBeenCalledWith('u2');
   });
 });

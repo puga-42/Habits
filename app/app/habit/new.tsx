@@ -9,6 +9,7 @@ import { ThemedView } from '@/components/themed-view';
 import { useAuth } from '@/lib/auth';
 import { draftToInsert, useHabitForm } from '@/lib/habit-form';
 import { createHabit } from '@/lib/habits';
+import { syncWidgetData } from '@/lib/widget-sync';
 
 export default function NewHabitScreen() {
   const router = useRouter();
@@ -31,6 +32,7 @@ export default function NewHabitScreen() {
     setSaving(true);
     try {
       await createHabit(session.user.id, draftToInsert(draft));
+      syncWidgetData(session.user.id);
       reset();
       router.back();
     } catch (err) {

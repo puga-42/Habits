@@ -25,6 +25,7 @@ import {
   type Habit,
   occurrenceMidnight,
 } from '@/lib/habits';
+import { syncWidgetData } from '@/lib/widget-sync';
 
 type EditScope = 'this' | 'future' | 'all';
 
@@ -84,6 +85,7 @@ export default function EditHabitScreen() {
         if (Object.keys(patch).length === 0) { router.back(); return; }
         await applyEditThis(habit.id, occurrenceDate, patch);
       }
+      syncWidgetData(session.user.id);
       reset();
       router.back();
     } catch (err) {
@@ -127,6 +129,7 @@ export default function EditHabitScreen() {
     try {
       if (scope === 'all') await deleteHabitAll(habit.id);
       else await deleteHabitFuture(habit);
+      if (session?.user.id) syncWidgetData(session.user.id);
       reset();
       router.back();
     } catch (err) {
