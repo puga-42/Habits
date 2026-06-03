@@ -30,7 +30,7 @@ const meditate: Habit = {
   title: 'Meditate',
   description: null,
   icon: '🧘',
-  color: '#09EDE2',
+  color: '#0ABAB5',
   visibility: 'private',
   timezone: 'UTC',
   dtstart: '2026-05-01T07:00:00Z',

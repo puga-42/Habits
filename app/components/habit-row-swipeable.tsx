@@ -11,6 +11,7 @@ import Animated, {
 
 import { AgendaRow } from '@/components/agenda-row';
 import { ThemedText } from '@/components/themed-text';
+import { Palette } from '@/constants/colors';
 import type { AgendaRow as AgendaRowT, SwipeAction } from '@/lib/history';
 import { swipeActionsForRow } from '@/lib/history';
 
@@ -131,8 +132,8 @@ export function HabitRowSwipeable({
 }
 
 const CHIP_COLORS: Record<SwipeAction, { bg: string; text: string }> = {
-  reset: { bg: 'rgba(127,127,127,0.18)', text: undefined as any },
-  skip: { bg: '#E0A526', text: '#fff' },
+  reset: { bg: Palette.lavenderMuted, text: Palette.lavender },
+  skip: { bg: Palette.blushMuted, text: Palette.blush },
 };
 
 const CHIP_LABELS: Record<SwipeAction, string> = {

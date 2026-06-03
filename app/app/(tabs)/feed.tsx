@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Palette } from '@/constants/colors';
 import { useDrawer } from '@/components/drawer-provider';
 import { FeedActivityCard } from '@/components/feed-activity-card';
 import { FeedCard } from '@/components/feed-card';
@@ -332,9 +333,9 @@ const styles = StyleSheet.create({
   content: { flex: 1, paddingHorizontal: 20, paddingTop: 16 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   separator: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: 'rgba(127,127,127,0.25)',
-    marginHorizontal: 14,
+    height: 2,
+    backgroundColor: Palette.primary,
+    marginHorizontal: 0,
   },
   footer: { paddingVertical: 18, alignItems: 'center' },
 });

@@ -270,7 +270,7 @@ const styles = StyleSheet.create({
   },
   segment: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(127,127,127,0.1)',
+    backgroundColor: Palette.lavenderMuted,
     borderRadius: 8,
     padding: 4,
   },
@@ -280,9 +280,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 6,
   },
-  segmentItemActive: { backgroundColor: 'rgba(127,127,127,0.3)' },
+  segmentItemActive: { backgroundColor: Palette.primary },
   segmentText: { fontSize: 15, opacity: 0.65 },
-  segmentTextActive: { opacity: 1, fontWeight: '600' },
+  segmentTextActive: { color: Palette.charcoal, opacity: 1, fontWeight: '600' },
   disabled: { opacity: 0.5 },
   row: {
     flexDirection: 'row',

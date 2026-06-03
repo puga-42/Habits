@@ -299,9 +299,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: 'rgba(127,127,127,0.18)',
   },
-  dayHeaderToday: { borderBottomColor: 'rgba(124,58,237,0.6)' },
+  dayHeaderToday: { borderBottomColor: Palette.lavender },
   dayHeaderText: { fontSize: 14, opacity: 0.7, fontWeight: '600' },
-  dayHeaderTextToday: { color: Palette.primary, opacity: 1 },
+  dayHeaderTextToday: { color: Palette.lavender, opacity: 1 },
   empty: { fontSize: 13, opacity: 0.4, paddingVertical: 8, fontStyle: 'italic' },
   completedSub: {
     flexDirection: 'row',

@@ -486,7 +486,7 @@ export default function CalendarScreen() {
             {
               key: 'feedback',
               label: 'Feedback',
-              icon: <IconSymbol name="bubble.left" size={20} color={Palette.primary} />,
+              icon: <IconSymbol name="bubble.left" size={20} color={Palette.blush} />,
               onPress: () => router.push('/feedback'),
             },
           ]}
@@ -550,7 +550,7 @@ function parseIsoLocal(iso: string): Date {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   content: { flex: 1 },
-  todayBtn: { fontSize: 14, color: Palette.primary, fontWeight: '600' },
+  todayBtn: { fontSize: 14, color: Palette.lavender, fontWeight: '600' },
   subBar: {
     flexDirection: 'row',
     alignItems: 'center',

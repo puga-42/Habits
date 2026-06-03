@@ -5,7 +5,7 @@ import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { Palette, primaryRgba } from '@/constants/colors';
+import { Palette } from '@/constants/colors';
 import type { DayGroup, MonthCell } from '@/lib/history';
 
 type CellHabit = {
@@ -24,7 +24,7 @@ type Props = {
 
 const WEEKDAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
-const TODAY_RING = primaryRgba(0.55);
+const TODAY_RING = Palette.lavender;
 const SELECTED_RING = Palette.primary;
 const MAX_CHIPS = 3;
 

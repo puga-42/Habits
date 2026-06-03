@@ -245,7 +245,7 @@ const styles = StyleSheet.create({
   },
   weekday: { fontSize: 10, opacity: 0.55, textTransform: 'uppercase', letterSpacing: 0.5 },
   dateNum: { fontSize: 16, marginTop: 1 },
-  todayText: { color: Palette.primary, fontWeight: '600', opacity: 1 },
+  todayText: { color: Palette.lavender, fontWeight: '600', opacity: 1 },
   cellContent: { padding: 2, paddingBottom: 80, gap: 2 },
   compactRow: {
     flexDirection: 'row',

@@ -14,15 +14,16 @@
 // shrink the leading icon.
 
 import * as Haptics from 'expo-haptics';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, useColorScheme, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { primaryRgba } from '@/constants/colors';
+import { solidTint } from '@/constants/colors';
 import type { FlexPeriod } from '@/lib/habits';
 import type { AgendaRow as AgendaRowT } from '@/lib/history';
 
 const LONG_PRESS_MS = 300;
-const FALLBACK_COLOR = 'rgba(127,127,127,0.45)';
+const FALLBACK_COLOR = '#5C5C6A';
+const PILL_TINT = 0.22;
 
 type Props = {
   row: AgendaRowT;
@@ -53,7 +54,9 @@ export function AgendaRow({
   const isFlexCompletion = isCompletion && row.isFlex;
   const isTight = compact === 'tight';
 
+  const isDark = useColorScheme() !== 'light';
   const habitColor = row.habit.color ?? FALLBACK_COLOR;
+  const pillBg = solidTint(row.habit.color ?? '#94A3B8', PILL_TINT, isDark);
   const iconSize = isTight ? 24 : compact ? 32 : 40;
   const emojiSize = isTight ? 14 : compact ? 18 : 22;
 
@@ -79,6 +82,7 @@ export function AgendaRow({
       delayLongPress={LONG_PRESS_MS}
       style={({ pressed }) => [
         styles.pill,
+        { backgroundColor: pillBg },
         compact && !isTight && styles.pillCompact,
         isTight && styles.pillTight,
         pressed && (onLongPress || onPress) && styles.pillPressed,
@@ -222,7 +226,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 14,
     borderRadius: 18,
-    backgroundColor: primaryRgba(0.14),
+    backgroundColor: 'transparent',
   },
   pillCompact: {
     paddingVertical: 8,

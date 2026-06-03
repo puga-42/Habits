@@ -218,7 +218,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   dayDate: { fontSize: 20, marginTop: 2 },
-  dayEmphasis: { color: Palette.primary, opacity: 1 },
+  dayEmphasis: { color: Palette.lavender, opacity: 1 },
   columnContent: { padding: 6, paddingBottom: 100 },
   rowWrap: { marginBottom: 6 },
   emptyText: { fontSize: 12, opacity: 0.4, textAlign: 'center', paddingVertical: 20 },

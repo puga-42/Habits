@@ -78,7 +78,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   buttonAccent: { backgroundColor: Palette.primary },
-  buttonGhost: { backgroundColor: 'rgba(127,127,127,0.12)' },
+  buttonGhost: { backgroundColor: Palette.blushMuted },
   buttonText: { fontSize: 13, fontWeight: '600' },
   buttonTextAccent: { color: '#fff' },
   buttonTextGhost: { opacity: 0.7 },

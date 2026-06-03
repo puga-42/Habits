@@ -5,15 +5,16 @@
 // not the selected day.
 
 import { useEffect, useMemo, useRef } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, useColorScheme, View } from 'react-native';
 import PagerView from 'react-native-pager-view';
 
 import { ThemedText } from '@/components/themed-text';
-import { Palette, primaryRgba } from '@/constants/colors';
+import { Palette, solidTint } from '@/constants/colors';
 import { isoDate } from '@/lib/habits';
 import { densityBucket, weekDatesFrom } from '@/lib/history';
 
 const ACCENT = Palette.primary;
+const TODAY_ACCENT = Palette.lavender;
 const WEEKDAY_LETTERS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const DENSITY_ALPHA = [0, 0.12, 0.26, 0.45, 0.68] as const;
 
@@ -104,6 +105,8 @@ function WeekRow({
     [weekAnchor, weekStart],
   );
 
+  const isDark = useColorScheme() !== 'light';
+
   return (
     <View style={styles.row}>
       {dates.map((iso, i) => {
@@ -123,7 +126,7 @@ function WeekRow({
             <ThemedText
               style={[
                 styles.weekdayLetter,
-                isToday && !isSelected && styles.accentText,
+                isToday && !isSelected && styles.todayText,
               ]}>
               {letter}
             </ThemedText>
@@ -131,14 +134,14 @@ function WeekRow({
               style={[
                 styles.dayBubble,
                 bucket > 0 && {
-                  backgroundColor: primaryRgba(DENSITY_ALPHA[bucket]),
+                  backgroundColor: solidTint(ACCENT, DENSITY_ALPHA[bucket], isDark),
                 },
                 isSelected && styles.dayBubbleSelected,
               ]}>
               <ThemedText
                 style={[
                   styles.dayNumber,
-                  isToday && !isSelected && styles.accentText,
+                  isToday && !isSelected && styles.todayText,
                   isSelected && styles.dayNumberSelected,
                 ]}>
                 {day}
@@ -190,5 +193,5 @@ const styles = StyleSheet.create({
   },
   dayNumber: { fontSize: 15, fontWeight: '500' },
   dayNumberSelected: { fontWeight: '700' },
-  accentText: { color: ACCENT },
+  todayText: { color: TODAY_ACCENT },
 });
