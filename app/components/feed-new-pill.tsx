@@ -4,6 +4,7 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { Palette } from '@/constants/colors';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 
 type Props = {
@@ -41,7 +42,7 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingVertical: 8,
     paddingHorizontal: 14,
-    backgroundColor: '#0a7ea4',
+    backgroundColor: Palette.primary,
     borderRadius: 18,
     shadowColor: '#000',
     shadowOpacity: 0.18,

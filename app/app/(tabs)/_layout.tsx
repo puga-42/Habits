@@ -6,6 +6,7 @@ import { DrawerProvider, useDrawer } from '@/components/drawer-provider';
 import { HapticTab } from '@/components/haptic-tab';
 import { PendingCountProvider, usePendingCount } from '@/components/pending-count-provider';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { Palette } from '@/constants/colors';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/lib/auth';
@@ -37,6 +38,12 @@ function TabLayoutInner() {
           tabBarActiveTintColor: tint,
           headerShown: false,
           tabBarButton: HapticTab,
+          tabBarStyle: {
+            backgroundColor: colorScheme === 'dark' ? Palette.charcoalElevated : Palette.ghostWhite,
+            borderTopColor: colorScheme === 'dark'
+              ? 'rgba(255,255,255,0.08)'
+              : Palette.slate200,
+          },
         }}>
         <Tabs.Screen
           name="index"

@@ -7,6 +7,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import PagerView from 'react-native-pager-view';
 
+import { Palette } from '@/constants/colors';
 import { AgendaRow } from '@/components/agenda-row';
 import { ThemedText } from '@/components/themed-text';
 import { isoDate, type Habit } from '@/lib/habits';
@@ -217,7 +218,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   dayDate: { fontSize: 20, marginTop: 2 },
-  dayEmphasis: { color: '#7c3aed', opacity: 1 },
+  dayEmphasis: { color: Palette.primary, opacity: 1 },
   columnContent: { padding: 6, paddingBottom: 100 },
   rowWrap: { marginBottom: 6 },
   emptyText: { fontSize: 12, opacity: 0.4, textAlign: 'center', paddingVertical: 20 },

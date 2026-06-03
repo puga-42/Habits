@@ -17,6 +17,7 @@ import * as Haptics from 'expo-haptics';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { primaryRgba } from '@/constants/colors';
 import type { FlexPeriod } from '@/lib/habits';
 import type { AgendaRow as AgendaRowT } from '@/lib/history';
 
@@ -221,7 +222,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 14,
     borderRadius: 18,
-    backgroundColor: 'rgba(127,127,127,0.08)',
+    backgroundColor: primaryRgba(0.14),
   },
   pillCompact: {
     paddingVertical: 8,

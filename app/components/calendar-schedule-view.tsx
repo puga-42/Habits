@@ -7,6 +7,7 @@ import DraggableFlatList, {
   type RenderItemParams,
 } from 'react-native-draggable-flatlist';
 
+import { Palette } from '@/constants/colors';
 import { HabitRowSwipeable } from '@/components/habit-row-swipeable';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -300,7 +301,7 @@ const styles = StyleSheet.create({
   },
   dayHeaderToday: { borderBottomColor: 'rgba(124,58,237,0.6)' },
   dayHeaderText: { fontSize: 14, opacity: 0.7, fontWeight: '600' },
-  dayHeaderTextToday: { color: '#7c3aed', opacity: 1 },
+  dayHeaderTextToday: { color: Palette.primary, opacity: 1 },
   empty: { fontSize: 13, opacity: 0.4, paddingVertical: 8, fontStyle: 'italic' },
   completedSub: {
     flexDirection: 'row',

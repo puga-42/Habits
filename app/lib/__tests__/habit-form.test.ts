@@ -8,7 +8,7 @@ const scheduledHabit: Habit = {
   kind: 'scheduled',
   title: 'Meditate',
   description: 'Focus on breathing for 10 min',
-  color: '#7c3aed',
+  color: '#09EDE2',
   icon: '🧘',
   visibility: 'private',
   timezone: 'America/New_York',

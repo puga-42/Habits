@@ -18,6 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Palette } from '@/constants/colors';
 import {
   MAX_FEEDBACK_LENGTH,
   submitFeedback,
@@ -230,7 +231,7 @@ function CategoryPicker({
             onPress={() => onChange(cat)}
             style={[
               styles.categoryButton,
-              { backgroundColor: active ? '#7c3aed' : inactiveBg },
+              { backgroundColor: active ? Palette.primary : inactiveBg },
             ]}
           >
             <ThemedText
@@ -278,7 +279,7 @@ const styles = StyleSheet.create({
   },
   cancelText: { fontSize: 16 },
   title: { fontSize: 17, fontWeight: '600' },
-  submitText: { fontSize: 16, fontWeight: '600', color: '#7c3aed' },
+  submitText: { fontSize: 16, fontWeight: '600', color: Palette.primary },
   submitDisabled: { opacity: 0.4 },
 
   categoryRow: {

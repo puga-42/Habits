@@ -10,6 +10,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
+import { Palette } from '@/constants/colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export type FabAction = {
@@ -153,7 +154,7 @@ const styles = StyleSheet.create({
     width: FAB_SIZE,
     height: FAB_SIZE,
     borderRadius: FAB_SIZE / 2,
-    backgroundColor: '#7c3aed',
+    backgroundColor: Palette.primary,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
@@ -163,7 +164,7 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   fabPressed: { opacity: 0.85, transform: [{ scale: 0.97 }] },
-  plus: { color: '#fff', fontSize: 30, lineHeight: 32, fontWeight: '300' },
+  plus: { color: Palette.charcoal, fontSize: 30, lineHeight: 32, fontWeight: '300' },
   actionRow: {
     position: 'absolute',
     right: FAB_RIGHT,

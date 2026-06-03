@@ -1,3 +1,6 @@
+import * as Crypto from 'expo-crypto';
+import { File as ExpoFile } from 'expo-file-system';
+
 import { supabase } from './supabase';
 
 // ─── Handle validation ────────────────────────────────────────────────────
@@ -19,10 +22,18 @@ export function validateHandle(handle: string): HandleValidation {
   return { ok: true };
 }
 
+export type CropParams = {
+  scale: number;
+  translateX: number;
+  translateY: number;
+};
+
 export type Profile = {
   id: string;
   handle: string;
   avatar_url: string | null;
+  avatar_original_url: string | null;
+  avatar_crop_params: CropParams | null;
   week_start: number;
   created_at: string;
   updated_at: string;
@@ -63,6 +74,91 @@ export async function updateWeekStart(
     .update({ week_start: weekStart })
     .eq('id', userId);
   if (error) throw error;
+}
+
+// ─── Avatar upload ─────────────────────────────────────────────────────────
+
+const MIME_EXT: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/heic': 'heic',
+  'image/heif': 'heif',
+};
+
+async function uploadToStorage(
+  userId: string,
+  file: { uri: string; mimeType: string },
+): Promise<string> {
+  const ext = MIME_EXT[file.mimeType] ?? 'jpg';
+  const storagePath = `${userId}/${Crypto.randomUUID()}.${ext}`;
+
+  const expoFile = new ExpoFile(file.uri);
+  if (!expoFile.exists) throw new Error('File not found');
+  const bytes = await expoFile.bytes();
+
+  const { error: uploadErr } = await supabase.storage
+    .from('avatars')
+    .upload(storagePath, bytes, { contentType: file.mimeType });
+  if (uploadErr) throw uploadErr;
+
+  const { data: urlData } = supabase.storage
+    .from('avatars')
+    .getPublicUrl(storagePath);
+
+  return urlData.publicUrl;
+}
+
+export async function uploadAvatar(
+  userId: string,
+  file: { uri: string; mimeType: string },
+): Promise<string> {
+  const publicUrl = await uploadToStorage(userId, file);
+
+  const { error: updateErr } = await supabase
+    .from('profiles')
+    .update({
+      avatar_url: publicUrl,
+      avatar_original_url: publicUrl,
+      avatar_crop_params: null,
+    })
+    .eq('id', userId);
+  if (updateErr) throw updateErr;
+
+  return publicUrl;
+}
+
+export async function uploadCroppedAvatar(
+  userId: string,
+  croppedFile: { uri: string; mimeType: string },
+  cropParams: CropParams,
+): Promise<string> {
+  const publicUrl = await uploadToStorage(userId, croppedFile);
+
+  const { error: updateErr } = await supabase
+    .from('profiles')
+    .update({
+      avatar_url: publicUrl,
+      avatar_crop_params: cropParams,
+    })
+    .eq('id', userId);
+  if (updateErr) throw updateErr;
+
+  return publicUrl;
+}
+
+export async function fetchAvatarOriginal(
+  userId: string,
+): Promise<{ originalUrl: string | null; cropParams: CropParams | null }> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('avatar_original_url, avatar_crop_params')
+    .eq('id', userId)
+    .single();
+  if (error) throw error;
+  return {
+    originalUrl: data.avatar_original_url as string | null,
+    cropParams: data.avatar_crop_params as CropParams | null,
+  };
 }
 
 export const WEEKDAY_NAMES = [

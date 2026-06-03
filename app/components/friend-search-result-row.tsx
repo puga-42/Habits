@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { FeedAvatar } from '@/components/feed-avatar';
 import { ThemedText } from '@/components/themed-text';
+import { Palette } from '@/constants/colors';
 import type { SearchResult } from '@/lib/friends';
 
 type Props = {
@@ -103,7 +104,7 @@ const styles = StyleSheet.create({
     minWidth: 72,
     alignItems: 'center',
   },
-  buttonAccent: { backgroundColor: '#0a7ea4' },
+  buttonAccent: { backgroundColor: Palette.primary },
   buttonGhost: {
     backgroundColor: 'rgba(127,127,127,0.12)',
   },

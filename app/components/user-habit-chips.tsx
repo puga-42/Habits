@@ -1,6 +1,7 @@
 import { FlatList, Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { Palette } from '@/constants/colors';
 import type { UserHabit } from '@/lib/user-profile';
 
 type Props = {
@@ -93,7 +94,7 @@ const styles = StyleSheet.create({
   },
   chipSelected: {
     backgroundColor: 'rgba(10,126,164,0.15)',
-    borderColor: '#0a7ea4',
+    borderColor: Palette.primary,
   },
   chipIcon: { fontSize: 14 },
   chipText: { fontSize: 13, fontWeight: '500', maxWidth: 120 },

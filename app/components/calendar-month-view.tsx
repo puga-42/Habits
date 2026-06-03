@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { Palette, primaryRgba } from '@/constants/colors';
 import type { DayGroup, MonthCell } from '@/lib/history';
 
 type CellHabit = {
@@ -23,8 +24,8 @@ type Props = {
 
 const WEEKDAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
-const TODAY_RING = 'rgba(124, 58, 237, 0.55)';
-const SELECTED_RING = '#7c3aed';
+const TODAY_RING = primaryRgba(0.55);
+const SELECTED_RING = Palette.primary;
 const MAX_CHIPS = 3;
 
 export function CalendarMonthView({

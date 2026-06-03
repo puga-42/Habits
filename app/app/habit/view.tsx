@@ -1,3 +1,4 @@
+import { Palette } from '@/constants/colors';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
@@ -147,7 +148,7 @@ const styles = StyleSheet.create({
   },
   headerButton: { fontSize: 16 },
   headerTitle: { flex: 1, textAlign: 'center', marginHorizontal: 8 },
-  editButton: { fontWeight: '600', color: '#7c3aed' },
+  editButton: { fontWeight: '600', color: Palette.primary },
   headerPlaceholder: { width: 40 },
   scroll: { padding: 20 },
   heroRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 24 },

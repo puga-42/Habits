@@ -1,5 +1,6 @@
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
+import { Palette } from '@/constants/colors';
 import { FeedAvatar } from '@/components/feed-avatar';
 import { ThemedText } from '@/components/themed-text';
 import type { FriendRequest } from '@/lib/friends';
@@ -76,7 +77,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: 'center',
   },
-  buttonAccent: { backgroundColor: '#0a7ea4' },
+  buttonAccent: { backgroundColor: Palette.primary },
   buttonGhost: { backgroundColor: 'rgba(127,127,127,0.12)' },
   buttonText: { fontSize: 13, fontWeight: '600' },
   buttonTextAccent: { color: '#fff' },

@@ -6,6 +6,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Palette } from '@/constants/colors';
 import { Calendar3DayView } from '@/components/calendar-3day-view';
 import { CalendarDayView } from '@/components/calendar-day-view';
 import type { ViewMode } from '@/components/calendar-menu-drawer';
@@ -479,13 +480,13 @@ export default function CalendarScreen() {
             {
               key: 'new-habit',
               label: 'New habit',
-              icon: <IconSymbol name="plus.circle" size={20} color="#7c3aed" />,
+              icon: <IconSymbol name="plus.circle" size={20} color={Palette.primary} />,
               onPress: () => router.push('/habit/new'),
             },
             {
               key: 'feedback',
               label: 'Feedback',
-              icon: <IconSymbol name="bubble.left" size={20} color="#7c3aed" />,
+              icon: <IconSymbol name="bubble.left" size={20} color={Palette.primary} />,
               onPress: () => router.push('/feedback'),
             },
           ]}
@@ -549,7 +550,7 @@ function parseIsoLocal(iso: string): Date {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   content: { flex: 1 },
-  todayBtn: { fontSize: 14, color: '#7c3aed', fontWeight: '600' },
+  todayBtn: { fontSize: 14, color: Palette.primary, fontWeight: '600' },
   subBar: {
     flexDirection: 'row',
     alignItems: 'center',

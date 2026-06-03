@@ -29,6 +29,7 @@ import {
   type CompletionDetail,
 } from '@/lib/completions';
 import { signedUrlsForPaths } from '@/lib/feed';
+import { Palette } from '@/constants/colors';
 import type { Visibility } from '@/lib/habits';
 
 export default function CompletionDetailScreen() {
@@ -184,7 +185,7 @@ export default function CompletionDetailScreen() {
     { hour: 'numeric', minute: '2-digit' },
   );
 
-  const habitColor = completion.habit.color ?? '#7c3aed';
+  const habitColor = completion.habit.color ?? Palette.primary;
 
   return (
     <ThemedView style={styles.root}>

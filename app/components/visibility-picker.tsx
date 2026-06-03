@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { Palette } from '@/constants/colors';
 import type { Visibility } from '@/lib/habits';
 
 type Props = {
@@ -71,12 +72,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: 10,
   },
-  radioSelected: { borderColor: '#7c3aed' },
+  radioSelected: { borderColor: Palette.primary },
   radioInner: {
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#7c3aed',
+    backgroundColor: Palette.primary,
   },
   optionLabel: { fontSize: 15 },
   hint: { fontSize: 12, opacity: 0.5, marginTop: 8, fontStyle: 'italic' },

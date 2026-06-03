@@ -1,5 +1,7 @@
 import { createContext, useContext, useState, type ReactNode } from 'react';
 
+import { Palette } from '@/constants/colors';
+
 import {
   buildRrule,
   parseRrule,
@@ -36,7 +38,7 @@ function defaultDraft(): HabitDraft {
     endsOn: null,
     targetCount: 3,
     targetPeriod: 'week',
-    color: '#7c3aed',
+    color: Palette.primary,
     icon: '✨',
     visibility: 'private',
   };
@@ -54,7 +56,7 @@ export function habitToDraft(habit: Habit): HabitDraft {
       endsOn: habit.until ? new Date(habit.until) : null,
       targetCount: 3,
       targetPeriod: 'week',
-      color: habit.color ?? '#7c3aed',
+      color: habit.color ?? Palette.primary,
       icon: habit.icon ?? '✨',
       visibility: habit.visibility,
     };
@@ -68,7 +70,7 @@ export function habitToDraft(habit: Habit): HabitDraft {
     endsOn: null,
     targetCount: habit.target_count ?? 3,
     targetPeriod: habit.target_period ?? 'week',
-    color: habit.color ?? '#7c3aed',
+    color: habit.color ?? Palette.primary,
     icon: habit.icon ?? '✨',
     visibility: habit.visibility,
   };

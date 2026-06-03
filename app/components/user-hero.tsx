@@ -1,5 +1,9 @@
-import { Alert, Pressable, StyleSheet, View } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import { useState } from 'react';
+import { ActionSheetIOS, ActivityIndicator, Alert, Platform, Pressable, StyleSheet, View } from 'react-native';
 
+import { Palette } from '@/constants/colors';
+import { AvatarCropModal } from '@/components/avatar-crop-modal';
 import { FeedAvatar } from '@/components/feed-avatar';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -10,6 +14,8 @@ import {
   removeFriend,
   sendFriendRequest,
 } from '@/lib/friends';
+import type { CropParams } from '@/lib/profile';
+import { fetchAvatarOriginal, uploadAvatar, uploadCroppedAvatar } from '@/lib/profile';
 import type { FriendshipStatus, UserProfileData } from '@/lib/user-profile';
 import { friendshipActionLabel } from '@/lib/user-profile';
 
@@ -21,9 +27,89 @@ type Props = {
   onBack: () => void;
 };
 
+async function pickImage(source: 'library' | 'camera'): Promise<ImagePicker.ImagePickerResult> {
+  if (source === 'camera') {
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
+    if (!perm.granted) throw new Error('Camera permission denied');
+    return ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.8 });
+  }
+  return ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8 });
+}
+
 export function UserHero({ profile, viewerId, targetId, onReload, onBack }: Props) {
   const isSelf = profile.friendship_status === 'self';
   const label = friendshipActionLabel(profile.friendship_status);
+  const [uploading, setUploading] = useState(false);
+  const [cropUri, setCropUri] = useState<string | null>(null);
+  const [cropParams, setCropParams] = useState<CropParams | null>(null);
+
+  const handleAvatarEdit = () => {
+    const hasAvatar = !!profile.avatar_url;
+    const options = hasAvatar
+      ? ['Choose from Library', 'Take Photo', 'View Profile Photo', 'Cancel']
+      : ['Choose from Library', 'Take Photo', 'Cancel'];
+    const cancelIdx = options.length - 1;
+    const openCropModal = async () => {
+      try {
+        const original = await fetchAvatarOriginal(viewerId);
+        setCropParams(original.cropParams);
+        setCropUri(original.originalUrl ?? profile.avatar_url);
+      } catch {
+        setCropParams(null);
+        setCropUri(profile.avatar_url);
+      }
+    };
+
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        { options, cancelButtonIndex: cancelIdx },
+        (idx) => {
+          if (idx === 0) doAvatarUpload('library');
+          else if (idx === 1) doAvatarUpload('camera');
+          else if (hasAvatar && idx === 2) openCropModal();
+        },
+      );
+    } else {
+      const items: { text: string; onPress?: () => void; style?: 'cancel' }[] = [
+        { text: 'Choose from Library', onPress: () => doAvatarUpload('library') },
+        { text: 'Take Photo', onPress: () => doAvatarUpload('camera') },
+      ];
+      if (hasAvatar) items.push({ text: 'View Profile Photo', onPress: openCropModal });
+      items.push({ text: 'Cancel', style: 'cancel' });
+      Alert.alert('Change Photo', undefined, items);
+    }
+  };
+
+  const doAvatarUpload = async (source: 'library' | 'camera') => {
+    try {
+      const result = await pickImage(source);
+      if (result.canceled || !result.assets[0]) return;
+      const asset = result.assets[0];
+      setUploading(true);
+      await uploadAvatar(viewerId, {
+        uri: asset.uri,
+        mimeType: asset.mimeType ?? 'image/jpeg',
+      });
+      onReload();
+    } catch (err) {
+      Alert.alert('Upload failed', err instanceof Error ? err.message : String(err));
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleCropSave = async (croppedUri: string, params: CropParams) => {
+    setCropUri(null);
+    setUploading(true);
+    try {
+      await uploadCroppedAvatar(viewerId, { uri: croppedUri, mimeType: 'image/jpeg' }, params);
+      onReload();
+    } catch (err) {
+      Alert.alert('Upload failed', err instanceof Error ? err.message : String(err));
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const handleFriendAction = async () => {
     const st = profile.friendship_status;
@@ -56,7 +142,18 @@ export function UserHero({ profile, viewerId, targetId, onReload, onBack }: Prop
 
   return (
     <View style={styles.root}>
-      <FeedAvatar url={profile.avatar_url} handle={profile.handle} size={96} />
+      {isSelf ? (
+        <Pressable onPress={handleAvatarEdit} disabled={uploading}>
+          <FeedAvatar url={profile.avatar_url} handle={profile.handle} size={96} />
+          <View style={styles.cameraBadge}>
+            {uploading
+              ? <ActivityIndicator size={14} color="#fff" />
+              : <IconSymbol name="camera.fill" color="#fff" size={14} />}
+          </View>
+        </Pressable>
+      ) : (
+        <FeedAvatar url={profile.avatar_url} handle={profile.handle} size={96} />
+      )}
       <ThemedText type="title" style={styles.handle}>@{profile.handle}</ThemedText>
 
       {!isSelf && label && (
@@ -69,6 +166,13 @@ export function UserHero({ profile, viewerId, targetId, onReload, onBack }: Prop
           </Pressable>
         </View>
       )}
+      <AvatarCropModal
+        visible={cropUri !== null}
+        imageUri={cropUri}
+        initialCropParams={cropParams}
+        onSave={handleCropSave}
+        onCancel={() => setCropUri(null)}
+      />
     </View>
   );
 }
@@ -82,10 +186,21 @@ function btnFg(st: FriendshipStatus) {
 
 const styles = StyleSheet.create({
   root: { alignItems: 'center', paddingTop: 24, paddingBottom: 16, gap: 8 },
+  cameraBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   handle: { marginTop: 4 },
   actions: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 4 },
   btn: { paddingHorizontal: 20, paddingVertical: 8, borderRadius: 20, minWidth: 110, alignItems: 'center' },
-  btnAccent: { backgroundColor: '#0a7ea4' },
+  btnAccent: { backgroundColor: Palette.primary },
   btnGhost: { backgroundColor: 'rgba(127,127,127,0.12)' },
   btnText: { fontSize: 14, fontWeight: '600' },
   btnTextAccent: { color: '#fff' },

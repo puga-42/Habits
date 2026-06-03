@@ -7,6 +7,7 @@ import { GestureResponderEvent, Pressable, ScrollView, StyleSheet, View } from '
 import PagerView from 'react-native-pager-view';
 
 import { ThemedText } from '@/components/themed-text';
+import { Palette } from '@/constants/colors';
 import { isoDate, type Habit } from '@/lib/habits';
 import {
   partitionRows,
@@ -244,7 +245,7 @@ const styles = StyleSheet.create({
   },
   weekday: { fontSize: 10, opacity: 0.55, textTransform: 'uppercase', letterSpacing: 0.5 },
   dateNum: { fontSize: 16, marginTop: 1 },
-  todayText: { color: '#7c3aed', fontWeight: '600', opacity: 1 },
+  todayText: { color: Palette.primary, fontWeight: '600', opacity: 1 },
   cellContent: { padding: 2, paddingBottom: 80, gap: 2 },
   compactRow: {
     flexDirection: 'row',

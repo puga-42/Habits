@@ -12,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { Palette } from '@/constants/colors';
 
 export type ViewMode = 'day' | '3day' | 'week' | 'month' | 'schedule';
 
@@ -25,7 +26,7 @@ type Props = {
 };
 
 const DRAWER_WIDTH = 280;
-const ACTIVE_TINT = '#7c3aed';
+const ACTIVE_TINT = Palette.primary;
 
 const VIEW_OPTIONS: Array<{ key: ViewMode; label: string }> = [
   { key: 'day', label: 'Day' },

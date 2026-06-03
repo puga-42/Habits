@@ -14,7 +14,9 @@ import { useHabitForm } from '@/lib/habit-form';
 import type { FlexPeriod, Visibility } from '@/lib/habits';
 import { describeRrule } from '@/lib/recurrence';
 
-const COLORS = ['#7c3aed', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#6b7280'];
+import { Palette } from '@/constants/colors';
+
+const COLORS = Palette.habitColors;
 const ICONS = ['✨', '🧘', '🏋', '🚶', '📖', '💧', '🍎', '🌱', '✍️', '☀️', '😴', '🧹', '☕️', '🚲', '🦷', '💊'];
 const PERIODS: FlexPeriod[] = ['day', 'week', 'month'];
 const VISIBILITY_OPTIONS: Visibility[] = ['public', 'friends', 'private'];

@@ -23,6 +23,7 @@ import { ThemedText } from '@/components/themed-text';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { Palette } from '@/constants/colors';
 import { useAuth } from '@/lib/auth';
 import {
   applyCommentLikeToggle,
@@ -242,7 +243,7 @@ export function FeedCommentsSheet({
                       (sending || input.trim().length === 0) && styles.sendDisabled,
                       pressed && styles.sendPressed,
                     ]}>
-                    <IconSymbol name="paperplane.fill" color="#fff" size={18} />
+                    <IconSymbol name="paperplane.fill" color={Palette.charcoal} size={18} />
                   </Pressable>
                 </View>
               </KeyboardAvoidingView>
@@ -311,7 +312,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#0a7ea4',
+    backgroundColor: Palette.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },

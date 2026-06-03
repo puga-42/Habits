@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { Palette } from '@/constants/colors';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import {
   keyboardAvoidingBehavior,
@@ -149,14 +150,14 @@ const styles = StyleSheet.create({
     height: 50,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#ccc',
+    borderColor: Palette.slate200,
     paddingHorizontal: 16,
     fontSize: 16,
   },
   emailButton: {
     height: 50,
     borderRadius: 8,
-    backgroundColor: '#333',
+    backgroundColor: Palette.charcoal,
     justifyContent: 'center',
     alignItems: 'center',
   },

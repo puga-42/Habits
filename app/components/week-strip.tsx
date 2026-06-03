@@ -9,10 +9,11 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import PagerView from 'react-native-pager-view';
 
 import { ThemedText } from '@/components/themed-text';
+import { Palette, primaryRgba } from '@/constants/colors';
 import { isoDate } from '@/lib/habits';
 import { densityBucket, weekDatesFrom } from '@/lib/history';
 
-const ACCENT = '#7c3aed';
+const ACCENT = Palette.primary;
 const WEEKDAY_LETTERS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const DENSITY_ALPHA = [0, 0.12, 0.26, 0.45, 0.68] as const;
 
@@ -130,7 +131,7 @@ function WeekRow({
               style={[
                 styles.dayBubble,
                 bucket > 0 && {
-                  backgroundColor: `rgba(124,58,237,${DENSITY_ALPHA[bucket]})`,
+                  backgroundColor: primaryRgba(DENSITY_ALPHA[bucket]),
                 },
                 isSelected && styles.dayBubbleSelected,
               ]}>

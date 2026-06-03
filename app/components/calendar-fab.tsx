@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { Palette } from '@/constants/colors';
 
 type Props = {
   onPress: () => void;
@@ -26,7 +27,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#7c3aed',
+    backgroundColor: Palette.primary,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
@@ -36,5 +37,5 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   fabPressed: { opacity: 0.85, transform: [{ scale: 0.97 }] },
-  plus: { color: '#fff', fontSize: 30, lineHeight: 32, fontWeight: '300' },
+  plus: { color: Palette.charcoal, fontSize: 30, lineHeight: 32, fontWeight: '300' },
 });
