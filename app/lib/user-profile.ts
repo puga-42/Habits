@@ -125,6 +125,17 @@ export function filterItemsByLineage(
   return items.filter((i) => habitIds.has(i.habit_id));
 }
 
+export function filterItemsByDate(
+  items: FeedItem[],
+  date: string | null,
+): FeedItem[] {
+  if (date === null) return items;
+  return items.filter((i) => {
+    const d = i.occurrence_date ?? i.period_start ?? i.completed_at?.slice(0, 10);
+    return d === date;
+  });
+}
+
 export function friendshipActionLabel(
   status: FriendshipStatus,
 ): string | null {

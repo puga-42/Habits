@@ -1,7 +1,8 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 
+import { ActivityHeatmap } from '@/components/activity-heatmap';
 import { FeedActivityCard } from '@/components/feed-activity-card';
 import { FeedCard } from '@/components/feed-card';
 import { FeedCommentsSheet } from '@/components/feed-comments-sheet';
@@ -10,17 +11,9 @@ import { MutualFriendsRow } from '@/components/mutual-friends-row';
 import { ThemedText } from '@/components/themed-text';
 import { UserHabitChips } from '@/components/user-habit-chips';
 import { UserHero } from '@/components/user-hero';
-import {
-  applyLikeToggle, blockUser, likeActivity, likeCompletion,
-  muteHabit, reportContent, unlikeActivity, unlikeCompletion,
-  type FeedItem, type FeedKind,
-} from '@/lib/feed';
+import { applyLikeToggle, blockUser, likeActivity, likeCompletion, muteHabit, reportContent, unlikeActivity, unlikeCompletion, type FeedItem, type FeedKind } from '@/lib/feed';
 import type { FriendProfile } from '@/lib/friends';
-import {
-  fetchMutualFriends, fetchUserFeedPage, fetchUserHabits, fetchUserProfile,
-  filterItemsByLineage, mergeUserFeedPages, userFeedSortKey,
-  type UserHabit, type UserProfileData,
-} from '@/lib/user-profile';
+import { fetchMutualFriends, fetchUserFeedPage, fetchUserHabits, fetchUserProfile, filterItemsByDate, filterItemsByLineage, mergeUserFeedPages, userFeedSortKey, type UserHabit, type UserProfileData } from '@/lib/user-profile';
 
 const PAGE_SIZE = 20;
 
@@ -45,8 +38,9 @@ export function UserProfileView({ targetId, viewerId, onBack }: Props) {
   const [paging, setPaging] = useState(false);
   const [reachedEnd, setReachedEnd] = useState(false);
   const [selectedLineageId, setSelectedLineageId] = useState<string | null>(null);
-  const [activeComment, setActiveComment] = useState<{ targetId: string; targetKind: FeedKind; ownerId: string } | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [mutualModalOpen, setMutualModalOpen] = useState(false);
+  const [activeComment, setActiveComment] = useState<{ targetId: string; targetKind: FeedKind; ownerId: string } | null>(null);
 
   const loadAll = useCallback(async () => {
     setLoading(true);
@@ -66,14 +60,12 @@ export function UserProfileView({ targetId, viewerId, onBack }: Props) {
       setReachedEnd(feed.length < PAGE_SIZE);
     } finally { setLoading(false); }
   }, [targetId, viewerId]);
-
   useFocusEffect(useCallback(() => { loadAll(); }, [loadAll]));
 
   const refresh = useCallback(async () => {
     setRefreshing(true);
     try { await loadAll(); } finally { setRefreshing(false); }
   }, [loadAll]);
-
   const loadMore = useCallback(async () => {
     if (paging || reachedEnd || items.length === 0) return;
     const last = items[items.length - 1];
@@ -91,9 +83,9 @@ export function UserProfileView({ targetId, viewerId, onBack }: Props) {
       }
     } finally { setPaging(false); }
   }, [targetId, items, paging, reachedEnd, selectedLineageId]);
-
   const handleChipSelect = useCallback((lineageId: string | null) => {
     setSelectedLineageId(lineageId);
+    setSelectedDate(null);
     if (lineageId === null) {
       setItems(allItemsRef.current);
       setReachedEnd(reachedEndAllRef.current);
@@ -102,7 +94,6 @@ export function UserProfileView({ targetId, viewerId, onBack }: Props) {
       setReachedEnd(false);
     }
   }, [habits]);
-
   const handleToggleLike = useCallback(async (item: FeedItem) => {
     if (!viewerId) return;
     const next = !item.viewer_liked;
@@ -116,6 +107,11 @@ export function UserProfileView({ targetId, viewerId, onBack }: Props) {
   }, [viewerId]);
 
   const backHandler = onBack ?? (() => {});
+
+  const displayedItems = useMemo(
+    () => filterItemsByDate(items, selectedDate),
+    [items, selectedDate],
+  );
 
   if (!profile && !loading) return (
     <View style={s.center}>
@@ -138,7 +134,7 @@ export function UserProfileView({ targetId, viewerId, onBack }: Props) {
         <View style={s.center}><ActivityIndicator /></View>
       ) : (
         <FlatList
-          data={items}
+          data={displayedItems}
           keyExtractor={(i) => i.id}
           ListHeaderComponent={
             <View>
@@ -150,6 +146,14 @@ export function UserProfileView({ targetId, viewerId, onBack }: Props) {
                   )}
                 </>
               )}
+              <ActivityHeatmap
+                targetId={targetId}
+                viewerId={viewerId}
+                selectedLineageId={selectedLineageId}
+                selectedDate={selectedDate}
+                onSelectDate={setSelectedDate}
+                habits={habits}
+              />
               <View style={s.chipsWrap}>
                 <UserHabitChips habits={habits} selectedLineageId={selectedLineageId} onSelect={handleChipSelect} />
               </View>

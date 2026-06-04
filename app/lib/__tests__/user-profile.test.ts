@@ -3,6 +3,7 @@ import {
   userFeedSortKey,
   friendshipActionLabel,
   filterItemsByLineage,
+  filterItemsByDate,
   type UserHabit,
 } from '../user-profile';
 import type { FeedItem } from '../feed';
@@ -153,6 +154,41 @@ describe('filterItemsByLineage', () => {
   it('handles unknown lineage gracefully', () => {
     const items = [makeItem({ id: 'a', habit_id: 'h1' })];
     expect(filterItemsByLineage(items, habits, 'L_unknown')).toEqual([]);
+  });
+});
+
+describe('filterItemsByDate', () => {
+  it('returns all items when date is null', () => {
+    const items = [makeItem({ id: 'a' }), makeItem({ id: 'b' })];
+    expect(filterItemsByDate(items, null)).toEqual(items);
+  });
+
+  it('filters by occurrence_date for scheduled completions', () => {
+    const items = [
+      makeItem({ id: 'a', occurrence_date: '2026-06-01' }),
+      makeItem({ id: 'b', occurrence_date: '2026-06-02' }),
+    ];
+    expect(filterItemsByDate(items, '2026-06-01').map((i) => i.id)).toEqual(['a']);
+  });
+
+  it('filters by period_start for flex completions', () => {
+    const items = [
+      makeItem({ id: 'a', occurrence_date: null, period_start: '2026-06-01' }),
+      makeItem({ id: 'b', occurrence_date: null, period_start: '2026-06-03' }),
+    ];
+    expect(filterItemsByDate(items, '2026-06-01').map((i) => i.id)).toEqual(['a']);
+  });
+
+  it('falls back to completed_at date for items without occurrence or period', () => {
+    const items = [
+      makeActivityItem({ id: 'a', completed_at: '2026-06-01T14:00:00Z' }),
+    ];
+    expect(filterItemsByDate(items, '2026-06-01').map((i) => i.id)).toEqual(['a']);
+  });
+
+  it('returns empty array when no items match', () => {
+    const items = [makeItem({ id: 'a', occurrence_date: '2026-06-01' })];
+    expect(filterItemsByDate(items, '2026-06-05')).toEqual([]);
   });
 });
 
