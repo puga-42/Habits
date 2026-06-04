@@ -4,6 +4,7 @@ import {
   friendshipActionLabel,
   filterItemsByLineage,
   filterItemsByDate,
+  habitsCompletedOnDate,
   type UserHabit,
 } from '../user-profile';
 import type { FeedItem } from '../feed';
@@ -202,5 +203,51 @@ describe('friendshipActionLabel', () => {
 
   it('returns null for self', () => {
     expect(friendshipActionLabel('self')).toBeNull();
+  });
+});
+
+describe('habitsCompletedOnDate', () => {
+  const habits: UserHabit[] = [
+    { id: 'h1', lineage_id: 'l1', title: 'Meditate', icon: '🧘', color: '#aaa', kind: 'scheduled' },
+    { id: 'h2', lineage_id: 'l2', title: 'Run', icon: '🏃', color: '#f00', kind: 'flex' },
+    { id: 'h3', lineage_id: 'l3', title: 'Read', icon: '📖', color: '#00f', kind: 'scheduled' },
+  ];
+
+  it('returns habits with completions on the given date', () => {
+    const items = [
+      makeItem({ id: 'c1', habit_id: 'h1', occurrence_date: '2026-06-01' }),
+      makeItem({ id: 'c2', habit_id: 'h3', occurrence_date: '2026-06-01' }),
+    ];
+    const result = habitsCompletedOnDate(items, habits, '2026-06-01');
+    expect(result.map((h) => h.id)).toEqual(['h1', 'h3']);
+  });
+
+  it('returns empty array when no items match the date', () => {
+    const items = [
+      makeItem({ id: 'c1', habit_id: 'h1', occurrence_date: '2026-06-02' }),
+    ];
+    expect(habitsCompletedOnDate(items, habits, '2026-06-01')).toEqual([]);
+  });
+
+  it('deduplicates habits with multiple completions', () => {
+    const items = [
+      makeItem({ id: 'c1', habit_id: 'h1', occurrence_date: '2026-06-01' }),
+      makeItem({ id: 'c2', habit_id: 'h1', occurrence_date: '2026-06-01' }),
+    ];
+    const result = habitsCompletedOnDate(items, habits, '2026-06-01');
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe('h1');
+  });
+
+  it('returns empty array for empty items', () => {
+    expect(habitsCompletedOnDate([], habits, '2026-06-01')).toEqual([]);
+  });
+
+  it('matches by period_start fallback', () => {
+    const items = [
+      makeItem({ id: 'c1', habit_id: 'h2', occurrence_date: null, period_start: '2026-06-01' }),
+    ];
+    const result = habitsCompletedOnDate(items, habits, '2026-06-01');
+    expect(result.map((h) => h.id)).toEqual(['h2']);
   });
 });

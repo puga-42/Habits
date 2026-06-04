@@ -3,6 +3,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 
 import { ActivityHeatmap } from '@/components/activity-heatmap';
+import { formatDaySummary } from '@/lib/activity-heatmap';
 import { FeedActivityCard } from '@/components/feed-activity-card';
 import { FeedCard } from '@/components/feed-card';
 import { FeedCommentsSheet } from '@/components/feed-comments-sheet';
@@ -13,7 +14,7 @@ import { UserHabitChips } from '@/components/user-habit-chips';
 import { UserHero } from '@/components/user-hero';
 import { applyLikeToggle, blockUser, likeActivity, likeCompletion, muteHabit, reportContent, unlikeActivity, unlikeCompletion, type FeedItem, type FeedKind } from '@/lib/feed';
 import type { FriendProfile } from '@/lib/friends';
-import { fetchMutualFriends, fetchUserFeedPage, fetchUserHabits, fetchUserProfile, filterItemsByDate, filterItemsByLineage, mergeUserFeedPages, userFeedSortKey, type UserHabit, type UserProfileData } from '@/lib/user-profile';
+import { fetchMutualFriends, fetchUserFeedPage, fetchUserHabits, fetchUserProfile, filterItemsByDate, filterItemsByLineage, habitsCompletedOnDate, mergeUserFeedPages, userFeedSortKey, type UserHabit, type UserProfileData } from '@/lib/user-profile';
 
 const PAGE_SIZE = 20;
 
@@ -39,6 +40,7 @@ export function UserProfileView({ targetId, viewerId, onBack }: Props) {
   const [reachedEnd, setReachedEnd] = useState(false);
   const [selectedLineageId, setSelectedLineageId] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [selectedDayCount, setSelectedDayCount] = useState(0);
   const [mutualModalOpen, setMutualModalOpen] = useState(false);
   const [activeComment, setActiveComment] = useState<{ targetId: string; targetKind: FeedKind; ownerId: string } | null>(null);
 
@@ -83,17 +85,17 @@ export function UserProfileView({ targetId, viewerId, onBack }: Props) {
       }
     } finally { setPaging(false); }
   }, [targetId, items, paging, reachedEnd, selectedLineageId]);
+  const handleDateSelect = useCallback((date: string | null, count: number) => {
+    setSelectedDate(date); setSelectedDayCount(count); setSelectedLineageId(null);
+    setItems(allItemsRef.current); setReachedEnd(reachedEndAllRef.current);
+  }, []);
   const handleChipSelect = useCallback((lineageId: string | null) => {
     setSelectedLineageId(lineageId);
-    setSelectedDate(null);
-    if (lineageId === null) {
-      setItems(allItemsRef.current);
-      setReachedEnd(reachedEndAllRef.current);
-    } else {
-      setItems(filterItemsByLineage(allItemsRef.current, habits, lineageId));
-      setReachedEnd(false);
-    }
-  }, [habits]);
+    if (selectedDate) return;
+    const filtered = lineageId ? filterItemsByLineage(allItemsRef.current, habits, lineageId) : allItemsRef.current;
+    setItems(filtered);
+    setReachedEnd(lineageId ? false : reachedEndAllRef.current);
+  }, [habits, selectedDate]);
   const handleToggleLike = useCallback(async (item: FeedItem) => {
     if (!viewerId) return;
     const next = !item.viewer_liked;
@@ -108,16 +110,13 @@ export function UserProfileView({ targetId, viewerId, onBack }: Props) {
 
   const backHandler = onBack ?? (() => {});
 
-  const displayedItems = useMemo(
-    () => filterItemsByDate(items, selectedDate),
-    [items, selectedDate],
-  );
+  const visibleHabits = selectedDate ? habitsCompletedOnDate(items, habits, selectedDate) : habits;
+  const displayedItems = useMemo(() => {
+    const byLineage = selectedLineageId ? filterItemsByLineage(items, habits, selectedLineageId) : items;
+    return filterItemsByDate(byLineage, selectedDate);
+  }, [items, selectedDate, selectedLineageId, habits]);
 
-  if (!profile && !loading) return (
-    <View style={s.center}>
-      <ThemedText style={s.muted}>User not found</ThemedText>
-    </View>
-  );
+  if (!profile && !loading) return <View style={s.center}><ThemedText style={s.muted}>User not found</ThemedText></View>;
 
   const cardProps = (item: FeedItem) => ({
     item, viewerId, now,
@@ -147,15 +146,15 @@ export function UserProfileView({ targetId, viewerId, onBack }: Props) {
                 </>
               )}
               <ActivityHeatmap
-                targetId={targetId}
-                viewerId={viewerId}
-                selectedLineageId={selectedLineageId}
-                selectedDate={selectedDate}
-                onSelectDate={setSelectedDate}
-                habits={habits}
+                targetId={targetId} viewerId={viewerId}
+                selectedLineageId={selectedLineageId} selectedDate={selectedDate}
+                onSelectDate={handleDateSelect} habits={habits}
               />
+              {selectedDate != null && (
+                <ThemedText style={s.daySummary}>{formatDaySummary(selectedDate, selectedDayCount)}</ThemedText>
+              )}
               <View style={s.chipsWrap}>
-                <UserHabitChips habits={habits} selectedLineageId={selectedLineageId} onSelect={handleChipSelect} />
+                <UserHabitChips habits={visibleHabits} selectedLineageId={selectedLineageId} onSelect={handleChipSelect} />
               </View>
             </View>
           }
@@ -193,6 +192,7 @@ function Sep() { return <View style={s.sep} />; }
 const s = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   muted: { opacity: 0.6, fontSize: 15 },
+  daySummary: { paddingHorizontal: 14, paddingBottom: 4, fontSize: 13, opacity: 0.7 },
   chipsWrap: { paddingBottom: 12 },
   empty: { textAlign: 'center', opacity: 0.5, paddingTop: 40, fontSize: 15 },
   sep: { height: StyleSheet.hairlineWidth, backgroundColor: 'rgba(127,127,127,0.25)', marginHorizontal: 14 },

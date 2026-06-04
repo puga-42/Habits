@@ -136,6 +136,16 @@ export function filterItemsByDate(
   });
 }
 
+export function habitsCompletedOnDate(
+  items: FeedItem[],
+  habits: UserHabit[],
+  date: string,
+): UserHabit[] {
+  const dateItems = filterItemsByDate(items, date);
+  const habitIds = new Set(dateItems.map((i) => i.habit_id));
+  return habits.filter((h) => habitIds.has(h.id));
+}
+
 export function friendshipActionLabel(
   status: FriendshipStatus,
 ): string | null {

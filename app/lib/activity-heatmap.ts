@@ -119,6 +119,17 @@ export function heatmapColor(
   return solidTint(baseColor, TINT_AMOUNTS[level], isDark);
 }
 
+export function formatDaySummary(date: string, count: number): string {
+  const [y, m, d] = date.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  const dayStr = dt.toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+  });
+  return `${count} ${count === 1 ? 'habit' : 'habits'} completed on ${dayStr}`;
+}
+
 // ─── Internal ──────────────────────────────────────────────────────────────
 
 function parseDate(s: string): Date {

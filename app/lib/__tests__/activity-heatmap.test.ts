@@ -3,6 +3,7 @@ import {
   intensityLevel,
   buildHeatmapGrid,
   heatmapColor,
+  formatDaySummary,
   type DayActivity,
 } from '../activity-heatmap';
 
@@ -169,5 +170,19 @@ describe('heatmapColor', () => {
     const dark = heatmapColor('#09EDE2', 2, true);
     const light = heatmapColor('#09EDE2', 2, false);
     expect(dark).not.toBe(light);
+  });
+});
+
+describe('formatDaySummary', () => {
+  it('formats plural count with full day name', () => {
+    expect(formatDaySummary('2026-06-03', 3)).toBe('3 habits on Wednesday, June 3');
+  });
+
+  it('formats singular count', () => {
+    expect(formatDaySummary('2026-06-01', 1)).toBe('1 habit on Monday, June 1');
+  });
+
+  it('formats zero count', () => {
+    expect(formatDaySummary('2026-05-31', 0)).toBe('0 habits on Sunday, May 31');
   });
 });

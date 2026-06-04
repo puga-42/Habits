@@ -22,7 +22,7 @@ type Props = {
   viewerId: string;
   selectedLineageId: string | null;
   selectedDate: string | null;
-  onSelectDate: (date: string | null) => void;
+  onSelectDate: (date: string | null, count: number) => void;
   habits: UserHabit[];
 };
 
@@ -66,7 +66,8 @@ export function ActivityHeatmap({
   }, [selectedLineageId, habits]);
 
   const handlePress = useCallback((day: HeatmapDay) => {
-    onSelectDate(selectedDate === day.date ? null : day.date);
+    const next = selectedDate === day.date ? null : day.date;
+    onSelectDate(next, day.count);
   }, [selectedDate, onSelectDate]);
 
   const scrollToEnd = useCallback(() => {
@@ -133,12 +134,12 @@ export function ActivityHeatmap({
 
 const s = StyleSheet.create({
   root: { paddingHorizontal: 14, paddingVertical: 8 },
-  loader: { height: 7 * STEP + 18, justifyContent: 'center', alignItems: 'center' },
+  loader: { height: 7 * STEP + 22, justifyContent: 'center', alignItems: 'center' },
   row: { flexDirection: 'row' },
-  dayLabels: { width: DAY_LABEL_WIDTH, paddingTop: 18 },
+  dayLabels: { width: DAY_LABEL_WIDTH, paddingTop: 22 },
   dayLabelCell: { height: STEP, justifyContent: 'center' },
   dayLabelText: { fontSize: 9, opacity: 0.5 },
-  monthRow: { height: 18, position: 'relative' },
+  monthRow: { height: 18, marginBottom: 4, position: 'relative' },
   monthLabel: { position: 'absolute', fontSize: 9, opacity: 0.5, top: 2 },
   grid: { flexDirection: 'row', gap: GAP },
   column: { gap: GAP },
