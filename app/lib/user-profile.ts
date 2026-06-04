@@ -188,5 +188,7 @@ function mapFeedRows(rows: unknown[]): FeedItem[] {
     like_count: (r.like_count as number) ?? 0,
     comment_count: (r.comment_count as number) ?? 0,
     viewer_liked: (r.viewer_liked as boolean) ?? false,
+    flex_position: (r.flex_position as number) ?? null,
+    flex_target: (r.flex_target as number) ?? null,
   }));
 }

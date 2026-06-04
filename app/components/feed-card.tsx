@@ -91,6 +91,11 @@ export function FeedCard({
         {item.habit_icon ? (
           <ThemedText style={styles.habitIcon}> {item.habit_icon}</ThemedText>
         ) : null}
+        {item.flex_position != null && item.flex_target != null && (
+          <ThemedText style={styles.flexProgress}>
+            {' '}{item.flex_position}/{item.flex_target}
+          </ThemedText>
+        )}
       </View>
 
       {item.attachments.length > 0 ? (
@@ -145,6 +150,7 @@ const styles = StyleSheet.create({
   habitVerb: { fontSize: 14, opacity: 0.7 },
   habitTitle: { fontSize: 15, fontWeight: '600' },
   habitIcon: { fontSize: 16 },
+  flexProgress: { fontSize: 13, opacity: 0.5, fontWeight: '500' },
   attachmentWrap: { marginBottom: 4 },
   actionWrap: { paddingHorizontal: 14, marginTop: 6 },
   noteWrap: { paddingHorizontal: 14, marginTop: 4 },

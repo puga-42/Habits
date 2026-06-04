@@ -1,9 +1,7 @@
-import { Palette } from '@/constants/colors';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,18 +9,16 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { CompletionCounter } from '@/components/completion-counter';
+import {
+  CompletionInlineEditor,
+  DisabledEditorPlaceholder,
+} from '@/components/completion-inline-editor';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Palette } from '@/constants/colors';
 import { useAuth } from '@/lib/auth';
-import { fetchHabit, type Habit, type Visibility } from '@/lib/habits';
-import { describeRrule, parseRrule } from '@/lib/recurrence';
-
-const VISIBILITY_LABELS: Record<Visibility, string> = {
-  public: 'Public',
-  friends: 'Friends only',
-  private: 'Private',
-};
+import { useHabitOverview } from '@/lib/use-habit-overview';
 
 export default function HabitViewScreen() {
   const router = useRouter();
@@ -31,23 +27,10 @@ export default function HabitViewScreen() {
     id: string;
     occurrenceDate?: string;
   }>();
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
 
-  const [habit, setHabit] = useState<Habit | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!id) return;
-    fetchHabit(id)
-      .then(setHabit)
-      .catch((err) => {
-        Alert.alert('Could not load habit', err instanceof Error ? err.message : String(err));
-      })
-      .finally(() => setLoading(false));
-  }, [id]);
-
-  const isOwner = habit?.owner_id === session?.user.id;
+  const state = useHabitOverview(id, session?.user.id, occurrenceDate);
+  const { habit, completions, signedUrls, loading, busy } = state;
+  const { expandedId, setExpandedId, isOwner, canComplete } = state;
 
   const handleEdit = useCallback(() => {
     if (!habit) return;
@@ -68,13 +51,6 @@ export default function HabitViewScreen() {
     );
   }
 
-  const scheduleLabel =
-    habit.kind === 'scheduled' && habit.rrule
-      ? describeRrule(parseRrule(habit.rrule))
-      : habit.kind === 'flex'
-        ? `${habit.target_count}× per ${habit.target_period}`
-        : null;
-
   return (
     <ThemedView style={styles.root}>
       <SafeAreaView edges={['top']} style={styles.content}>
@@ -94,42 +70,55 @@ export default function HabitViewScreen() {
           )}
         </View>
 
-        <ScrollView contentContainerStyle={styles.scroll}>
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          keyboardShouldPersistTaps="handled"
+        >
           <View style={styles.heroRow}>
             {habit.icon && <ThemedText type="icon" style={styles.heroIcon}>{habit.icon}</ThemedText>}
             <View style={styles.heroText}>
-              <ThemedText type="title" style={styles.title}>
-                {habit.title}
-              </ThemedText>
+              <ThemedText type="title" style={styles.title}>{habit.title}</ThemedText>
               {habit.description ? (
                 <ThemedText style={styles.description}>{habit.description}</ThemedText>
               ) : null}
             </View>
           </View>
 
-          <View style={styles.detailSection}>
-            <DetailRow label="Type" value={habit.kind === 'scheduled' ? 'Scheduled' : 'Flexible'} />
-            {scheduleLabel && <DetailRow label="Schedule" value={scheduleLabel} />}
-            <DetailRow label="Visibility" value={VISIBILITY_LABELS[habit.visibility]} />
-            {habit.color && (
-              <View style={styles.detailRow}>
-                <ThemedText style={styles.detailLabel}>Color</ThemedText>
-                <View style={[styles.colorSwatch, { backgroundColor: habit.color }]} />
-              </View>
-            )}
-          </View>
+          <CompletionCounter
+            habit={habit}
+            completionCount={completions.length}
+            onIncrement={state.handleIncrement}
+            onDecrement={state.handleDecrement}
+            disabled={!canComplete}
+            busy={busy}
+          />
+
+          {completions.length > 0 ? (
+            <View style={styles.completionsSection}>
+              {completions.map((c) => (
+                <CompletionInlineEditor
+                  key={c.id}
+                  completion={c}
+                  signedUrls={signedUrls}
+                  editable={isOwner}
+                  expanded={c.id === expandedId}
+                  onToggle={() =>
+                    setExpandedId(expandedId === c.id ? null : c.id)
+                  }
+                  onNoteSave={state.handleNoteSave}
+                  onAttachmentAdd={state.handleAttachmentAdd}
+                  onAttachmentDelete={state.handleAttachmentDelete}
+                  onAttachmentReorder={state.handleAttachmentReorder}
+                />
+              ))}
+            </View>
+          ) : (
+            isOwner && <DisabledEditorPlaceholder />
+          )}
+
         </ScrollView>
       </SafeAreaView>
     </ThemedView>
-  );
-}
-
-function DetailRow({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.detailRow}>
-      <ThemedText style={styles.detailLabel}>{label}</ThemedText>
-      <ThemedText style={styles.detailValue}>{value}</ThemedText>
-    </View>
   );
 }
 
@@ -150,24 +139,16 @@ const styles = StyleSheet.create({
   headerTitle: { flex: 1, textAlign: 'center', marginHorizontal: 8 },
   editButton: { fontWeight: '600', color: Palette.primary },
   headerPlaceholder: { width: 40 },
-  scroll: { padding: 20 },
-  heroRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 24 },
+  scroll: { padding: 20, paddingBottom: 40 },
+  heroRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   heroIcon: { fontSize: 40, marginRight: 14 },
   heroText: { flex: 1 },
   title: { fontSize: 24 },
   description: { fontSize: 15, marginTop: 4, opacity: 0.7 },
-  detailSection: {
+  completionsSection: {
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: 'rgba(127,127,127,0.2)',
-    paddingTop: 16,
-    gap: 14,
+    paddingTop: 12,
+    gap: 8,
   },
-  detailRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  detailLabel: { fontSize: 15, opacity: 0.6 },
-  detailValue: { fontSize: 15, fontWeight: '500' },
-  colorSwatch: { width: 20, height: 20, borderRadius: 10 },
 });

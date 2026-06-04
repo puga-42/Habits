@@ -31,6 +31,8 @@ function makeItem(overrides: Partial<FeedItem> = {}): FeedItem {
     like_count: 0,
     comment_count: 0,
     viewer_liked: false,
+    flex_position: null,
+    flex_target: null,
     ...overrides,
   };
 }
@@ -57,6 +59,8 @@ function makeActivityItem(overrides: Partial<FeedItem> = {}): FeedItem {
     like_count: 0,
     comment_count: 0,
     viewer_liked: false,
+    flex_position: null,
+    flex_target: null,
     ...overrides,
   };
 }

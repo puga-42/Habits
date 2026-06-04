@@ -43,6 +43,8 @@ export type FeedItem = {
   like_count: number;
   comment_count: number;
   viewer_liked: boolean;
+  flex_position: number | null;
+  flex_target: number | null;
 };
 
 export type Comment = {
