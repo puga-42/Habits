@@ -35,6 +35,16 @@ export function currentPeriodStart(
   }
 }
 
+export function resolveEffectiveNote(
+  pendingNotes: Map<string, string | null>,
+  completion: { id: string; note: string | null },
+): string | null {
+  if (pendingNotes.has(completion.id)) {
+    return pendingNotes.get(completion.id) ?? null;
+  }
+  return completion.note;
+}
+
 // ─── Queries ────────────────────────────────────────────────────────────────
 
 export async function fetchHabitCompletions(

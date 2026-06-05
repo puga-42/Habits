@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert } from 'react-native';
 
 import {
@@ -11,6 +11,7 @@ import { signedUrlsForPaths } from '@/lib/feed';
 import {
   currentPeriodStart,
   fetchHabitCompletions,
+  resolveEffectiveNote,
   type OverviewCompletion,
 } from '@/lib/habit-overview';
 import {
@@ -31,15 +32,19 @@ export type HabitOverviewState = {
   loading: boolean;
   busy: boolean;
   expandedId: string | null;
+  activeIndex: number;
   isOwner: boolean;
   canComplete: boolean;
   setExpandedId: (id: string | null) => void;
+  setActiveIndex: (index: number) => void;
   handleIncrement: () => void;
   handleDecrement: () => void;
   handleNoteSave: (completionId: string, note: string | null) => void;
   handleAttachmentAdd: (completionId: string) => void;
   handleAttachmentDelete: (completionId: string, attachmentId: string) => void;
   handleAttachmentReorder: (completionId: string, ids: string[]) => void;
+  effectiveNote: (completion: OverviewCompletion) => string | null;
+  flushPendingChanges: () => Promise<void>;
 };
 
 export function useHabitOverview(
@@ -53,6 +58,8 @@ export function useHabitOverview(
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const pendingNotes = useRef(new Map<string, string | null>());
 
   const dateIso = dateParam ?? isoDate(new Date());
   const isOwner = habit?.owner_id === userId;
@@ -67,6 +74,8 @@ export function useHabitOverview(
           : null;
       const list = await fetchHabitCompletions(h.id, occDate, perStart);
       setCompletions(list);
+      setActiveIndex(0);
+      pendingNotes.current.clear();
       if (list.length > 0) setExpandedId(list[0].id);
       const paths = list.flatMap((c) => c.attachments.map((a) => a.storage_path));
       if (paths.length > 0) {
@@ -127,11 +136,25 @@ export function useHabitOverview(
   }, [habit, userId, busy, completions, loadCompletions]);
 
   const handleNoteSave = useCallback(
-    async (completionId: string, note: string | null) => {
-      await updateNote(completionId, note);
+    (completionId: string, note: string | null) => {
+      pendingNotes.current.set(completionId, note);
     },
     [],
   );
+
+  const effectiveNote = useCallback(
+    (completion: OverviewCompletion): string | null =>
+      resolveEffectiveNote(pendingNotes.current, completion),
+    [],
+  );
+
+  const flushPendingChanges = useCallback(async () => {
+    const entries = Array.from(pendingNotes.current.entries());
+    pendingNotes.current.clear();
+    await Promise.all(
+      entries.map(([completionId, note]) => updateNote(completionId, note)),
+    );
+  }, []);
 
   const handleAttachmentAdd = useCallback(
     async (completionId: string) => {
@@ -169,14 +192,18 @@ export function useHabitOverview(
     loading,
     busy,
     expandedId,
+    activeIndex,
     isOwner,
     canComplete,
     setExpandedId,
+    setActiveIndex,
     handleIncrement,
     handleDecrement,
     handleNoteSave,
     handleAttachmentAdd,
     handleAttachmentDelete,
     handleAttachmentReorder,
+    effectiveNote,
+    flushPendingChanges,
   };
 }

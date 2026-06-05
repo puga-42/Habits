@@ -1,4 +1,4 @@
-import { currentPeriodStart } from '../habit-overview';
+import { currentPeriodStart, resolveEffectiveNote } from '../habit-overview';
 
 describe('currentPeriodStart', () => {
   it('returns the same date for day period', () => {
@@ -34,5 +34,39 @@ describe('currentPeriodStart', () => {
   it('handles week spanning year boundary', () => {
     // 2025-12-31 is a Wednesday, week starts 2025-12-29 (Monday)
     expect(currentPeriodStart('2025-12-31', 'week')).toBe('2025-12-29');
+  });
+});
+
+describe('resolveEffectiveNote', () => {
+  const makeCompletion = (id: string, note: string | null) => ({
+    id,
+    note,
+    habit_id: 'h1',
+    owner_id: 'u1',
+    occurrence_date: null,
+    period_start: '2026-06-01',
+    completed_at: '2026-06-01T10:00:00Z',
+    visibility_override: null,
+    attachments: [],
+  });
+
+  it('returns pending note when present', () => {
+    const pending = new Map<string, string | null>([['c1', 'updated']]);
+    expect(resolveEffectiveNote(pending, makeCompletion('c1', 'original'))).toBe('updated');
+  });
+
+  it('returns null when pending note is explicitly null', () => {
+    const pending = new Map<string, string | null>([['c1', null]]);
+    expect(resolveEffectiveNote(pending, makeCompletion('c1', 'original'))).toBeNull();
+  });
+
+  it('falls back to completion note when no pending entry', () => {
+    const pending = new Map<string, string | null>();
+    expect(resolveEffectiveNote(pending, makeCompletion('c1', 'stored'))).toBe('stored');
+  });
+
+  it('returns null when no pending and completion note is null', () => {
+    const pending = new Map<string, string | null>();
+    expect(resolveEffectiveNote(pending, makeCompletion('c1', null))).toBeNull();
   });
 });

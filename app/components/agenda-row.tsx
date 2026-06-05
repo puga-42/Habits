@@ -63,10 +63,8 @@ export function AgendaRow({
   // Subtitle text shown under the title for flex log-it rows: "2 / 3 this week".
   const flexSubtitle = isFlex ? formatFlexProgress(row.count, row.target, row.period) : null;
 
-  // Trailing tap is actionable only for open scheduled rows and flex below target.
   const trailingActionable =
-    (row.kind === 'scheduled' || (isFlex && row.count < row.target)) &&
-    !!onTrailingPress;
+    (row.kind === 'scheduled' || isFlex) && !!onTrailingPress;
 
   const handleTrailingPress = trailingActionable
     ? () => {

@@ -8,7 +8,7 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -44,6 +44,7 @@ export function CalendarMenuDrawer({
   onOpenSettings,
   onClose,
 }: Props) {
+  const insets = useSafeAreaInsets();
   const translateX = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
 
   useEffect(() => {
@@ -66,7 +67,7 @@ export function CalendarMenuDrawer({
           style={[styles.drawer, { transform: [{ translateX }] }]}
           onStartShouldSetResponder={() => true}>
           <ThemedView style={styles.drawerContent}>
-            <SafeAreaView edges={['top', 'bottom']} style={styles.safe}>
+            <View style={[styles.safe, { paddingTop: insets.top }]}>
               <View style={styles.titleRow}>
                 <ThemedText type="title" style={styles.titleText}>
                   Habits
@@ -116,7 +117,7 @@ export function CalendarMenuDrawer({
                   </Pressable>
                 </Section>
               </ScrollView>
-            </SafeAreaView>
+            </View>
           </ThemedView>
         </Animated.View>
       </Pressable>

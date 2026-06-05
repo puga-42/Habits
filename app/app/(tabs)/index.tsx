@@ -268,7 +268,7 @@ export default function CalendarScreen() {
     let completionId: string | undefined;
     if (row.kind === 'scheduled') {
       completionId = await markScheduledCompleted(row.habitId, userId, dateIso);
-    } else if (row.kind === 'flex' && row.count < row.target) {
+    } else if (row.kind === 'flex') {
       completionId = await markFlexCompleted(row.habitId, userId);
     }
     if (completionId) {

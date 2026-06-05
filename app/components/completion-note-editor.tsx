@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { StyleSheet, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { useThemeColor } from '@/hooks/use-theme-color';
@@ -11,11 +11,14 @@ type Props = {
   initialNote: string | null;
   editable: boolean;
   onSave: (note: string | null) => void;
+  inputBackgroundColor?: string;
 };
 
-export function CompletionNoteEditor({ initialNote, editable, onSave }: Props) {
+export function CompletionNoteEditor({ initialNote, editable, onSave, inputBackgroundColor }: Props) {
   const [text, setText] = useState(initialNote ?? '');
+  const [isFocused, setIsFocused] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inputRef = useRef<TextInput>(null);
   const textColor = useThemeColor({}, 'text');
   const savedRef = useRef(initialNote ?? '');
 
@@ -24,7 +27,12 @@ export function CompletionNoteEditor({ initialNote, editable, onSave }: Props) {
     savedRef.current = initialNote ?? '';
   }, [initialNote]);
 
+  const handleFocus = useCallback(() => {
+    setIsFocused(true);
+  }, []);
+
   const handleBlur = useCallback(() => {
+    setIsFocused(false);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     const trimmed = text.trim();
     if (trimmed !== savedRef.current) {
@@ -68,17 +76,22 @@ export function CompletionNoteEditor({ initialNote, editable, onSave }: Props) {
   return (
     <View style={styles.container}>
       <ThemedText style={styles.label}>Note</ThemedText>
-      <TextInput
-        style={[styles.input, { color: textColor }]}
-        value={text}
-        onChangeText={handleChange}
-        onBlur={handleBlur}
-        placeholder="Add a note..."
-        placeholderTextColor="rgba(127,127,127,0.5)"
-        multiline
-        maxLength={MAX_NOTE_LENGTH}
-        scrollEnabled={false}
-      />
+      <Pressable onPress={() => inputRef.current?.focus()}>
+        <TextInput
+          ref={inputRef}
+          pointerEvents={isFocused ? 'auto' : 'none'}
+          style={[styles.input, { color: textColor }, inputBackgroundColor != null && { backgroundColor: inputBackgroundColor }]}
+          value={text}
+          onChangeText={handleChange}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
+          placeholder="Add a note..."
+          placeholderTextColor="rgba(127,127,127,0.5)"
+          multiline
+          maxLength={MAX_NOTE_LENGTH}
+          scrollEnabled={false}
+        />
+      </Pressable>
       {text.length > CHAR_WARNING_THRESHOLD && (
         <ThemedText style={styles.charCount}>
           {text.length}/{MAX_NOTE_LENGTH}

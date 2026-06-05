@@ -97,8 +97,6 @@ function FlexCounter({
   onDecrement: () => void;
   disabled: boolean;
 }) {
-  const atTarget = count >= target;
-
   return (
     <View style={styles.container}>
       <View style={styles.flexRow}>
@@ -124,22 +122,17 @@ function FlexCounter({
 
         <Pressable
           onPress={onIncrement}
-          disabled={disabled || atTarget}
+          disabled={disabled}
           style={({ pressed }) => [
             styles.flexButton,
             pressed && styles.pressed,
-            (disabled || atTarget) && styles.disabledBtn,
+            disabled && styles.disabledBtn,
           ]}
           hitSlop={8}
         >
           <ThemedText style={styles.flexButtonText}>+</ThemedText>
         </Pressable>
       </View>
-      {atTarget && (
-        <ThemedText style={[styles.statusLabel, { color }]}>
-          Target reached
-        </ThemedText>
-      )}
     </View>
   );
 }

@@ -1,5 +1,5 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback } from 'react';
+import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
+import { useCallback, useEffect } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { CompletionCardStack } from '@/components/completion-card-stack';
 import { CompletionCounter } from '@/components/completion-counter';
 import {
   CompletionInlineEditor,
@@ -28,9 +29,23 @@ export default function HabitViewScreen() {
     occurrenceDate?: string;
   }>();
 
+  const navigation = useNavigation();
   const state = useHabitOverview(id, session?.user.id, occurrenceDate);
   const { habit, completions, signedUrls, loading, busy } = state;
   const { expandedId, setExpandedId, isOwner, canComplete } = state;
+  const { activeIndex, setActiveIndex, effectiveNote, flushPendingChanges } = state;
+
+  const handleClose = useCallback(async () => {
+    await flushPendingChanges();
+    router.back();
+  }, [flushPendingChanges, router]);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', () => {
+      flushPendingChanges();
+    });
+    return unsubscribe;
+  }, [navigation, flushPendingChanges]);
 
   const handleEdit = useCallback(() => {
     if (!habit) return;
@@ -55,7 +70,7 @@ export default function HabitViewScreen() {
     <ThemedView style={styles.root}>
       <SafeAreaView edges={['top']} style={styles.content}>
         <View style={styles.header}>
-          <Pressable onPress={() => router.back()} hitSlop={12}>
+          <Pressable onPress={handleClose} hitSlop={12}>
             <ThemedText style={styles.headerButton}>Close</ThemedText>
           </Pressable>
           <ThemedText type="defaultSemiBold" numberOfLines={1} style={styles.headerTitle}>
@@ -94,24 +109,39 @@ export default function HabitViewScreen() {
           />
 
           {completions.length > 0 ? (
-            <View style={styles.completionsSection}>
-              {completions.map((c) => (
-                <CompletionInlineEditor
-                  key={c.id}
-                  completion={c}
-                  signedUrls={signedUrls}
-                  editable={isOwner}
-                  expanded={c.id === expandedId}
-                  onToggle={() =>
-                    setExpandedId(expandedId === c.id ? null : c.id)
-                  }
-                  onNoteSave={state.handleNoteSave}
-                  onAttachmentAdd={state.handleAttachmentAdd}
-                  onAttachmentDelete={state.handleAttachmentDelete}
-                  onAttachmentReorder={state.handleAttachmentReorder}
-                />
-              ))}
-            </View>
+            habit.kind === 'flex' && completions.length > 1 ? (
+              <CompletionCardStack
+                completions={completions}
+                signedUrls={signedUrls}
+                editable={isOwner}
+                activeIndex={activeIndex}
+                onChangeIndex={setActiveIndex}
+                effectiveNote={effectiveNote}
+                onNoteSave={state.handleNoteSave}
+                onAttachmentAdd={state.handleAttachmentAdd}
+                onAttachmentDelete={state.handleAttachmentDelete}
+                onAttachmentReorder={state.handleAttachmentReorder}
+              />
+            ) : (
+              <View style={styles.completionsSection}>
+                {completions.map((c) => (
+                  <CompletionInlineEditor
+                    key={c.id}
+                    completion={c}
+                    signedUrls={signedUrls}
+                    editable={isOwner}
+                    expanded={c.id === expandedId}
+                    onToggle={() =>
+                      setExpandedId(expandedId === c.id ? null : c.id)
+                    }
+                    onNoteSave={state.handleNoteSave}
+                    onAttachmentAdd={state.handleAttachmentAdd}
+                    onAttachmentDelete={state.handleAttachmentDelete}
+                    onAttachmentReorder={state.handleAttachmentReorder}
+                  />
+                ))}
+              </View>
+            )
           ) : (
             isOwner && <DisabledEditorPlaceholder />
           )}
