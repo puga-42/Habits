@@ -4,6 +4,7 @@ import { ActionSheetIOS, ActivityIndicator, Alert, Platform, Pressable, StyleShe
 
 import { Palette } from '@/constants/colors';
 import { AvatarCropModal } from '@/components/avatar-crop-modal';
+import { AvatarViewerModal } from '@/components/avatar-viewer-modal';
 import { FeedAvatar } from '@/components/feed-avatar';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -42,6 +43,7 @@ export function UserHero({ profile, viewerId, targetId, onReload, onBack }: Prop
   const [uploading, setUploading] = useState(false);
   const [cropUri, setCropUri] = useState<string | null>(null);
   const [cropParams, setCropParams] = useState<CropParams | null>(null);
+  const [viewerOpen, setViewerOpen] = useState(false);
 
   const handleAvatarEdit = () => {
     const hasAvatar = !!profile.avatar_url;
@@ -152,7 +154,9 @@ export function UserHero({ profile, viewerId, targetId, onReload, onBack }: Prop
           </View>
         </Pressable>
       ) : (
-        <FeedAvatar url={profile.avatar_url} handle={profile.handle} size={96} />
+        <Pressable onPress={() => setViewerOpen(true)}>
+          <FeedAvatar url={profile.avatar_url} handle={profile.handle} size={96} />
+        </Pressable>
       )}
       <ThemedText type="title" style={styles.handle}>@{profile.handle}</ThemedText>
 
@@ -172,6 +176,12 @@ export function UserHero({ profile, viewerId, targetId, onReload, onBack }: Prop
         initialCropParams={cropParams}
         onSave={handleCropSave}
         onCancel={() => setCropUri(null)}
+      />
+      <AvatarViewerModal
+        visible={viewerOpen}
+        imageUri={profile.avatar_url}
+        handle={profile.handle}
+        onClose={() => setViewerOpen(false)}
       />
     </View>
   );
