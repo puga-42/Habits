@@ -43,19 +43,6 @@ export function FeedActionBar({
 
   return (
     <View>
-      <View style={styles.row}>
-        <Pressable onPress={handleLike} hitSlop={8} style={styles.iconButton}>
-          <IconSymbol
-            name={viewerLiked ? 'heart.fill' : 'heart'}
-            color={viewerLiked ? '#ff3b5c' : 'rgba(127,127,127,0.9)'}
-            size={26}
-          />
-        </Pressable>
-        <Pressable onPress={onOpenComments} hitSlop={8} style={styles.iconButton}>
-          <IconSymbol name="bubble.right" color="rgba(127,127,127,0.9)" size={24} />
-        </Pressable>
-      </View>
-
       {likeCount > 0 ? (
         <Pressable onPress={openLikers} hitSlop={4} style={styles.countRow}>
           <ThemedText style={styles.countLine}>
@@ -65,15 +52,21 @@ export function FeedActionBar({
         </Pressable>
       ) : null}
 
-      {commentCount > 0 ? (
-        <Pressable onPress={onOpenComments} hitSlop={4} style={styles.countRow}>
-          <ThemedText style={styles.commentsLink}>
-            {commentCount === 1
-              ? 'View 1 comment'
-              : `View all ${commentCount} comments`}
-          </ThemedText>
+      <View style={styles.row}>
+        <Pressable onPress={handleLike} hitSlop={8} style={styles.iconButton}>
+          <IconSymbol
+            name={viewerLiked ? 'heart.fill' : 'heart'}
+            color={viewerLiked ? '#ff3b5c' : 'rgba(127,127,127,0.9)'}
+            size={26}
+          />
         </Pressable>
-      ) : null}
+        <Pressable onPress={onOpenComments} hitSlop={8} style={styles.commentButton}>
+          <IconSymbol name="bubble.right" color="rgba(127,127,127,0.9)" size={24} />
+          {commentCount > 0 ? (
+            <ThemedText style={styles.commentCount}>{commentCount}</ThemedText>
+          ) : null}
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -86,6 +79,8 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   iconButton: { padding: 4 },
+  commentButton: { flexDirection: 'row', alignItems: 'center', gap: 4, padding: 4 },
+  commentCount: { fontSize: 14, opacity: 0.7 },
   countRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -93,5 +88,4 @@ const styles = StyleSheet.create({
   },
   countLine: { fontSize: 14, fontWeight: '600' },
   chev: { fontSize: 14, opacity: 0.55 },
-  commentsLink: { fontSize: 14, opacity: 0.6, marginTop: 2 },
 });

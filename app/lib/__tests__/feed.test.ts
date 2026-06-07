@@ -4,6 +4,7 @@ import {
   feedItemSortKey,
   formatRelativeTime,
   mergeFeedPages,
+  parseLikerKind,
   type Comment,
   type FeedItem,
 } from '../feed';
@@ -231,5 +232,24 @@ describe('applyLikeToggle on activity items', () => {
     const result = applyLikeToggle(item, true);
     expect(result.like_count).toBe(2);
     expect(result.viewer_liked).toBe(true);
+  });
+});
+
+describe('parseLikerKind', () => {
+  it('returns "completion" for "completion"', () => {
+    expect(parseLikerKind('completion')).toBe('completion');
+  });
+
+  it('returns "comment" for "comment"', () => {
+    expect(parseLikerKind('comment')).toBe('comment');
+  });
+
+  it('returns "activity" for "activity"', () => {
+    expect(parseLikerKind('activity')).toBe('activity');
+  });
+
+  it('defaults to "completion" for unknown strings', () => {
+    expect(parseLikerKind('garbage')).toBe('completion');
+    expect(parseLikerKind('')).toBe('completion');
   });
 });

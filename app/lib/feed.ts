@@ -22,6 +22,8 @@ export type Attachment = {
 
 export type FeedKind = 'completion' | 'habit_created';
 
+export type LikerTargetKind = 'completion' | 'comment' | 'activity';
+
 export type FeedItem = {
   id: string;
   habit_id: string;
@@ -102,7 +104,7 @@ export async function fetchComments(
 }
 
 export async function fetchLikers(
-  target: { kind: 'completion' | 'comment'; id: string },
+  target: { kind: LikerTargetKind; id: string },
   cursor?: LikerCursor,
   limit = 50,
 ): Promise<Liker[]> {
@@ -578,6 +580,11 @@ export function applyCommentLikeToggle(
       ? comment.like_count + 1
       : Math.max(0, comment.like_count - 1),
   };
+}
+
+export function parseLikerKind(raw: string): LikerTargetKind {
+  if (raw === 'completion' || raw === 'comment' || raw === 'activity') return raw;
+  return 'completion';
 }
 
 // Postgres unique-violation SQLSTATE.

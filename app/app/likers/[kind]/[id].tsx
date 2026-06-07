@@ -1,5 +1,5 @@
-// Likers list — paginated profiles who liked a completion or a comment.
-// Route: /likers/<completion|comment>/<id>
+// Likers list — paginated profiles who liked a completion, comment, or activity.
+// Route: /likers/<completion|comment|activity>/<id>
 
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -17,6 +17,7 @@ import { ThemedView } from '@/components/themed-view';
 import {
   fetchLikers,
   formatRelativeTime,
+  parseLikerKind,
   type Liker,
   type LikerCursor,
 } from '@/lib/feed';
@@ -25,7 +26,7 @@ const PAGE_SIZE = 50;
 
 export default function LikersScreen() {
   const params = useLocalSearchParams<{ kind: string; id: string }>();
-  const kind = params.kind === 'comment' ? 'comment' : 'completion';
+  const kind = parseLikerKind(params.kind ?? '');
   const targetId = params.id ?? '';
   const [items, setItems] = useState<Liker[]>([]);
   const [loading, setLoading] = useState(false);

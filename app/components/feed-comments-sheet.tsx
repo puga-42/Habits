@@ -6,8 +6,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
+  Dimensions,
   Easing,
   FlatList,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -16,7 +18,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { FeedCommentRow } from '@/components/feed-comment-row';
 import { ThemedText } from '@/components/themed-text';
@@ -62,14 +64,23 @@ export function FeedCommentsSheet({
   onCountChange,
 }: Props) {
   const { session } = useAuth();
+  const insets = useSafeAreaInsets();
   const textColor = useThemeColor({}, 'text');
   const viewerId = session?.user.id ?? null;
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(false);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
+  const [kbVisible, setKbVisible] = useState(false);
   const translateY = useRef(new Animated.Value(800)).current;
   const now = useRef(new Date()).current;
+  const kbOffset = Dimensions.get('window').height * (1 - SHEET_HEIGHT_FRACTION);
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener('keyboardWillShow', () => setKbVisible(true));
+    const hideSub = Keyboard.addListener('keyboardWillHide', () => setKbVisible(false));
+    return () => { showSub.remove(); hideSub.remove(); };
+  }, []);
 
   useEffect(() => {
     Animated.timing(translateY, {
@@ -188,9 +199,9 @@ export function FeedCommentsSheet({
           style={[styles.sheet, { transform: [{ translateY }] }]}
           onStartShouldSetResponder={() => true}>
           <ThemedView style={styles.sheetContent}>
-            <SafeAreaView edges={['bottom']} style={styles.safe}>
               <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                keyboardVerticalOffset={kbOffset}
                 style={styles.flex}>
                 <View style={styles.handle} />
                 <View style={styles.headerRow}>
@@ -225,7 +236,7 @@ export function FeedCommentsSheet({
                   />
                 )}
 
-                <View style={styles.composer}>
+                <View style={[styles.composer, !kbVisible && { paddingBottom: 10 + insets.bottom }]}>
                   <TextInput
                     value={input}
                     onChangeText={setInput}
@@ -247,7 +258,6 @@ export function FeedCommentsSheet({
                   </Pressable>
                 </View>
               </KeyboardAvoidingView>
-            </SafeAreaView>
           </ThemedView>
         </Animated.View>
       </Pressable>
@@ -268,7 +278,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   sheetContent: { flex: 1 },
-  safe: { flex: 1 },
   flex: { flex: 1 },
   handle: {
     width: 36,
