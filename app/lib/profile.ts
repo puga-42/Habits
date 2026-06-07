@@ -35,6 +35,8 @@ export type Profile = {
   avatar_original_url: string | null;
   avatar_crop_params: CropParams | null;
   week_start: number;
+  notify_likes: boolean;
+  notify_comments: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -159,6 +161,22 @@ export async function fetchAvatarOriginal(
     originalUrl: data.avatar_original_url as string | null,
     cropParams: data.avatar_crop_params as CropParams | null,
   };
+}
+
+export type NotificationPrefs = {
+  notify_likes: boolean;
+  notify_comments: boolean;
+};
+
+export async function updateNotificationPrefs(
+  userId: string,
+  prefs: NotificationPrefs,
+): Promise<void> {
+  const { error } = await supabase
+    .from('profiles')
+    .update(prefs)
+    .eq('id', userId);
+  if (error) throw error;
 }
 
 export const WEEKDAY_NAMES = [

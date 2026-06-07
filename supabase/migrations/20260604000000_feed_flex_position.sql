@@ -1,6 +1,8 @@
 -- Add flex_position and flex_target to the feed RPC so the feed card can
 -- display "completed Meditate 2/5" for flex habits.
 
+drop function if exists public.fetch_feed_page(timestamptz, uuid, int);
+
 create or replace function public.fetch_feed_page(
   cursor_completed_at timestamptz default null,
   cursor_id           uuid        default null,
