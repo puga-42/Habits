@@ -29,6 +29,7 @@ const MAPPING = {
   'paperplane.fill': 'send',
   'play.fill': 'play-arrow',
   bell: 'notifications-none',
+  'bell.fill': 'notifications',
 } as IconMapping;
 
 /**

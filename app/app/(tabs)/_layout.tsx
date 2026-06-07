@@ -5,6 +5,7 @@ import { CalendarMenuDrawer } from '@/components/calendar-menu-drawer';
 import { DrawerProvider, useDrawer } from '@/components/drawer-provider';
 import { HapticTab } from '@/components/haptic-tab';
 import { PendingCountProvider, usePendingCount } from '@/components/pending-count-provider';
+import { UnreadCountProvider, useUnreadCount } from '@/components/unread-count-provider';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Palette } from '@/constants/colors';
 import { Colors } from '@/constants/theme';
@@ -15,10 +16,13 @@ const AVAILABLE_VIEWS = ['day', '3day', 'week', 'month'] as const;
 
 export default function TabLayout() {
   const { session } = useAuth();
+  const userId = session?.user.id ?? null;
   return (
     <DrawerProvider>
-      <PendingCountProvider userId={session?.user.id ?? null}>
-        <TabLayoutInner />
+      <PendingCountProvider userId={userId}>
+        <UnreadCountProvider userId={userId}>
+          <TabLayoutInner />
+        </UnreadCountProvider>
       </PendingCountProvider>
     </DrawerProvider>
   );
@@ -29,6 +33,7 @@ function TabLayoutInner() {
   const tint = Colors[colorScheme ?? 'light'].tint;
   const router = useRouter();
   const { pendingCount } = usePendingCount();
+  const { unreadCount } = useUnreadCount();
   const { menuOpen, closeDrawer, view, setView } = useDrawer();
 
   return (
@@ -67,6 +72,14 @@ function TabLayoutInner() {
             title: 'Friends',
             tabBarIcon: ({ color }) => <IconSymbol size={28} name="person.2.fill" color={color} />,
             tabBarBadge: pendingCount > 0 ? pendingCount : undefined,
+          }}
+        />
+        <Tabs.Screen
+          name="notifications"
+          options={{
+            title: 'Notifications',
+            tabBarIcon: ({ color }) => <IconSymbol size={28} name="bell.fill" color={color} />,
+            tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
           }}
         />
         <Tabs.Screen

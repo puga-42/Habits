@@ -1,15 +1,17 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Alert, Pressable, StyleSheet, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Switch, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { HandleEditor, WeekStartPicker } from '@/components/settings-modals';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { Palette } from '@/constants/colors';
 import { useAuth } from '@/lib/auth';
 import {
   fetchProfile,
   updateHandle,
+  updateNotificationPrefs,
   updateWeekStart,
   weekdayName,
   type Profile,
@@ -58,6 +60,21 @@ export default function SettingsScreen() {
     }
   }
 
+  async function onToggleNotif(key: 'notify_likes' | 'notify_comments', value: boolean) {
+    if (!session?.user.id || !profile) return;
+    const prev = profile;
+    setProfile({ ...profile, [key]: value });
+    try {
+      await updateNotificationPrefs(session.user.id, {
+        notify_likes: key === 'notify_likes' ? value : profile.notify_likes,
+        notify_comments: key === 'notify_comments' ? value : profile.notify_comments,
+      });
+    } catch (err) {
+      setProfile(prev);
+      Alert.alert('Could not save', err instanceof Error ? err.message : String(err));
+    }
+  }
+
   return (
     <ThemedView style={styles.root}>
       <SafeAreaView edges={['top']} style={styles.content}>
@@ -96,6 +113,26 @@ export default function SettingsScreen() {
               {profile ? weekdayName(profile.week_start) : '…'}
             </ThemedText>
           </Pressable>
+        </View>
+
+        <View style={styles.section}>
+          <ThemedText style={styles.sectionTitle}>Notifications</ThemedText>
+          <View style={styles.row}>
+            <ThemedText style={styles.rowLabel}>Likes</ThemedText>
+            <Switch
+              value={profile?.notify_likes ?? true}
+              onValueChange={(v) => onToggleNotif('notify_likes', v)}
+              trackColor={{ true: Palette.primary }}
+            />
+          </View>
+          <View style={styles.row}>
+            <ThemedText style={styles.rowLabel}>Comments</ThemedText>
+            <Switch
+              value={profile?.notify_comments ?? true}
+              onValueChange={(v) => onToggleNotif('notify_comments', v)}
+              trackColor={{ true: Palette.primary }}
+            />
+          </View>
         </View>
 
         <Pressable onPress={signOut} style={styles.signOut}>
