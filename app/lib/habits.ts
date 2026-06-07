@@ -6,6 +6,8 @@ import { supabase } from './supabase';
 export type HabitKind = 'scheduled' | 'flex';
 export type Visibility = 'public' | 'friends' | 'private';
 export type FlexPeriod = 'day' | 'week' | 'month';
+export type HabitUnit = 'count' | 'time';
+export type TimeDisplayUnit = 'seconds' | 'minutes' | 'hours';
 
 export type Habit = {
   id: string;
@@ -23,6 +25,9 @@ export type Habit = {
   until: string | null;
   target_count: number | null;
   target_period: FlexPeriod | null;
+  unit: HabitUnit;
+  target_seconds: number | null;
+  display_unit: TimeDisplayUnit | null;
   sort_index: number;
   created_at: string;
   updated_at: string;
@@ -158,6 +163,10 @@ export type HabitInsert = {
   // flex-only
   target_count?: number;
   target_period?: FlexPeriod;
+  // time-based
+  unit?: HabitUnit;
+  target_seconds?: number;
+  display_unit?: TimeDisplayUnit;
 };
 
 export async function createHabit(

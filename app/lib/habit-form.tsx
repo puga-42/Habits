@@ -11,8 +11,11 @@ import type {
   FlexPeriod,
   Habit,
   HabitInsert,
+  HabitUnit,
+  TimeDisplayUnit,
   Visibility,
 } from './habits';
+import { secondsFromInput, inputFromSeconds } from './time-format';
 
 export type HabitDraft = {
   title: string;
@@ -23,6 +26,9 @@ export type HabitDraft = {
   endsOn: Date | null;
   targetCount: number;
   targetPeriod: FlexPeriod;
+  unit: HabitUnit;
+  targetValue: number;
+  displayUnit: TimeDisplayUnit;
   color: string;
   icon: string;
   visibility: Visibility;
@@ -38,6 +44,9 @@ function defaultDraft(): HabitDraft {
     endsOn: null,
     targetCount: 3,
     targetPeriod: 'week',
+    unit: 'count',
+    targetValue: 30,
+    displayUnit: 'minutes',
     color: Palette.primary,
     icon: '✨',
     visibility: 'private',
@@ -45,6 +54,14 @@ function defaultDraft(): HabitDraft {
 }
 
 export function habitToDraft(habit: Habit): HabitDraft {
+  const unitFields = {
+    unit: habit.unit ?? 'count' as HabitUnit,
+    targetValue: habit.target_seconds
+      ? inputFromSeconds(habit.target_seconds, habit.display_unit ?? 'minutes')
+      : 30,
+    displayUnit: habit.display_unit ?? 'minutes' as TimeDisplayUnit,
+  };
+
   if (habit.kind === 'scheduled') {
     const dtstart = habit.dtstart ? new Date(habit.dtstart) : new Date();
     return {
@@ -56,6 +73,7 @@ export function habitToDraft(habit: Habit): HabitDraft {
       endsOn: habit.until ? new Date(habit.until) : null,
       targetCount: 3,
       targetPeriod: 'week',
+      ...unitFields,
       color: habit.color ?? Palette.primary,
       icon: habit.icon ?? '✨',
       visibility: habit.visibility,
@@ -70,6 +88,7 @@ export function habitToDraft(habit: Habit): HabitDraft {
     endsOn: null,
     targetCount: habit.target_count ?? 3,
     targetPeriod: habit.target_period ?? 'week',
+    ...unitFields,
     color: habit.color ?? Palette.primary,
     icon: habit.icon ?? '✨',
     visibility: habit.visibility,
@@ -81,8 +100,16 @@ export function habitToDraft(habit: Habit): HabitDraft {
 export function draftToInsert(draft: HabitDraft): HabitInsert {
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const description = draft.description.trim() || null;
+
+  const timeFields = draft.unit === 'time'
+    ? {
+        unit: 'time' as const,
+        target_seconds: secondsFromInput(draft.targetValue, draft.displayUnit),
+        display_unit: draft.displayUnit,
+      }
+    : { unit: 'count' as const };
+
   if (draft.kind === 'scheduled') {
-    // No user-facing time-of-day; dtstart is the start date at local midnight.
     const dtstart = new Date(draft.startsOn);
     dtstart.setHours(0, 0, 0, 0);
     return {
@@ -96,6 +123,7 @@ export function draftToInsert(draft: HabitDraft): HabitInsert {
       dtstart: dtstart.toISOString(),
       rrule: buildRrule(draft.recurrence),
       until: draft.endsOn?.toISOString() ?? null,
+      ...timeFields,
     };
   }
   return {
@@ -108,6 +136,7 @@ export function draftToInsert(draft: HabitDraft): HabitInsert {
     timezone: tz,
     target_count: draft.targetCount,
     target_period: draft.targetPeriod,
+    ...timeFields,
   };
 }
 
