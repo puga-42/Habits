@@ -15,10 +15,13 @@ import {
   CompletionInlineEditor,
   DisabledEditorPlaceholder,
 } from '@/components/completion-inline-editor';
+import { StopwatchPanel } from '@/components/stopwatch-panel';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Palette } from '@/constants/colors';
 import { useAuth } from '@/lib/auth';
+import { currentPeriodStart } from '@/lib/habit-overview';
+import { isoDate } from '@/lib/habits';
 import { useHabitOverview } from '@/lib/use-habit-overview';
 
 export default function HabitViewScreen() {
@@ -99,14 +102,28 @@ export default function HabitViewScreen() {
             </View>
           </View>
 
-          <CompletionCounter
-            habit={habit}
-            completionCount={completions.length}
-            onIncrement={state.handleIncrement}
-            onDecrement={state.handleDecrement}
-            disabled={!canComplete}
-            busy={busy}
-          />
+          {habit.unit === 'time' && session?.user.id ? (
+            <StopwatchPanel
+              habit={habit}
+              userId={session.user.id}
+              occurrenceDate={habit.kind === 'scheduled' ? (occurrenceDate ?? isoDate(new Date())) : null}
+              periodStart={
+                habit.kind === 'flex' && habit.target_period
+                  ? currentPeriodStart(occurrenceDate ?? isoDate(new Date()), habit.target_period)
+                  : null
+              }
+              isAlreadyComplete={completions.length > 0}
+            />
+          ) : (
+            <CompletionCounter
+              habit={habit}
+              completionCount={completions.length}
+              onIncrement={state.handleIncrement}
+              onDecrement={state.handleDecrement}
+              disabled={!canComplete}
+              busy={busy}
+            />
+          )}
 
           {completions.length > 0 ? (
             habit.kind === 'flex' && completions.length > 1 ? (

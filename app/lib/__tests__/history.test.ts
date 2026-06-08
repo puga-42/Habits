@@ -88,6 +88,7 @@ function mkScheduled(
       icon: habit.icon,
       color: habit.color,
       kind: habit.kind,
+      unit: habit.unit,
     },
   };
 }
@@ -115,6 +116,7 @@ function mkFlex(
       icon: habit.icon,
       color: habit.color,
       kind: habit.kind,
+      unit: habit.unit,
     },
   };
 }
@@ -599,6 +601,7 @@ describe('completionCountByDate', () => {
     description: null,
     icon: null,
     color: null,
+    unit: 'count' as const,
   };
 
   function completionRow(id: string): AgendaRow {
@@ -977,7 +980,7 @@ describe('partitionRows', () => {
     return {
       kind: 'completion',
       id: 'c-' + habitId,
-      habit: { id: habitId, title: habitId, description: null, icon: null, color: null },
+      habit: { id: habitId, title: habitId, description: null, icon: null, color: null, unit: 'count' as const },
       time: null,
       isFlex: false,
     };
@@ -986,7 +989,7 @@ describe('partitionRows', () => {
     return {
       kind: 'scheduled',
       habitId,
-      habit: { id: habitId, title: habitId, description: null, icon: null, color: null },
+      habit: { id: habitId, title: habitId, description: null, icon: null, color: null, unit: 'count' as const },
       time: null,
     };
   }
@@ -994,7 +997,7 @@ describe('partitionRows', () => {
     return {
       kind: 'skip',
       habitId,
-      habit: { id: habitId, title: habitId, description: null, icon: null, color: null },
+      habit: { id: habitId, title: habitId, description: null, icon: null, color: null, unit: 'count' as const },
       time: null,
     };
   }
@@ -1093,7 +1096,7 @@ describe('densityBucket', () => {
 // ─── swipeActionsForRow ───────────────────────────────────────────────────
 
 describe('swipeActionsForRow', () => {
-  const habit = { id: 'h1', title: 'H', description: null, icon: null, color: null };
+  const habit = { id: 'h1', title: 'H', description: null, icon: null, color: null, unit: 'count' as const };
 
   it('returns [skip] for a scheduled (open) row', () => {
     const row: AgendaRow = { kind: 'scheduled', habitId: 'h1', habit, time: null };

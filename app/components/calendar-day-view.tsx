@@ -17,6 +17,7 @@ import DraggableFlatList, {
 import { ScrollView } from 'react-native-gesture-handler';
 
 import { HabitRowSwipeable } from '@/components/habit-row-swipeable';
+import type { TimerStatus } from '@/components/time-trailing-icon';
 import { ThemedText } from '@/components/themed-text';
 import { isoDate, type Habit } from '@/lib/habits';
 import {
@@ -41,6 +42,8 @@ type Props = {
   habits: Habit[];
   dayGroups: DayGroup[];
   flexProgressByHabitId: Map<string, { count: number; target: number }>;
+  timeProgressByHabitId: Map<string, number>;
+  activeTimerHabitId?: string | null;
   onAnchorChange: (date: Date) => void;
   onRowPress: (row: AgendaRowT, dateIso: string) => void;
   onPillPress?: (row: AgendaRowT, dateIso: string) => void;
@@ -57,6 +60,8 @@ export function CalendarDayView({
   habits,
   dayGroups,
   flexProgressByHabitId,
+  timeProgressByHabitId,
+  activeTimerHabitId,
   onAnchorChange,
   onRowPress,
   onPillPress,
@@ -134,6 +139,8 @@ export function CalendarDayView({
             group={groupByIso.get(isoDate(d))}
             habitMap={habitMap}
             flexProgressByHabitId={flexProgressByHabitId}
+            timeProgressByHabitId={timeProgressByHabitId}
+            activeTimerHabitId={activeTimerHabitId}
             onRowPress={onRowPress}
             onPillPress={onPillPress}
             onSwipeAction={onSwipeAction}
@@ -151,6 +158,8 @@ function DayContent({
   group,
   habitMap,
   flexProgressByHabitId,
+  timeProgressByHabitId,
+  activeTimerHabitId,
   onRowPress,
   onPillPress,
   onSwipeAction,
@@ -161,6 +170,8 @@ function DayContent({
   group: DayGroup | undefined;
   habitMap: Map<string, Habit>;
   flexProgressByHabitId: Map<string, { count: number; target: number }>;
+  timeProgressByHabitId: Map<string, number>;
+  activeTimerHabitId?: string | null;
   onRowPress: (row: AgendaRowT, dateIso: string) => void;
   onPillPress?: (row: AgendaRowT, dateIso: string) => void;
   onSwipeAction: (row: AgendaRowT, dateIso: string, action: SwipeAction) => void;
@@ -242,6 +253,14 @@ function DayContent({
     }
     const habitId =
       item.row.kind === 'completion' ? item.row.habit.id : item.row.habitId;
+    const timerStatus: TimerStatus | undefined =
+      item.row.habit.unit === 'time'
+        ? item.row.kind === 'completion'
+          ? 'complete'
+          : activeTimerHabitId === habitId
+            ? 'running'
+            : 'idle'
+        : undefined;
     return (
       <HabitRowSwipeable
         row={item.row}
@@ -253,6 +272,8 @@ function DayContent({
         onDrawerClose={handleDrawerClose}
         onLongPress={drag}
         flexProgress={flexProgressByHabitId.get(habitId)}
+        timerStatus={timerStatus}
+        timeProgress={timeProgressByHabitId.get(habitId)}
         isActive={isActive}
       />
     );

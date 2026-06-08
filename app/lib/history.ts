@@ -13,6 +13,7 @@ import {
   type Habit,
   type HabitKind,
   type HabitOverride,
+  type HabitUnit,
   type OccurrencePatch,
 } from './habits';
 
@@ -34,6 +35,7 @@ export type CompletionWithHabit = Completion & {
     icon: string | null;
     color: string | null;
     kind: HabitKind;
+    unit: HabitUnit;
   };
 };
 
@@ -43,6 +45,7 @@ type AgendaHabit = {
   description: string | null;
   icon: string | null;
   color: string | null;
+  unit: HabitUnit;
 };
 
 export type AgendaRow =
@@ -287,6 +290,7 @@ export function buildDayGroups(
                   description: habitMap.get(c.habit_id)?.description ?? null,
                   icon: patch.icon ?? c.habits.icon,
                   color: patch.color ?? c.habits.color,
+                  unit: c.habits.unit,
                 },
                 time: new Date(c.completed_at),
                 isFlex: c.habits.kind === 'flex',
@@ -314,6 +318,7 @@ export function buildDayGroups(
                 description: habit.description,
                 icon: patch.icon ?? habit.icon,
                 color: patch.color ?? habit.color,
+                unit: habit.unit,
               },
               time: patch.time ? applyTimePatch(occTime, patch.time) : occTime,
             });
@@ -345,6 +350,7 @@ export function buildDayGroups(
           description: habitMap.get(c.habit_id)?.description ?? null,
           icon: patch.icon ?? c.habits.icon,
           color: patch.color ?? c.habits.color,
+          unit: c.habits.unit,
         },
         time: new Date(c.completed_at),
         isFlex: false,
@@ -387,6 +393,7 @@ function agendaHabitFor(h: Habit): AgendaHabit {
     description: h.description,
     icon: h.icon,
     color: h.color,
+    unit: h.unit,
   };
 }
 
@@ -576,7 +583,7 @@ export async function fetchRange(
 }> {
   const { data: completions, error: cErr } = await supabase
     .from('habit_completions')
-    .select('*, habits!inner(id, title, icon, color, kind)')
+    .select('*, habits!inner(id, title, icon, color, kind, unit)')
     .eq('owner_id', userId)
     .or(
       `and(occurrence_date.gte.${fromIso},occurrence_date.lt.${toIso}),and(occurrence_date.is.null,completed_at.gte.${fromIso},completed_at.lt.${toIso})`,

@@ -10,6 +10,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { AgendaRow } from '@/components/agenda-row';
+import type { TimerStatus } from '@/components/time-trailing-icon';
 import { ThemedText } from '@/components/themed-text';
 import { Palette } from '@/constants/colors';
 import type { AgendaRow as AgendaRowT, SwipeAction } from '@/lib/history';
@@ -42,6 +43,8 @@ type Props = {
   onDrawerClose?: () => void;
   onLongPress?: () => void;
   flexProgress?: { count: number; target: number };
+  timerStatus?: TimerStatus;
+  timeProgress?: number;
   compact?: boolean | 'tight';
   isActive?: boolean;
 };
@@ -55,6 +58,8 @@ export function HabitRowSwipeable({
   onDrawerClose,
   onLongPress,
   flexProgress,
+  timerStatus,
+  timeProgress,
   compact,
   isActive,
 }: Props) {
@@ -87,6 +92,8 @@ export function HabitRowSwipeable({
         onTrailingPress={onTrailingPress}
         onLongPress={onLongPress}
         flexProgress={flexProgress}
+        timerStatus={timerStatus}
+        timeProgress={timeProgress}
         compact={compact}
         isActive={isActive}
       />
@@ -124,6 +131,8 @@ export function HabitRowSwipeable({
         onTrailingPress={onTrailingPress}
         onLongPress={onLongPress}
         flexProgress={flexProgress}
+        timerStatus={timerStatus}
+        timeProgress={timeProgress}
         compact={compact}
         isActive={isActive}
       />

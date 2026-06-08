@@ -17,6 +17,7 @@ import * as Haptics from 'expo-haptics';
 import { Pressable, StyleSheet, useColorScheme, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { TimeTrailingIcon, type TimerStatus } from '@/components/time-trailing-icon';
 import { solidTint } from '@/constants/colors';
 import type { FlexPeriod } from '@/lib/habits';
 import type { AgendaRow as AgendaRowT } from '@/lib/history';
@@ -34,6 +35,10 @@ type Props = {
   // the trailing area renders a quarter-step ring chart filled toward target.
   flexProgress?: { count: number; target: number };
   compact?: boolean | 'tight';
+  // For time-based habits: the parent manages one global timer and passes
+  // the status down so the trailing icon reflects start/stop state.
+  timerStatus?: TimerStatus;
+  timeProgress?: number;
   // Accepted for API compatibility with DraggableFlatList's RenderItemParams;
   // the row's appearance never changes — finger on the moving row is enough
   // visual feedback.
@@ -47,6 +52,8 @@ export function AgendaRow({
   onLongPress,
   flexProgress,
   compact = false,
+  timerStatus,
+  timeProgress,
 }: Props) {
   const isSkip = row.kind === 'skip';
   const isCompletion = row.kind === 'completion';
@@ -63,8 +70,9 @@ export function AgendaRow({
   // Subtitle text shown under the title for flex log-it rows: "2 / 3 this week".
   const flexSubtitle = isFlex ? formatFlexProgress(row.count, row.target, row.period) : null;
 
+  const isTimeHabit = row.habit.unit === 'time';
   const trailingActionable =
-    (row.kind === 'scheduled' || isFlex) && !!onTrailingPress;
+    (row.kind === 'scheduled' || isFlex || isTimeHabit) && !!onTrailingPress;
 
   const handleTrailingPress = trailingActionable
     ? () => {
@@ -135,7 +143,9 @@ export function AgendaRow({
             pressed && trailingActionable && styles.trailingPressed,
             !trailingActionable && styles.trailingInert,
           ]}>
-          {isFlex ? (
+          {isTimeHabit && timerStatus ? (
+            <TimeTrailingIcon status={timerStatus} color={habitColor} fraction={timeProgress} />
+          ) : isFlex ? (
             <FlexRing count={row.count} target={row.target} color={habitColor} />
           ) : isFlexCompletion && flexProgress ? (
             <FlexRing count={flexProgress.count} target={flexProgress.target} color={habitColor} />

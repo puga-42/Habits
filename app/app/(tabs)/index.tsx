@@ -1,8 +1,9 @@
 // Calendar tab — unified entry point that replaces the old Today + History tabs.
 // Phase B ships Day, Month, 3-day, Week, and Schedule views.
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -53,6 +54,14 @@ import {
   type SwipeAction,
 } from '@/lib/history';
 import { fetchProfile, type Profile } from '@/lib/profile';
+import {
+  checkAndAutoComplete,
+  dateParamsForHabit,
+  fetchTimeEntries,
+  sumDurationSeconds,
+  startTimeEntry,
+  stopTimeEntry,
+} from '@/lib/time-entries';
 import { syncWidgetData } from '@/lib/widget-sync';
 
 const SCHEDULE_INITIAL_HALF_WINDOW = 7; // days each direction
@@ -86,6 +95,10 @@ export default function CalendarScreen() {
 
   const [toastVisible, setToastVisible] = useState(false);
   const [toastCompletionId, setToastCompletionId] = useState<string | null>(null);
+  const [activeTimerHabitId, setActiveTimerHabitId] = useState<string | null>(null);
+  const activeTimerRef = useRef<{ entryId: string; startedAt: string } | null>(null);
+  const [timeBaseByHabitId, setTimeBaseByHabitId] = useState<Map<string, number>>(new Map());
+  const [liveElapsed, setLiveElapsed] = useState(0);
 
   const anchorYear = anchorDate.getFullYear();
   const anchorMonth = anchorDate.getMonth() + 1;
@@ -128,6 +141,16 @@ export default function CalendarScreen() {
     setOverrides(rangeRes.overrides);
     if (profileRes) setProfile(profileRes);
     scheduleExtendingRef.current = false;
+
+    const timeHabits = habitsRes.filter((h) => h.unit === 'time' && h.target_seconds);
+    const baseTotals = await Promise.all(
+      timeHabits.map(async (h) => {
+        const { occurrenceDate, periodStart } = dateParamsForHabit(h);
+        const te = await fetchTimeEntries(h.id, occurrenceDate, periodStart);
+        return [h.id, sumDurationSeconds(te)] as const;
+      }),
+    );
+    setTimeBaseByHabitId(new Map(baseTotals));
   }, [userId, dataRange.from, dataRange.to]);
 
   useFocusEffect(
@@ -137,6 +160,47 @@ export default function CalendarScreen() {
       syncWidgetData(userId);
     }, [userId, load]),
   );
+
+  useEffect(() => {
+    async function restoreTimer() {
+      for (const h of habits) {
+        if (h.unit !== 'time') continue;
+        const { occurrenceDate, periodStart } = dateParamsForHabit(h);
+        const key = `timer:${h.id}:${occurrenceDate ?? periodStart}`;
+        const stored = await AsyncStorage.getItem(key);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          activeTimerRef.current = parsed;
+          setActiveTimerHabitId(h.id);
+          return;
+        }
+      }
+    }
+    if (habits.length > 0) restoreTimer();
+  }, [habits]);
+
+  useEffect(() => {
+    if (!activeTimerHabitId || !activeTimerRef.current) {
+      setLiveElapsed(0);
+      return;
+    }
+    const startMs = new Date(activeTimerRef.current.startedAt).getTime();
+    const tick = () => setLiveElapsed(Math.floor((Date.now() - startMs) / 1000));
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [activeTimerHabitId]);
+
+  const timeProgressByHabitId = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const h of habits) {
+      if (h.unit !== 'time' || !h.target_seconds) continue;
+      const base = timeBaseByHabitId.get(h.id) ?? 0;
+      const elapsed = h.id === activeTimerHabitId ? liveElapsed : 0;
+      map.set(h.id, Math.min(1, (base + elapsed) / h.target_seconds));
+    }
+    return map;
+  }, [habits, timeBaseByHabitId, activeTimerHabitId, liveElapsed]);
 
   // The days the active view needs to render.
   const daysInRange = useMemo(() => {
@@ -265,6 +329,15 @@ export default function CalendarScreen() {
   async function handleTrailingPress(row: AgendaRow, dateIso: string) {
     if (!userId) return;
     if (!canCompleteOn(dateIso, today)) return;
+
+    const habitId = row.kind === 'completion' ? row.habit.id : row.habitId;
+    const habit = habits.find((h) => h.id === habitId);
+
+    if (habit?.unit === 'time') {
+      await handleTimerToggle(habit, dateIso);
+      return;
+    }
+
     let completionId: string | undefined;
     if (row.kind === 'scheduled') {
       completionId = await markScheduledCompleted(row.habitId, userId, dateIso);
@@ -276,6 +349,36 @@ export default function CalendarScreen() {
       setToastVisible(true);
     }
     await load();
+  }
+
+  async function handleTimerToggle(habit: Habit, dateIso: string) {
+    if (!userId) return;
+    const { occurrenceDate, periodStart } = dateParamsForHabit(habit);
+    const key = `timer:${habit.id}:${occurrenceDate ?? periodStart}`;
+
+    if (activeTimerHabitId === habit.id && activeTimerRef.current) {
+      await stopTimeEntry(activeTimerRef.current.entryId, activeTimerRef.current.startedAt);
+      await AsyncStorage.removeItem(key);
+      activeTimerRef.current = null;
+      setActiveTimerHabitId(null);
+      await checkAndAutoComplete(habit.id, userId, habit, occurrenceDate, periodStart);
+      await load();
+    } else {
+      if (activeTimerHabitId && activeTimerRef.current) {
+        const prevHabit = habits.find((h) => h.id === activeTimerHabitId);
+        if (prevHabit) {
+          const prev = dateParamsForHabit(prevHabit);
+          const prevKey = `timer:${prevHabit.id}:${prev.occurrenceDate ?? prev.periodStart}`;
+          await stopTimeEntry(activeTimerRef.current.entryId, activeTimerRef.current.startedAt);
+          await AsyncStorage.removeItem(prevKey);
+          await checkAndAutoComplete(prevHabit.id, userId, prevHabit, prev.occurrenceDate, prev.periodStart);
+        }
+      }
+      const { id, startedAt } = await startTimeEntry(habit.id, userId, occurrenceDate, periodStart);
+      activeTimerRef.current = { entryId: id, startedAt };
+      setActiveTimerHabitId(habit.id);
+      await AsyncStorage.setItem(key, JSON.stringify({ entryId: id, startedAt }));
+    }
   }
 
   function handlePillPress(row: AgendaRow, dateIso: string) {
@@ -429,6 +532,8 @@ export default function CalendarScreen() {
             habits={habits}
             dayGroups={dayGroups}
             flexProgressByHabitId={flexProgressByHabitId}
+            timeProgressByHabitId={timeProgressByHabitId}
+            activeTimerHabitId={activeTimerHabitId}
             onAnchorChange={setAnchorDate}
             onRowPress={handleTrailingPress}
             onPillPress={handlePillPress}

@@ -11,7 +11,7 @@ import { Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 're
 import { ThemedText } from '@/components/themed-text';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { useHabitForm } from '@/lib/habit-form';
-import type { FlexPeriod, Visibility } from '@/lib/habits';
+import type { FlexPeriod, HabitUnit, TimeDisplayUnit, Visibility } from '@/lib/habits';
 import { describeRrule } from '@/lib/recurrence';
 
 import { Palette } from '@/constants/colors';
@@ -19,6 +19,10 @@ import { Palette } from '@/constants/colors';
 const COLORS = Palette.habitColors;
 const ICONS = ['✨', '🧘', '🏋', '🚶', '📖', '💧', '🍎', '🌱', '✍️', '☀️', '😴', '🧹', '☕️', '🚲', '🦷', '💊'];
 const PERIODS: FlexPeriod[] = ['day', 'week', 'month'];
+const UNITS: HabitUnit[] = ['count', 'time'];
+const UNIT_LABELS: Record<HabitUnit, string> = { count: 'Count', time: 'Time' };
+const DISPLAY_UNITS: TimeDisplayUnit[] = ['seconds', 'minutes', 'hours'];
+const DISPLAY_UNIT_LABELS: Record<TimeDisplayUnit, string> = { seconds: 'sec', minutes: 'min', hours: 'hr' };
 const VISIBILITY_OPTIONS: Visibility[] = ['public', 'friends', 'private'];
 const VISIBILITY_LABELS: Record<Visibility, string> = {
   public: 'Public — anyone can see',
@@ -87,6 +91,54 @@ export function HabitFormFields({ lockKind = false, onDelete }: Props) {
           ))}
         </View>
       </View>
+
+      {/* Unit */}
+      <View style={styles.section}>
+        <ThemedText style={styles.label}>Unit</ThemedText>
+        <View style={styles.segment}>
+          {UNITS.map((u) => (
+            <Pressable
+              key={u}
+              onPress={() => update({ unit: u })}
+              style={[styles.segmentItem, draft.unit === u && styles.segmentItemActive]}>
+              <ThemedText
+                style={[styles.segmentText, draft.unit === u && styles.segmentTextActive]}>
+                {UNIT_LABELS[u]}
+              </ThemedText>
+            </Pressable>
+          ))}
+        </View>
+      </View>
+
+      {draft.unit === 'time' && (
+        <View style={styles.section}>
+          <ThemedText style={styles.label}>Duration</ThemedText>
+          <View style={styles.durationRow}>
+            <TextInput
+              value={String(draft.targetValue)}
+              onChangeText={(t) => {
+                const n = parseInt(t, 10);
+                update({ targetValue: isNaN(n) ? 0 : n });
+              }}
+              keyboardType="number-pad"
+              style={[styles.input, styles.durationInput, { color: textColor }]}
+            />
+            <View style={styles.segment}>
+              {DISPLAY_UNITS.map((du) => (
+                <Pressable
+                  key={du}
+                  onPress={() => update({ displayUnit: du })}
+                  style={[styles.segmentItem, draft.displayUnit === du && styles.segmentItemActive]}>
+                  <ThemedText
+                    style={[styles.segmentText, draft.displayUnit === du && styles.segmentTextActive]}>
+                    {DISPLAY_UNIT_LABELS[du]}
+                  </ThemedText>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        </View>
+      )}
 
       {draft.kind === 'scheduled' ? (
         <>
@@ -267,6 +319,14 @@ const styles = StyleSheet.create({
   textArea: {
     minHeight: 80,
     paddingTop: 10,
+  },
+  durationRow: {
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'center',
+  },
+  durationInput: {
+    width: 80,
   },
   segment: {
     flexDirection: 'row',
