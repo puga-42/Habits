@@ -21,6 +21,7 @@ type Props = {
   onToggleLike: () => void;
   onOpenComments: () => void;
   onEdit?: () => void;
+  onHabitPress: () => void;
   onReport: () => void;
   onBlock: () => void;
   onMute: () => void;
@@ -33,6 +34,7 @@ export function FeedCard({
   onToggleLike,
   onOpenComments,
   onEdit,
+  onHabitPress,
   onReport,
   onBlock,
   onMute,
@@ -85,7 +87,7 @@ export function FeedCard({
         </Pressable>
       </View>
 
-      <View style={styles.habitLine}>
+      <Pressable style={styles.habitLine} onPress={onHabitPress}>
         <ThemedText style={styles.habitVerb}>completed </ThemedText>
         <ThemedText style={styles.habitTitle}>{item.habit_title}</ThemedText>
         {item.habit_icon ? (
@@ -96,7 +98,7 @@ export function FeedCard({
             {' '}{item.flex_position}/{item.flex_target}
           </ThemedText>
         )}
-      </View>
+      </Pressable>
 
       {item.attachments.length > 0 ? (
         <View style={styles.attachmentWrap}>

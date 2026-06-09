@@ -47,6 +47,8 @@ export type FeedItem = {
   viewer_liked: boolean;
   flex_position: number | null;
   flex_target: number | null;
+  event_type: 'created' | 'adopted' | null;
+  adopted_from_handle: string | null;
 };
 
 export type Comment = {

@@ -32,6 +32,7 @@ export type HabitDraft = {
   color: string;
   icon: string;
   visibility: Visibility;
+  adoptedFromUserId: string | null;
 };
 
 function defaultDraft(): HabitDraft {
@@ -50,6 +51,7 @@ function defaultDraft(): HabitDraft {
     color: Palette.primary,
     icon: '✨',
     visibility: 'private',
+    adoptedFromUserId: null,
   };
 }
 
@@ -77,6 +79,7 @@ export function habitToDraft(habit: Habit): HabitDraft {
       color: habit.color ?? Palette.primary,
       icon: habit.icon ?? '✨',
       visibility: habit.visibility,
+      adoptedFromUserId: null,
     };
   }
   return {
@@ -92,6 +95,7 @@ export function habitToDraft(habit: Habit): HabitDraft {
     color: habit.color ?? Palette.primary,
     icon: habit.icon ?? '✨',
     visibility: habit.visibility,
+    adoptedFromUserId: null,
   };
 }
 
@@ -109,6 +113,10 @@ export function draftToInsert(draft: HabitDraft): HabitInsert {
       }
     : { unit: 'count' as const };
 
+  const adoptionFields = draft.adoptedFromUserId
+    ? { adopted_from_user_id: draft.adoptedFromUserId }
+    : {};
+
   if (draft.kind === 'scheduled') {
     const dtstart = new Date(draft.startsOn);
     dtstart.setHours(0, 0, 0, 0);
@@ -124,6 +132,7 @@ export function draftToInsert(draft: HabitDraft): HabitInsert {
       rrule: buildRrule(draft.recurrence),
       until: draft.endsOn?.toISOString() ?? null,
       ...timeFields,
+      ...adoptionFields,
     };
   }
   return {
@@ -137,6 +146,7 @@ export function draftToInsert(draft: HabitDraft): HabitInsert {
     target_count: draft.targetCount,
     target_period: draft.targetPeriod,
     ...timeFields,
+    ...adoptionFields,
   };
 }
 

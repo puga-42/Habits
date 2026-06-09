@@ -92,9 +92,11 @@ export default function NotificationsScreen() {
       );
       markRead(n.id).then(refreshUnreadCount).catch(() => {});
     }
-    const isCompletionRelated =
-      n.kind === 'completion_like' || n.kind === 'completion_comment' || n.kind === 'comment_like';
-    if (isCompletionRelated) {
+    if (n.kind === 'habit_adopted') {
+      router.push(`/user/${n.actor_id}`);
+    } else if (
+      n.kind === 'completion_like' || n.kind === 'completion_comment' || n.kind === 'comment_like'
+    ) {
       router.push(`/completion/${n.target_id}`);
     } else {
       router.push('/(tabs)/feed');

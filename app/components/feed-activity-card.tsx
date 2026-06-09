@@ -14,6 +14,7 @@ type Props = {
   now: Date;
   onToggleLike: () => void;
   onOpenComments: () => void;
+  onHabitPress: () => void;
   onReport: () => void;
   onBlock: () => void;
   onMute: () => void;
@@ -25,6 +26,7 @@ export function FeedActivityCard({
   now,
   onToggleLike,
   onOpenComments,
+  onHabitPress,
   onReport,
   onBlock,
   onMute,
@@ -86,13 +88,20 @@ export function FeedActivityCard({
         </Pressable>
       </View>
 
-      <View style={styles.habitLine}>
-        <ThemedText style={styles.habitVerb}>started </ThemedText>
+      <Pressable style={styles.habitLine} onPress={onHabitPress}>
+        <ThemedText style={styles.habitVerb}>
+          {item.event_type === 'adopted' ? 'adopted ' : 'started '}
+        </ThemedText>
         <ThemedText style={styles.habitTitle}>{item.habit_title}</ThemedText>
         {item.habit_icon ? (
           <ThemedText style={styles.habitIcon}> {item.habit_icon}</ThemedText>
         ) : null}
-      </View>
+        {item.event_type === 'adopted' && item.adopted_from_handle ? (
+          <ThemedText style={styles.adoptedFrom}>
+            {' '}from @{item.adopted_from_handle}
+          </ThemedText>
+        ) : null}
+      </Pressable>
 
       <View style={styles.actionWrap}>
         <FeedActionBar
@@ -132,5 +141,6 @@ const styles = StyleSheet.create({
   habitVerb: { fontSize: 14, opacity: 0.7 },
   habitTitle: { fontSize: 15, fontWeight: '600' },
   habitIcon: { fontSize: 16 },
+  adoptedFrom: { fontSize: 13, opacity: 0.5 },
   actionWrap: { paddingHorizontal: 14, marginTop: 6 },
 });

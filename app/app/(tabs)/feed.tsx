@@ -227,6 +227,12 @@ export default function FeedScreen() {
                       ownerId: item.owner_id,
                     })
                   }
+                  onHabitPress={() =>
+                    router.push({
+                      pathname: '/habit/view',
+                      params: { id: item.habit_id },
+                    })
+                  }
                   onReport={() =>
                     reportContent(viewerId, {
                       kind: 'completion',
@@ -257,6 +263,19 @@ export default function FeedScreen() {
                     item.owner_id === viewerId
                       ? () => router.push(`/completion/${item.id}`)
                       : undefined
+                  }
+                  onHabitPress={() =>
+                    router.push({
+                      pathname: '/habit/view',
+                      params: {
+                        id: item.habit_id,
+                        ...(item.occurrence_date
+                          ? { occurrenceDate: item.occurrence_date }
+                          : item.period_start
+                            ? { occurrenceDate: item.period_start }
+                            : {}),
+                      },
+                    })
                   }
                   onReport={() =>
                     reportContent(viewerId, {

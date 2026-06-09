@@ -8,7 +8,8 @@ export type NotificationKind =
   | 'comment_like'
   | 'activity_like'
   | 'activity_comment'
-  | 'activity_comment_like';
+  | 'activity_comment_like'
+  | 'habit_adopted';
 
 export type AppNotification = {
   id: string;
@@ -44,6 +45,8 @@ export function notificationMessage(n: AppNotification): string {
       return title ? `liked your ${title}` : 'liked your habit';
     case 'activity_comment':
       return title ? `commented on your ${title}` : 'commented on your habit';
+    case 'habit_adopted':
+      return title ? `adopted your habit ${title}` : 'adopted your habit';
   }
 }
 

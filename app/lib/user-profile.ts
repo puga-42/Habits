@@ -190,5 +190,7 @@ function mapFeedRows(rows: unknown[]): FeedItem[] {
     viewer_liked: (r.viewer_liked as boolean) ?? false,
     flex_position: (r.flex_position as number) ?? null,
     flex_target: (r.flex_target as number) ?? null,
+    event_type: (r.event_type as FeedItem['event_type']) ?? null,
+    adopted_from_handle: (r.adopted_from_handle as string) ?? null,
   }));
 }

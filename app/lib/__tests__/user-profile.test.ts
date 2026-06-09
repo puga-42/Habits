@@ -33,6 +33,8 @@ function makeItem(overrides: Partial<FeedItem> = {}): FeedItem {
     viewer_liked: false,
     flex_position: null,
     flex_target: null,
+    event_type: null,
+    adopted_from_handle: null,
     ...overrides,
   };
 }
@@ -61,6 +63,8 @@ function makeActivityItem(overrides: Partial<FeedItem> = {}): FeedItem {
     viewer_liked: false,
     flex_position: null,
     flex_target: null,
+    event_type: 'created',
+    adopted_from_handle: null,
     ...overrides,
   };
 }

@@ -55,4 +55,14 @@ describe('notificationMessage', () => {
     const n = makeNotification({ kind: 'completion_like', habit_title: '' });
     expect(notificationMessage(n)).toBe('liked your completion');
   });
+
+  it('formats habit_adopted with title', () => {
+    const n = makeNotification({ kind: 'habit_adopted', habit_title: 'Yoga' });
+    expect(notificationMessage(n)).toBe('adopted your habit Yoga');
+  });
+
+  it('formats habit_adopted without title', () => {
+    const n = makeNotification({ kind: 'habit_adopted', habit_title: '' });
+    expect(notificationMessage(n)).toBe('adopted your habit');
+  });
 });

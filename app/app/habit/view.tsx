@@ -20,6 +20,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Palette } from '@/constants/colors';
 import { useAuth } from '@/lib/auth';
+import { useHabitForm } from '@/lib/habit-form';
 import { currentPeriodStart } from '@/lib/habit-overview';
 import { isoDate } from '@/lib/habits';
 import { useHabitOverview } from '@/lib/use-habit-overview';
@@ -33,6 +34,7 @@ export default function HabitViewScreen() {
   }>();
 
   const navigation = useNavigation();
+  const { seedFromHabit, update } = useHabitForm();
   const state = useHabitOverview(id, session?.user.id, occurrenceDate);
   const { habit, completions, signedUrls, loading, busy } = state;
   const { expandedId, setExpandedId, isOwner, canComplete } = state;
@@ -59,6 +61,13 @@ export default function HabitViewScreen() {
     }
   }, [habit, occurrenceDate, router]);
 
+  const handleAdopt = useCallback(() => {
+    if (!habit) return;
+    seedFromHabit(habit);
+    update({ adoptedFromUserId: habit.owner_id });
+    router.push('/habit/new');
+  }, [habit, seedFromHabit, update, router]);
+
   if (loading || !habit) {
     return (
       <ThemedView style={styles.root}>
@@ -84,7 +93,9 @@ export default function HabitViewScreen() {
               <ThemedText style={[styles.headerButton, styles.editButton]}>Edit</ThemedText>
             </Pressable>
           ) : (
-            <View style={styles.headerPlaceholder} />
+            <Pressable onPress={handleAdopt} hitSlop={12}>
+              <ThemedText style={[styles.headerButton, styles.adoptButton]}>Adopt</ThemedText>
+            </Pressable>
           )}
         </View>
 
@@ -185,7 +196,7 @@ const styles = StyleSheet.create({
   headerButton: { fontSize: 16 },
   headerTitle: { flex: 1, textAlign: 'center', marginHorizontal: 8 },
   editButton: { fontWeight: '600', color: Palette.primary },
-  headerPlaceholder: { width: 40 },
+  adoptButton: { fontWeight: '600', color: Palette.primary },
   scroll: { padding: 20, paddingBottom: 40 },
   heroRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   heroIcon: { fontSize: 40, marginRight: 14 },

@@ -65,4 +65,38 @@ describe('draftToInsert', () => {
     const insert = draftToInsert(draft);
     expect(insert.description).toBe('Stay hydrated');
   });
+
+  it('includes adopted_from_user_id when set', () => {
+    const draft = habitToDraft(scheduledHabit);
+    draft.adoptedFromUserId = 'user-abc';
+    const insert = draftToInsert(draft);
+    expect(insert.adopted_from_user_id).toBe('user-abc');
+  });
+
+  it('omits adopted_from_user_id when null', () => {
+    const draft = habitToDraft(scheduledHabit);
+    expect(draft.adoptedFromUserId).toBeNull();
+    const insert = draftToInsert(draft);
+    expect(insert.adopted_from_user_id).toBeUndefined();
+  });
+
+  it('includes adopted_from_user_id in flex insert', () => {
+    const flexHabit: Habit = {
+      ...scheduledHabit,
+      kind: 'flex',
+      target_count: 3,
+      target_period: 'week',
+    };
+    const draft = habitToDraft(flexHabit);
+    draft.adoptedFromUserId = 'user-xyz';
+    const insert = draftToInsert(draft);
+    expect(insert.adopted_from_user_id).toBe('user-xyz');
+  });
+});
+
+describe('habitToDraft adoption', () => {
+  it('sets adoptedFromUserId to null by default', () => {
+    const draft = habitToDraft(scheduledHabit);
+    expect(draft.adoptedFromUserId).toBeNull();
+  });
 });

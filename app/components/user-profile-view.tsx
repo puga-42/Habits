@@ -122,6 +122,17 @@ export function UserProfileView({ targetId, viewerId, onBack }: Props) {
     item, viewerId, now,
     onToggleLike: () => handleToggleLike(item),
     onOpenComments: () => setActiveComment({ targetId: item.id, targetKind: item.feed_kind, ownerId: item.owner_id }),
+    onHabitPress: () => router.push({
+      pathname: '/habit/view',
+      params: {
+        id: item.habit_id,
+        ...(item.occurrence_date
+          ? { occurrenceDate: item.occurrence_date }
+          : item.period_start
+            ? { occurrenceDate: item.period_start }
+            : {}),
+      },
+    }),
     onReport: () => reportContent(viewerId, { kind: 'completion', id: item.id }),
     onBlock: () => blockUser(viewerId, item.owner_id).then(backHandler),
     onMute: () => muteHabit(viewerId, item.habit_id).then(loadAll),

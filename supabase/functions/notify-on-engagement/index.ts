@@ -17,7 +17,8 @@ type Kind =
   | "comment_like"
   | "activity_like"
   | "activity_comment"
-  | "activity_comment_like";
+  | "activity_comment_like"
+  | "habit_adopted";
 
 interface Resolved {
   kind: Kind;
@@ -35,6 +36,7 @@ const TABLE_TO_KIND: Record<string, Kind> = {
   activity_likes: "activity_like",
   activity_comments: "activity_comment",
   activity_comment_likes: "activity_comment_like",
+  habit_activity: "habit_adopted",
 };
 
 const LIKE_KINDS: Kind[] = [
@@ -55,14 +57,54 @@ serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
 
-  const kind = TABLE_TO_KIND[payload.table];
+  let kind = TABLE_TO_KIND[payload.table];
   if (!kind) return json({ skipped: "unknown table" });
+
+  if (kind === "habit_adopted" && payload.record.event_type !== "adopted") {
+    return json({ skipped: "not an adoption event" });
+  }
 
   const resolved = await resolve(supabase, kind, payload.record);
   if (!resolved) return json({ skipped: "self-action or missing target" });
 
-  // In-app notification row is created by DB trigger (create_engagement_notification).
+  // In-app notification row is created by DB triggers.
   // This function only handles push delivery.
+
+  if (resolved.kind === "habit_adopted") {
+    const { data: tokens } = await supabase
+      .from("expo_push_tokens")
+      .select("token")
+      .eq("user_id", resolved.recipientId);
+    if (!tokens?.length) return json({ ok: true, push: "no_tokens" });
+
+    const { data: actor } = await supabase
+      .from("profiles")
+      .select("handle")
+      .eq("id", resolved.actorId)
+      .single();
+
+    const { data: habit } = await supabase
+      .from("habits")
+      .select("title")
+      .eq("id", resolved.targetId)
+      .single();
+
+    const actorName = actor?.handle ? `@${actor.handle}` : "Someone";
+    const habitTitle = habit?.title ?? "your habit";
+    const messages = tokens.map((t: { token: string }) => ({
+      to: t.token,
+      title: `${actorName} adopted your habit`,
+      body: habitTitle,
+      data: {
+        kind: "habit_adopted",
+        target_id: resolved.targetId,
+        actor_id: resolved.actorId,
+      },
+      sound: "default",
+    }));
+    await sendExpoPush(messages);
+    return json({ ok: true, push: "sent" });
+  }
 
   const isLike = LIKE_KINDS.includes(resolved.kind);
   const prefColumn = isLike ? "notify_likes" : "notify_comments";
@@ -225,6 +267,19 @@ async function resolve(
         actorId: record.user_id,
         targetId: data.activity_id,
         commentId: record.comment_id,
+        body: null,
+      };
+    }
+
+    case "habit_adopted": {
+      if (!record.adopted_from_user_id) return null;
+      if (record.owner_id === record.adopted_from_user_id) return null;
+      return {
+        kind,
+        recipientId: record.adopted_from_user_id,
+        actorId: record.owner_id,
+        targetId: record.habit_id,
+        commentId: null,
         body: null,
       };
     }

@@ -167,6 +167,8 @@ export type HabitInsert = {
   unit?: HabitUnit;
   target_seconds?: number;
   display_unit?: TimeDisplayUnit;
+  // adoption provenance
+  adopted_from_user_id?: string;
 };
 
 export async function createHabit(
