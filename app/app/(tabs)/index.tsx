@@ -23,6 +23,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { WeekStrip } from '@/components/week-strip';
 import { useAuth } from '@/lib/auth';
+import { setNavHabit } from '@/lib/habit-nav-cache';
 import {
   applySectionReorder,
   canCompleteOn,
@@ -360,6 +361,11 @@ export default function CalendarScreen() {
       await stopTimeEntry(activeTimerRef.current.entryId, activeTimerRef.current.startedAt);
       await AsyncStorage.removeItem(key);
       activeTimerRef.current = null;
+      setTimeBaseByHabitId((prev) => {
+        const next = new Map(prev);
+        next.set(habit.id, (prev.get(habit.id) ?? 0) + liveElapsed);
+        return next;
+      });
       setActiveTimerHabitId(null);
       await checkAndAutoComplete(habit.id, userId, habit, occurrenceDate, periodStart);
       await load();
@@ -371,6 +377,11 @@ export default function CalendarScreen() {
           const prevKey = `timer:${prevHabit.id}:${prev.occurrenceDate ?? prev.periodStart}`;
           await stopTimeEntry(activeTimerRef.current.entryId, activeTimerRef.current.startedAt);
           await AsyncStorage.removeItem(prevKey);
+          setTimeBaseByHabitId((p) => {
+            const next = new Map(p);
+            next.set(prevHabit.id, (p.get(prevHabit.id) ?? 0) + liveElapsed);
+            return next;
+          });
           await checkAndAutoComplete(prevHabit.id, userId, prevHabit, prev.occurrenceDate, prev.periodStart);
         }
       }
@@ -383,6 +394,8 @@ export default function CalendarScreen() {
 
   function handlePillPress(row: AgendaRow, dateIso: string) {
     const habitId = row.kind === 'completion' ? row.habit.id : row.habitId;
+    const habit = habits.find((h) => h.id === habitId);
+    if (habit) setNavHabit(habit);
     router.push({
       pathname: '/habit/view',
       params: { id: habitId, occurrenceDate: dateIso },

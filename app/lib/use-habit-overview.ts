@@ -8,6 +8,7 @@ import {
 } from '@/lib/attachment-actions';
 import { updateNote } from '@/lib/completions';
 import { signedUrlsForPaths } from '@/lib/feed';
+import { consumeNavHabit } from '@/lib/habit-nav-cache';
 import {
   currentPeriodStart,
   fetchHabitCompletions,
@@ -52,10 +53,11 @@ export function useHabitOverview(
   userId: string | undefined,
   dateParam: string | undefined,
 ): HabitOverviewState {
-  const [habit, setHabit] = useState<Habit | null>(null);
+  const [cachedHabit] = useState(() => consumeNavHabit());
+  const [habit, setHabit] = useState<Habit | null>(cachedHabit);
   const [completions, setCompletions] = useState<OverviewCompletion[]>([]);
   const [signedUrls, setSignedUrls] = useState<Map<string, string>>(new Map());
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!cachedHabit);
   const [busy, setBusy] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -92,16 +94,18 @@ export function useHabitOverview(
 
   useEffect(() => {
     if (!habitId) return;
-    fetchHabit(habitId)
-      .then((h) => {
-        setHabit(h);
-        return loadCompletions(h);
-      })
+    const loadAll = cachedHabit
+      ? loadCompletions(cachedHabit)
+      : fetchHabit(habitId).then((h) => {
+          setHabit(h);
+          return loadCompletions(h);
+        });
+    loadAll
       .catch((err) => {
         Alert.alert('Could not load habit', err instanceof Error ? err.message : String(err));
       })
       .finally(() => setLoading(false));
-  }, [habitId, loadCompletions]);
+  }, [habitId, cachedHabit, loadCompletions]);
 
   const handleIncrement = useCallback(async () => {
     if (!habit || !userId || busy) return;
