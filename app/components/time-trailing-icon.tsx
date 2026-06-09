@@ -2,8 +2,13 @@ import { StyleSheet, View } from 'react-native';
 
 import { ProgressRing } from '@/components/progress-ring';
 import { ThemedText } from '@/components/themed-text';
+import { TRAILING_ICON_SIZE } from '@/constants/theme';
 
 export type TimerStatus = 'idle' | 'running' | 'complete';
+
+const RING_STROKE = 2.5;
+const RING_SIZE = TRAILING_ICON_SIZE + RING_STROKE * 2 + 8;
+const STOP_SIZE = TRAILING_ICON_SIZE * 0.45;
 
 type Props = {
   status: TimerStatus;
@@ -15,31 +20,30 @@ export function TimeTrailingIcon({ status, color, fraction = 0 }: Props) {
   const showRing = status !== 'idle' || fraction > 0;
 
   if (!showRing) {
-    return <ThemedText style={[styles.playLarge, { color }]}>▶</ThemedText>;
+    return <ThemedText style={[styles.icon, { color }]}>▶</ThemedText>;
   }
 
-  const f = status === 'complete' ? 1 : fraction;
+  if (status === 'complete') {
+    return <ThemedText style={[styles.iconBold, { color }]}>✓</ThemedText>;
+  }
 
   return (
-    <ProgressRing size={22} strokeWidth={2.5} fraction={f} color={color}>
-      {status === 'complete' ? (
-        <ThemedText style={[styles.check, { color }]}>✓</ThemedText>
-      ) : status === 'running' ? (
+    <ProgressRing size={RING_SIZE} strokeWidth={RING_STROKE} fraction={fraction} color={color}>
+      {status === 'running' ? (
         <View style={[styles.stopIcon, { backgroundColor: color }]} />
       ) : (
-        <ThemedText style={[styles.playSmall, { color }]}>▶</ThemedText>
+        <ThemedText style={[styles.icon, { color }]}>▶</ThemedText>
       )}
     </ProgressRing>
   );
 }
 
 const styles = StyleSheet.create({
-  playLarge: { fontSize: 14, lineHeight: 18 },
-  playSmall: { fontSize: 8, lineHeight: 10, marginLeft: 1 },
-  check: { fontSize: 11, lineHeight: 14, fontWeight: '700' },
+  icon: { fontSize: TRAILING_ICON_SIZE, marginLeft: 2 },
+  iconBold: { fontSize: TRAILING_ICON_SIZE, fontWeight: '700' },
   stopIcon: {
-    width: 8,
-    height: 8,
+    width: STOP_SIZE,
+    height: STOP_SIZE,
     borderRadius: 1.5,
   },
 });

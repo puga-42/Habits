@@ -280,7 +280,7 @@ describe('buildDayGroups (past)', () => {
     expect(groups[1].rows).toHaveLength(1);
   });
 
-  it('does not emit a row for a flex completion on a past day (flex shows as one pill, not per-tap rows)', () => {
+  it('emits a flex pill (not per-tap rows) for a flex completion on a past day', () => {
     const completion = mkFlex('c1', gym, '2026-05-11', '2026-05-13T18:30:00Z');
     const groups = buildDayGroups(
       ['2026-05-13'],
@@ -289,7 +289,11 @@ describe('buildDayGroups (past)', () => {
       [],
       MAY_14,
     );
-    expect(groups[0].rows).toEqual([]);
+    expect(groups[0].rows).toHaveLength(1);
+    expect(groups[0].rows[0].kind).toBe('flex');
+    if (groups[0].rows[0].kind === 'flex') {
+      expect(groups[0].rows[0].count).toBe(1);
+    }
   });
 
   it('applies an edit override to the displayed title/icon/color', () => {
@@ -344,9 +348,10 @@ describe('buildDayGroups (past)', () => {
     expect(groups[0].rows[0].kind).toBe('skip');
   });
 
-  it('returns empty rows for past days with no activity', () => {
+  it('shows scheduled rows for past days with no activity', () => {
     const groups = buildDayGroups(['2026-05-13'], [meditate], [], [], MAY_14);
-    expect(groups[0].rows).toEqual([]);
+    expect(groups[0].rows).toHaveLength(1);
+    expect(groups[0].rows[0].kind).toBe('scheduled');
   });
 
   it('sorts rows within a day by time, earlier first', () => {
@@ -422,10 +427,11 @@ describe('buildDayGroups (today + future)', () => {
     expect(groups[0].rows[0].kind).toBe('scheduled');
   });
 
-  it('does NOT show a scheduled row on a past day with no completion', () => {
+  it('shows a scheduled row on a past day with no completion', () => {
     // Today = May 13; date in range = May 10 (past). Habit is daily.
     const groups = buildDayGroups(['2026-05-10'], [meditate], [], [], TODAY);
-    expect(groups[0].rows).toEqual([]);
+    expect(groups[0].rows).toHaveLength(1);
+    expect(groups[0].rows[0].kind).toBe('scheduled');
   });
 
   it('respects the habit until cap when expanding future occurrences', () => {
@@ -539,10 +545,16 @@ describe('buildDayGroups (flex log-it rows)', () => {
     }
   });
 
-  it('does NOT emit a flex row on a past day', () => {
+  it('emits a flex row on a past day', () => {
     const pastIso = '2026-05-10';
     const groups = buildDayGroups([pastIso], [gym], [], [], TODAY);
-    expect(groups[0].rows.find((r) => r.kind === 'flex')).toBeUndefined();
+    const flexRow = groups[0].rows.find((r) => r.kind === 'flex');
+    expect(flexRow).toBeDefined();
+    if (flexRow && flexRow.kind === 'flex') {
+      expect(flexRow.habitId).toBe(gym.id);
+      expect(flexRow.count).toBe(0);
+      expect(flexRow.target).toBe(3);
+    }
   });
 
   it('skips flex habits missing target_count or target_period', () => {

@@ -26,6 +26,8 @@ export const Colors = {
   },
 };
 
+export const TRAILING_ICON_SIZE = 18;
+
 export const Fonts = Platform.select({
   ios: {
     /** iOS `UIFontDescriptorSystemDesignDefault` */

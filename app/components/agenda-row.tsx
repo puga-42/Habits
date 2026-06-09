@@ -19,6 +19,7 @@ import { Pressable, StyleSheet, useColorScheme, View } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { TimeTrailingIcon, type TimerStatus } from '@/components/time-trailing-icon';
 import { solidTint } from '@/constants/colors';
+import { TRAILING_ICON_SIZE } from '@/constants/theme';
 import type { FlexPeriod } from '@/lib/habits';
 import type { AgendaRow as AgendaRowT } from '@/lib/history';
 
@@ -269,8 +270,8 @@ const styles = StyleSheet.create({
   },
   trailingPressed: { opacity: 0.6 },
   trailingInert: { opacity: 0.5 },
-  markerDim: { fontSize: 18, opacity: 0.5 },
-  markerCheck: { fontSize: 18, fontWeight: '700' },
+  markerDim: { fontSize: TRAILING_ICON_SIZE, opacity: 0.5 },
+  markerCheck: { fontSize: TRAILING_ICON_SIZE, fontWeight: '700' },
   ring: {
     width: 18,
     height: 18,

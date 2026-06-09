@@ -206,7 +206,6 @@ export function buildDayGroups(
   today: Date = new Date(),
 ): DayGroup[] {
   const habitMap = new Map(habits.map((h) => [h.id, h]));
-  const todayIso = isoDate(today);
 
   // Bucket completions by their display date (occurrence_date for scheduled,
   // local date of completed_at for flex).
@@ -226,103 +225,101 @@ export function buildDayGroups(
   for (const dayIso of daysInRange) {
     const dayCompletions = completionsByDate.get(dayIso) ?? [];
     const dayOverrides = overridesByDate.get(dayIso) ?? [];
-    const isPast = dayIso < todayIso;
 
     const rows: AgendaRow[] = [];
     const handledCompletionIds = new Set<string>();
     const handledOverrideIds = new Set<string>();
 
-    if (!isPast) {
-      // Today or future: expand scheduled habits and overlay completions/skips.
-      const dayStart = parseIsoToLocalMidnight(dayIso);
-      const dayEnd = new Date(dayStart);
-      dayEnd.setHours(23, 59, 59, 999);
+    // Expand scheduled habits and flex "log it" rows for all days (past,
+    // today, and future) so users can retroactively complete missed habits.
+    const dayStart = parseIsoToLocalMidnight(dayIso);
+    const dayEnd = new Date(dayStart);
+    dayEnd.setHours(23, 59, 59, 999);
 
-      // Flex habits: emit a persistent "log it" row per habit per day, with
-      // the count of completions in this day's containing period (week/month/
-      // day). The row is shown even after the target is met — over-target
-      // logging is a deliberate feature, not a bug.
-      for (const habit of habits) {
-        if (habit.kind !== 'flex') continue;
-        if (habit.target_count == null || habit.target_period == null) continue;
-        const periodStart = flexPeriodStartFor(dayIso, habit.target_period);
-        let count = 0;
-        for (const c of completions) {
-          if (c.habit_id === habit.id && c.period_start === periodStart) count++;
-        }
-        rows.push({
-          kind: 'flex',
-          habitId: habit.id,
-          habit: agendaHabitFor(habit),
-          time: null,
-          period: habit.target_period,
-          count,
-          target: habit.target_count,
-        });
+    // Flex habits: emit a persistent "log it" row per habit per day, with
+    // the count of completions in this day's containing period (week/month/
+    // day). The row is shown even after the target is met — over-target
+    // logging is a deliberate feature, not a bug.
+    for (const habit of habits) {
+      if (habit.kind !== 'flex') continue;
+      if (habit.target_count == null || habit.target_period == null) continue;
+      const periodStart = flexPeriodStartFor(dayIso, habit.target_period);
+      let count = 0;
+      for (const c of completions) {
+        if (c.habit_id === habit.id && c.period_start === periodStart) count++;
       }
+      rows.push({
+        kind: 'flex',
+        habitId: habit.id,
+        habit: agendaHabitFor(habit),
+        time: null,
+        period: habit.target_period,
+        count,
+        target: habit.target_count,
+      });
+    }
 
-      for (const habit of habits) {
-        if (habit.kind !== 'scheduled') continue;
-        const occurrences = expandHabit(habit, dayStart, dayEnd);
-        for (const occTime of occurrences) {
-          const matchedCompletions = dayCompletions.filter(
-            (c) => c.habit_id === habit.id && c.occurrence_date === dayIso,
-          );
-          const matchedSkip = dayOverrides.find(
-            (o) => o.habit_id === habit.id && o.kind === 'skip',
-          );
-          const editOverride = dayOverrides.find(
-            (o) =>
-              o.habit_id === habit.id &&
-              (o.kind === 'edit' || o.kind === 'reschedule'),
-          );
+    for (const habit of habits) {
+      if (habit.kind !== 'scheduled') continue;
+      const occurrences = expandHabit(habit, dayStart, dayEnd);
+      for (const occTime of occurrences) {
+        const matchedCompletions = dayCompletions.filter(
+          (c) => c.habit_id === habit.id && c.occurrence_date === dayIso,
+        );
+        const matchedSkip = dayOverrides.find(
+          (o) => o.habit_id === habit.id && o.kind === 'skip',
+        );
+        const editOverride = dayOverrides.find(
+          (o) =>
+            o.habit_id === habit.id &&
+            (o.kind === 'edit' || o.kind === 'reschedule'),
+        );
 
-          if (matchedCompletions.length > 0) {
-            for (const c of matchedCompletions) {
-              if (handledCompletionIds.has(c.id)) continue;
-              const patch: OccurrencePatch = editOverride?.patch ?? {};
-              rows.push({
-                kind: 'completion',
-                id: c.id,
-                habit: {
-                  id: c.habits.id,
-                  title: patch.title ?? c.habits.title,
-                  description: habitMap.get(c.habit_id)?.description ?? null,
-                  icon: patch.icon ?? c.habits.icon,
-                  color: patch.color ?? c.habits.color,
-                  unit: c.habits.unit,
-                },
-                time: new Date(c.completed_at),
-                isFlex: c.habits.kind === 'flex',
-              });
-              handledCompletionIds.add(c.id);
-            }
-          } else if (matchedSkip) {
-            if (!handledOverrideIds.has(matchedSkip.id)) {
-              rows.push({
-                kind: 'skip',
-                habitId: habit.id,
-                habit: agendaHabitFor(habit),
-                time: occTime,
-              });
-              handledOverrideIds.add(matchedSkip.id);
-            }
-          } else {
+        if (matchedCompletions.length > 0) {
+          for (const c of matchedCompletions) {
+            if (handledCompletionIds.has(c.id)) continue;
             const patch: OccurrencePatch = editOverride?.patch ?? {};
             rows.push({
-              kind: 'scheduled',
-              habitId: habit.id,
+              kind: 'completion',
+              id: c.id,
               habit: {
-                id: habit.id,
-                title: patch.title ?? habit.title,
-                description: habit.description,
-                icon: patch.icon ?? habit.icon,
-                color: patch.color ?? habit.color,
-                unit: habit.unit,
+                id: c.habits.id,
+                title: patch.title ?? c.habits.title,
+                description: habitMap.get(c.habit_id)?.description ?? null,
+                icon: patch.icon ?? c.habits.icon,
+                color: patch.color ?? c.habits.color,
+                unit: c.habits.unit,
               },
-              time: patch.time ? applyTimePatch(occTime, patch.time) : occTime,
+              time: new Date(c.completed_at),
+              isFlex: c.habits.kind === 'flex',
             });
+            handledCompletionIds.add(c.id);
           }
+        } else if (matchedSkip) {
+          if (!handledOverrideIds.has(matchedSkip.id)) {
+            rows.push({
+              kind: 'skip',
+              habitId: habit.id,
+              habit: agendaHabitFor(habit),
+              time: occTime,
+            });
+            handledOverrideIds.add(matchedSkip.id);
+          }
+        } else {
+          const patch: OccurrencePatch = editOverride?.patch ?? {};
+          rows.push({
+            kind: 'scheduled',
+            habitId: habit.id,
+            habit: {
+              id: habit.id,
+              title: patch.title ?? habit.title,
+              description: habit.description,
+              icon: patch.icon ?? habit.icon,
+              color: patch.color ?? habit.color,
+              unit: habit.unit,
+            },
+            time: patch.time ? applyTimePatch(occTime, patch.time) : occTime,
+          });
         }
       }
     }
