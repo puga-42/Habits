@@ -1,10 +1,5 @@
-// Week view: seven day columns aligned to the user's chosen week-start day.
-// Swipe horizontally to advance by 7 days. Columns are narrow so each row
-// is rendered compactly (marker + emoji only).
-
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { GestureResponderEvent, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import PagerView from 'react-native-pager-view';
 
 import { ThemedText } from '@/components/themed-text';
 import { Palette } from '@/constants/colors';
@@ -21,7 +16,6 @@ type Props = {
   weekStart: number;
   habits: Habit[];
   dayGroups: DayGroup[];
-  onAnchorChange: (date: Date) => void;
   onColumnPress: (iso: string) => void;
   onRowPress: (row: AgendaRowT, dateIso: string) => void;
 };
@@ -31,31 +25,9 @@ export function CalendarWeekView({
   weekStart,
   habits,
   dayGroups,
-  onAnchorChange,
   onColumnPress,
   onRowPress,
 }: Props) {
-  const pagerRef = useRef<PagerView>(null);
-  const pendingIdx = useRef<number | null>(null);
-  const scrollState = useRef('idle');
-
-  const weekStarts = useMemo(() => {
-    const out: Date[] = [];
-    for (let weekOffset = -5; weekOffset <= 5; weekOffset++) {
-      const d = new Date(anchorDate);
-      d.setDate(anchorDate.getDate() + weekOffset * 7);
-      d.setHours(0, 0, 0, 0);
-      out.push(d);
-    }
-    return out;
-  }, [anchorDate]);
-
-  useEffect(() => {
-    if (scrollState.current === 'idle') {
-      pagerRef.current?.setPageWithoutAnimation(5);
-    }
-  }, [anchorDate]);
-
   const groupByIso = useMemo(() => {
     const m = new Map<string, DayGroup>();
     for (const g of dayGroups) m.set(g.date, g);
@@ -69,33 +41,15 @@ export function CalendarWeekView({
   }, [habits]);
 
   return (
-    <PagerView
-      ref={pagerRef}
-      initialPage={5}
-      style={styles.pager}
-      onPageSelected={(e) => {
-        pendingIdx.current = e.nativeEvent.position;
-      }}
-      onPageScrollStateChanged={(e) => {
-        scrollState.current = e.nativeEvent.pageScrollState;
-        if (scrollState.current === 'idle' && pendingIdx.current !== null) {
-          const idx = pendingIdx.current;
-          pendingIdx.current = null;
-          if (idx !== 5) onAnchorChange(weekStarts[idx]);
-        }
-      }}>
-      {weekStarts.map((anchorForPage, pageIdx) => (
-        <View key={pageIdx} style={styles.page}>
-          <WeekColumns
-            weekDays={weekDatesFrom(anchorForPage, weekStart)}
-            groupByIso={groupByIso}
-            habitMap={habitMap}
-            onColumnPress={onColumnPress}
-            onRowPress={onRowPress}
-          />
-        </View>
-      ))}
-    </PagerView>
+    <View style={styles.root}>
+      <WeekColumns
+        weekDays={weekDatesFrom(anchorDate, weekStart)}
+        groupByIso={groupByIso}
+        habitMap={habitMap}
+        onColumnPress={onColumnPress}
+        onRowPress={onRowPress}
+      />
+    </View>
   );
 }
 
@@ -228,8 +182,7 @@ function CompactRow({
 }
 
 const styles = StyleSheet.create({
-  pager: { flex: 1 },
-  page: { flex: 1 },
+  root: { flex: 1 },
   columnsRow: { flex: 1, flexDirection: 'row' },
   column: { flex: 1 },
   columnDivider: {

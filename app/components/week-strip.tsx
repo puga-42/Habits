@@ -1,22 +1,27 @@
-// Week strip: 7 day cells for the week containing `anchorDate`, with a
-// 3-page horizontal pager so swiping the strip jumps anchor ±7 days (same
-// weekday). Each cell's background fill scales with that day's completion
-// density. The selected day is outlined; today is accent-colored when it's
-// not the selected day.
-
-import { useEffect, useMemo, useRef } from 'react';
-import { Pressable, StyleSheet, useColorScheme, View } from 'react-native';
-import PagerView from 'react-native-pager-view';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
+import {
+  FlatList,
+  Pressable,
+  StyleSheet,
+  useColorScheme,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { Palette, solidTint } from '@/constants/colors';
 import { isoDate } from '@/lib/habits';
-import { densityBucket, weekDatesFrom } from '@/lib/history';
+import { densityBucket } from '@/lib/history';
 
 const ACCENT = Palette.primary;
 const TODAY_ACCENT = Palette.lavender;
-const WEEKDAY_LETTERS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const DENSITY_ALPHA = [0, 0.12, 0.26, 0.45, 0.68] as const;
+
+const HALF_WINDOW = 90;
+const CELL_BUBBLE = 30;
+const OVAL_HEIGHT = 66;
+const OVAL_WIDTH = 40;
 
 type Props = {
   anchorDate: Date;
@@ -26,130 +31,149 @@ type Props = {
   onSelect: (date: Date) => void;
 };
 
+function buildDateStrip(today: Date): string[] {
+  const dates: string[] = [];
+  const start = new Date(today);
+  start.setDate(start.getDate() - HALF_WINDOW);
+  for (let i = 0; i <= HALF_WINDOW * 2; i++) {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    dates.push(isoDate(d));
+  }
+  return dates;
+}
+
 export function WeekStrip({
   anchorDate,
-  weekStart,
   today,
   countByDate,
   onSelect,
 }: Props) {
-  const pagerRef = useRef<PagerView>(null);
-
-  // Three week-start dates: prev / current / next. The "current" week is the
-  // one containing the anchor.
-  const weekStarts = useMemo(() => {
-    const out: Date[] = [];
-    for (let offset = -1; offset <= 1; offset++) {
-      const a = new Date(anchorDate);
-      a.setDate(a.getDate() + offset * 7);
-      out.push(a);
-    }
-    return out;
-  }, [anchorDate]);
-
-  // After anchorDate changes, re-center the pager on the middle page without
-  // animation so the next swipe starts from a clean ±1 step.
-  useEffect(() => {
-    pagerRef.current?.setPageWithoutAnimation(1);
-  }, [anchorDate]);
-
   const anchorIso = isoDate(anchorDate);
   const todayIso = isoDate(today);
-
-  return (
-    <PagerView
-      ref={pagerRef}
-      initialPage={1}
-      style={styles.pager}
-      onPageSelected={(e) => {
-        const idx = e.nativeEvent.position;
-        if (idx === 1) return;
-        const delta = (idx - 1) * 7;
-        const next = new Date(anchorDate);
-        next.setDate(next.getDate() + delta);
-        onSelect(next);
-      }}>
-      {weekStarts.map((weekAnchor, pageIdx) => (
-        <View key={pageIdx} style={styles.page} collapsable={false}>
-          <WeekRow
-            weekAnchor={weekAnchor}
-            weekStart={weekStart}
-            anchorIso={anchorIso}
-            todayIso={todayIso}
-            countByDate={countByDate}
-            onSelect={onSelect}
-          />
-        </View>
-      ))}
-    </PagerView>
-  );
-}
-
-function WeekRow({
-  weekAnchor,
-  weekStart,
-  anchorIso,
-  todayIso,
-  countByDate,
-  onSelect,
-}: {
-  weekAnchor: Date;
-  weekStart: number;
-  anchorIso: string;
-  todayIso: string;
-  countByDate: Map<string, number>;
-  onSelect: (date: Date) => void;
-}) {
-  const dates = useMemo(
-    () => weekDatesFrom(weekAnchor, weekStart),
-    [weekAnchor, weekStart],
-  );
-
   const isDark = useColorScheme() !== 'light';
+  const listRef = useRef<FlatList<string>>(null);
+  const { width: screenWidth } = useWindowDimensions();
+  const cellWidth = Math.floor(screenWidth / 7);
 
-  return (
-    <View style={styles.row}>
-      {dates.map((iso, i) => {
-        const letter = WEEKDAY_LETTERS[(weekStart + i) % 7];
-        const day = parseInt(iso.slice(8, 10), 10);
-        const count = countByDate.get(iso) ?? 0;
-        const bucket = densityBucket(count);
-        const isSelected = iso === anchorIso;
-        const isToday = iso === todayIso;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const dates = useMemo(() => buildDateStrip(today), [todayIso]);
 
-        return (
-          <Pressable
-            key={iso}
-            hitSlop={4}
-            onPress={() => onSelect(parseIsoLocal(iso))}
-            style={({ pressed }) => [styles.cellWrap, pressed && styles.cellPressed]}>
+  const getItemLayout = useCallback(
+    (_: unknown, index: number) => ({
+      length: cellWidth,
+      offset: cellWidth * index,
+      index,
+    }),
+    [cellWidth],
+  );
+
+  const initialIndex = useMemo(() => {
+    const idx = dates.indexOf(anchorIso);
+    return idx >= 0 ? idx : HALF_WINDOW;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const idx = dates.indexOf(anchorIso);
+    if (idx >= 0) {
+      listRef.current?.scrollToIndex({
+        index: idx,
+        animated: true,
+        viewPosition: 0.5,
+      });
+    }
+  }, [anchorIso, dates]);
+
+  const handleScrollFailed = useCallback(
+    (info: { index: number }) => {
+      setTimeout(() => {
+        listRef.current?.scrollToIndex({
+          index: info.index,
+          animated: true,
+          viewPosition: 0.5,
+        });
+      }, 100);
+    },
+    [],
+  );
+
+  const renderItem = useCallback(
+    ({ item: iso }: { item: string }) => {
+      const date = parseIsoLocal(iso);
+      const letter = WEEKDAY_LABELS[date.getDay()];
+      const day = date.getDate();
+      const count = countByDate.get(iso) ?? 0;
+      const bucket = densityBucket(count);
+      const isSelected = iso === anchorIso;
+      const isToday = iso === todayIso;
+
+      return (
+        <Pressable
+          hitSlop={4}
+          onPress={() => onSelect(parseIsoLocal(iso))}
+          style={({ pressed }) => [
+            styles.cellWrap,
+            { width: cellWidth },
+            pressed && styles.cellPressed,
+          ]}>
+          <View
+            style={[
+              styles.cellInner,
+              isToday && styles.cellToday,
+              isSelected && styles.cellSelected,
+            ]}>
             <ThemedText
               style={[
                 styles.weekdayLetter,
-                isToday && !isSelected && styles.todayText,
+                isToday && styles.todayText,
+                isSelected && styles.selectedText,
               ]}>
               {letter}
             </ThemedText>
             <View
               style={[
                 styles.dayBubble,
-                bucket > 0 && {
-                  backgroundColor: solidTint(ACCENT, DENSITY_ALPHA[bucket], isDark),
+                bucket > 0 && !isToday && {
+                  backgroundColor: solidTint(
+                    ACCENT,
+                    DENSITY_ALPHA[bucket],
+                    isDark,
+                  ),
                 },
-                isSelected && styles.dayBubbleSelected,
               ]}>
               <ThemedText
                 style={[
                   styles.dayNumber,
-                  isToday && !isSelected && styles.todayText,
-                  isSelected && styles.dayNumberSelected,
+                  isToday && styles.todayText,
+                  isSelected && styles.selectedText,
                 ]}>
                 {day}
               </ThemedText>
             </View>
-          </Pressable>
-        );
-      })}
+          </View>
+        </Pressable>
+      );
+    },
+    [anchorIso, todayIso, countByDate, isDark, onSelect, cellWidth],
+  );
+
+  const keyExtractor = useCallback((iso: string) => iso, []);
+
+  return (
+    <View style={styles.strip}>
+      <FlatList
+        ref={listRef}
+        data={dates}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        getItemLayout={getItemLayout}
+        initialScrollIndex={initialIndex}
+        onScrollToIndexFailed={handleScrollFailed}
+        windowSize={5}
+      />
     </View>
   );
 }
@@ -159,19 +183,25 @@ function parseIsoLocal(iso: string): Date {
   return new Date(y, m - 1, d, 0, 0, 0, 0);
 }
 
-const CELL_BUBBLE = 34;
-
 const styles = StyleSheet.create({
-  pager: { height: 64 },
-  page: { flex: 1, justifyContent: 'center' },
-  row: {
-    flexDirection: 'row',
-    paddingHorizontal: 8,
-  },
+  strip: { height: 70, justifyContent: 'center' },
   cellWrap: {
-    flex: 1,
     alignItems: 'center',
-    paddingVertical: 4,
+    justifyContent: 'center',
+  },
+  cellInner: {
+    width: OVAL_WIDTH,
+    height: OVAL_HEIGHT,
+    borderRadius: OVAL_WIDTH / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cellToday: {
+    backgroundColor: TODAY_ACCENT,
+  },
+  cellSelected: {
+    borderWidth: 1.5,
+    borderColor: ACCENT,
   },
   cellPressed: { opacity: 0.6 },
   weekdayLetter: {
@@ -187,11 +217,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  dayBubbleSelected: {
-    borderWidth: 1.5,
-    borderColor: ACCENT,
-  },
   dayNumber: { fontSize: 15, fontWeight: '500' },
-  dayNumberSelected: { fontWeight: '700' },
-  todayText: { color: TODAY_ACCENT },
+  selectedText: { fontWeight: '700' },
+  todayText: { color: '#fff', opacity: 1 },
 });

@@ -3,6 +3,7 @@ import * as Crypto from 'expo-crypto';
 import { supabase } from './supabase';
 import type { Habit } from './habits';
 import { isoDate, markFlexCompleted, markScheduledCompleted, weekStart } from './habits';
+import { flexPeriodStartFor } from './history';
 
 export type TimeEntry = {
   id: string;
@@ -99,10 +100,20 @@ export function dateParamsForHabit(habit: Habit): {
   occurrenceDate: string | null;
   periodStart: string | null;
 } {
+  return dateParamsForHabitOn(habit, isoDate(new Date()));
+}
+
+export function dateParamsForHabitOn(
+  habit: Habit,
+  dateIso: string,
+): { occurrenceDate: string | null; periodStart: string | null } {
   if (habit.kind === 'scheduled') {
-    return { occurrenceDate: isoDate(new Date()), periodStart: null };
+    return { occurrenceDate: dateIso, periodStart: null };
   }
-  return { occurrenceDate: null, periodStart: isoDate(weekStart(new Date())) };
+  return {
+    occurrenceDate: null,
+    periodStart: flexPeriodStartFor(dateIso, habit.target_period ?? 'week'),
+  };
 }
 
 export async function checkAndAutoComplete(

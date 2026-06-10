@@ -1,11 +1,5 @@
-// 3-day view: three day columns side by side; swipe horizontally to advance
-// by 3 days. Today is the leftmost column on first open. Each column shows
-// open habits on top and completed/skipped below (muted). No drag-reorder
-// in this view — the columns are too tight for the handle.
-
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
-import PagerView from 'react-native-pager-view';
 
 import { Palette } from '@/constants/colors';
 import { AgendaRow } from '@/components/agenda-row';
@@ -21,7 +15,6 @@ type Props = {
   anchorDate: Date;
   habits: Habit[];
   dayGroups: DayGroup[];
-  onAnchorChange: (date: Date) => void;
   onRowPress: (row: AgendaRowT, dateIso: string) => void;
 };
 
@@ -29,30 +22,8 @@ export function Calendar3DayView({
   anchorDate,
   habits,
   dayGroups,
-  onAnchorChange,
   onRowPress,
 }: Props) {
-  const pagerRef = useRef<PagerView>(null);
-  const pendingIdx = useRef<number | null>(null);
-  const scrollState = useRef('idle');
-
-  const windowStarts = useMemo(() => {
-    const out: Date[] = [];
-    for (let pageOffset = -5; pageOffset <= 5; pageOffset++) {
-      const d = new Date(anchorDate);
-      d.setDate(anchorDate.getDate() + pageOffset * 3);
-      d.setHours(0, 0, 0, 0);
-      out.push(d);
-    }
-    return out;
-  }, [anchorDate]);
-
-  useEffect(() => {
-    if (scrollState.current === 'idle') {
-      pagerRef.current?.setPageWithoutAnimation(5);
-    }
-  }, [anchorDate]);
-
   const groupByIso = useMemo(() => {
     const m = new Map<string, DayGroup>();
     for (const g of dayGroups) m.set(g.date, g);
@@ -66,32 +37,14 @@ export function Calendar3DayView({
   }, [habits]);
 
   return (
-    <PagerView
-      ref={pagerRef}
-      initialPage={5}
-      style={styles.pager}
-      onPageSelected={(e) => {
-        pendingIdx.current = e.nativeEvent.position;
-      }}
-      onPageScrollStateChanged={(e) => {
-        scrollState.current = e.nativeEvent.pageScrollState;
-        if (scrollState.current === 'idle' && pendingIdx.current !== null) {
-          const idx = pendingIdx.current;
-          pendingIdx.current = null;
-          if (idx !== 5) onAnchorChange(windowStarts[idx]);
-        }
-      }}>
-      {windowStarts.map((start, pageIdx) => (
-        <View key={pageIdx} style={styles.page}>
-          <ColumnsPage
-            start={start}
-            groupByIso={groupByIso}
-            habitMap={habitMap}
-            onRowPress={onRowPress}
-          />
-        </View>
-      ))}
-    </PagerView>
+    <View style={styles.root}>
+      <ColumnsPage
+        start={anchorDate}
+        groupByIso={groupByIso}
+        habitMap={habitMap}
+        onRowPress={onRowPress}
+      />
+    </View>
   );
 }
 
@@ -197,8 +150,7 @@ function DayHeader({ date }: { date: Date }) {
 }
 
 const styles = StyleSheet.create({
-  pager: { flex: 1 },
-  page: { flex: 1 },
+  root: { flex: 1 },
   columnsRow: { flex: 1, flexDirection: 'row' },
   column: { flex: 1 },
   columnDivider: {

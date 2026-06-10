@@ -1,109 +1,40 @@
-// Day view: shows one day at a time, with horizontal swipe to move +/-1 day.
-// Uses a native horizontal ScrollView (pagingEnabled) for swipe navigation —
-// iOS resolves directional gesture conflicts between the outer horizontal
-// scroll and nested vertical DraggableFlatLists natively.
+import { useMemo } from 'react';
+import { StyleSheet, View } from 'react-native';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  Dimensions,
-  type NativeScrollEvent,
-  type NativeSyntheticEvent,
-  StyleSheet,
-  View,
-} from 'react-native';
-import DraggableFlatList, {
-  type RenderItemParams,
-} from 'react-native-draggable-flatlist';
-import { ScrollView } from 'react-native-gesture-handler';
-
-import { HabitRowSwipeable } from '@/components/habit-row-swipeable';
-import type { TimerStatus } from '@/components/time-trailing-icon';
-import { ThemedText } from '@/components/themed-text';
+import { DayContent, type Section } from '@/components/day-content';
 import { isoDate, type Habit } from '@/lib/habits';
-import {
-  partitionRows,
-  type AgendaRow as AgendaRowT,
-  type DayGroup,
-  type SwipeAction,
-} from '@/lib/history';
-
-type Section = 'notCompleted' | 'completed';
-
-type DayItem =
-  | { kind: 'completed-header' }
-  | { kind: 'all-done' }
-  | { kind: 'row'; row: AgendaRowT; section: Section };
-
-const SNAPPY_DROP = { damping: 30, stiffness: 700, mass: 0.6 };
-const SCREEN_WIDTH = Dimensions.get('window').width;
+import { isDayFuture, type AgendaRow as AgendaRowT, type DayGroup, type SwipeAction } from '@/lib/history';
 
 type Props = {
   anchorDate: Date;
+  today: Date;
   habits: Habit[];
   dayGroups: DayGroup[];
   flexProgressByHabitId: Map<string, { count: number; target: number }>;
   timeProgressByHabitId: Map<string, number>;
   activeTimerHabitId?: string | null;
-  onAnchorChange: (date: Date) => void;
   onRowPress: (row: AgendaRowT, dateIso: string) => void;
   onPillPress?: (row: AgendaRowT, dateIso: string) => void;
   onSwipeAction: (row: AgendaRowT, dateIso: string, action: SwipeAction) => void;
-  onReorderSection: (
-    dateIso: string,
-    section: Section,
-    newRows: AgendaRowT[],
-  ) => void;
+  onReorderSection: (dateIso: string, section: Section, newRows: AgendaRowT[]) => void;
 };
 
 export function CalendarDayView({
   anchorDate,
+  today,
   habits,
   dayGroups,
   flexProgressByHabitId,
   timeProgressByHabitId,
   activeTimerHabitId,
-  onAnchorChange,
   onRowPress,
   onPillPress,
   onSwipeAction,
   onReorderSection,
 }: Props) {
-  const scrollRef = useRef<any>(null);
-  const outerScrollRef = useRef<any>(null);
-  const isResetting = useRef(false);
-
-  const pageDates = useMemo(() => {
-    const out: Date[] = [];
-    for (let offset = -5; offset <= 5; offset++) {
-      const d = new Date(anchorDate);
-      d.setDate(anchorDate.getDate() + offset);
-      d.setHours(0, 0, 0, 0);
-      out.push(d);
-    }
-    return out;
-  }, [anchorDate]);
-
-  useEffect(() => {
-    scrollRef.current?.scrollTo({ x: SCREEN_WIDTH * 5, animated: false });
-  }, [anchorDate]);
-
-  const handleScrollEnd = useCallback(
-    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-      if (isResetting.current) {
-        isResetting.current = false;
-        return;
-      }
-      const x = e.nativeEvent.contentOffset.x;
-      const page = Math.round(x / SCREEN_WIDTH);
-      if (page === 5) return;
-      isResetting.current = true;
-      const next = new Date(anchorDate);
-      next.setDate(anchorDate.getDate() + (page - 5));
-      next.setHours(0, 0, 0, 0);
-      onAnchorChange(next);
-    },
-    [anchorDate, onAnchorChange],
-  );
+  const anchorIso = isoDate(anchorDate);
+  const todayIso = isoDate(today);
+  const isFuture = isDayFuture(anchorIso, todayIso);
 
   const groupByIso = useMemo(() => {
     const m = new Map<string, DayGroup>();
@@ -118,258 +49,24 @@ export function CalendarDayView({
   }, [habits]);
 
   return (
-    <ScrollView
-      ref={(node) => {
-        scrollRef.current = node;
-        outerScrollRef.current = node;
-      }}
-      horizontal
-      pagingEnabled
-      showsHorizontalScrollIndicator={false}
-      scrollEventThrottle={16}
-      onMomentumScrollEnd={handleScrollEnd}
-      contentOffset={{ x: SCREEN_WIDTH * 5, y: 0 }}
-      bounces={false}
-      waitFor={[]}
-    >
-      {pageDates.map((d, idx) => (
-        <View key={idx} style={styles.page}>
-          <DayContent
-            date={d}
-            group={groupByIso.get(isoDate(d))}
-            habitMap={habitMap}
-            flexProgressByHabitId={flexProgressByHabitId}
-            timeProgressByHabitId={timeProgressByHabitId}
-            activeTimerHabitId={activeTimerHabitId}
-            onRowPress={onRowPress}
-            onPillPress={onPillPress}
-            onSwipeAction={onSwipeAction}
-            onReorderSection={onReorderSection}
-            simultaneousHandlers={outerScrollRef}
-          />
-        </View>
-      ))}
-    </ScrollView>
-  );
-}
-
-function DayContent({
-  date,
-  group,
-  habitMap,
-  flexProgressByHabitId,
-  timeProgressByHabitId,
-  activeTimerHabitId,
-  onRowPress,
-  onPillPress,
-  onSwipeAction,
-  onReorderSection,
-  simultaneousHandlers,
-}: {
-  date: Date;
-  group: DayGroup | undefined;
-  habitMap: Map<string, Habit>;
-  flexProgressByHabitId: Map<string, { count: number; target: number }>;
-  timeProgressByHabitId: Map<string, number>;
-  activeTimerHabitId?: string | null;
-  onRowPress: (row: AgendaRowT, dateIso: string) => void;
-  onPillPress?: (row: AgendaRowT, dateIso: string) => void;
-  onSwipeAction: (row: AgendaRowT, dateIso: string, action: SwipeAction) => void;
-  onReorderSection: (
-    dateIso: string,
-    section: Section,
-    newRows: AgendaRowT[],
-  ) => void;
-  simultaneousHandlers?: React.Ref<any> | React.Ref<any>[];
-}) {
-  const iso = isoDate(date);
-  const rows = group?.rows ?? [];
-  const { notCompleted, completed } = useMemo(
-    () => partitionRows(rows, habitMap),
-    [rows, habitMap],
-  );
-
-  const data = useMemo<DayItem[]>(() => {
-    const out: DayItem[] = [];
-    if (notCompleted.length > 0) {
-      for (const row of notCompleted) {
-        out.push({ kind: 'row', row, section: 'notCompleted' });
-      }
-    } else if (completed.length > 0) {
-      out.push({ kind: 'all-done' });
-    }
-    if (completed.length > 0) {
-      out.push({ kind: 'completed-header' });
-      for (const row of completed) {
-        out.push({ kind: 'row', row, section: 'completed' });
-      }
-    }
-    return out;
-  }, [notCompleted, completed]);
-
-  const [generation, setGeneration] = useState(0);
-
-  // Drawer coordination: only one swipe drawer open at a time.
-  const closeCurrentDrawer = useRef<(() => void) | null>(null);
-  const handleDrawerOpen = useCallback((closeFn: () => void) => {
-    closeCurrentDrawer.current?.();
-    closeCurrentDrawer.current = closeFn;
-  }, []);
-  const handleDrawerClose = useCallback(() => {
-    closeCurrentDrawer.current = null;
-  }, []);
-
-  if (rows.length === 0) {
-    return (
-      <View style={styles.emptyState}>
-        <ThemedText style={styles.emptyText}>
-          Nothing scheduled for this day.
-        </ThemedText>
-      </View>
-    );
-  }
-
-  const keyExtractor = (item: DayItem): string => {
-    if (item.kind === 'completed-header') return '__ch';
-    if (item.kind === 'all-done') return '__ad';
-    if (item.row.kind === 'completion') return `c-${item.row.id}`;
-    return `${item.row.kind}-${item.row.habitId}`;
-  };
-
-  const renderItem = ({ item, drag, isActive }: RenderItemParams<DayItem>) => {
-    if (item.kind === 'all-done') {
-      return (
-        <ThemedText style={styles.allDone}>Everything done for today.</ThemedText>
-      );
-    }
-    if (item.kind === 'completed-header') {
-      return (
-        <View style={styles.completedHeader}>
-          <View style={styles.completedRule} />
-          <ThemedText style={styles.completedLabel}>Completed</ThemedText>
-          <View style={styles.completedRule} />
-        </View>
-      );
-    }
-    const habitId =
-      item.row.kind === 'completion' ? item.row.habit.id : item.row.habitId;
-    const timerStatus: TimerStatus | undefined =
-      item.row.habit.unit === 'time'
-        ? item.row.kind === 'completion'
-          ? 'complete'
-          : activeTimerHabitId === habitId
-            ? 'running'
-            : 'idle'
-        : undefined;
-    return (
-      <HabitRowSwipeable
-        row={item.row}
-        dateIso={iso}
-        onPress={onPillPress ? () => onPillPress(item.row, iso) : undefined}
-        onTrailingPress={() => onRowPress(item.row, iso)}
-        onSwipeAction={(action) => onSwipeAction(item.row, iso, action)}
-        onDrawerOpen={handleDrawerOpen}
-        onDrawerClose={handleDrawerClose}
-        onLongPress={drag}
-        flexProgress={flexProgressByHabitId.get(habitId)}
-        timerStatus={timerStatus}
-        timeProgress={timeProgressByHabitId.get(habitId)}
-        isActive={isActive}
+    <View style={styles.root}>
+      <DayContent
+        date={anchorDate}
+        group={groupByIso.get(anchorIso)}
+        habitMap={habitMap}
+        flexProgressByHabitId={flexProgressByHabitId}
+        timeProgressByHabitId={timeProgressByHabitId}
+        activeTimerHabitId={activeTimerHabitId}
+        isFuture={isFuture}
+        onRowPress={onRowPress}
+        onPillPress={onPillPress}
+        onSwipeAction={onSwipeAction}
+        onReorderSection={onReorderSection}
       />
-    );
-  };
-
-  const ItemSeparator = () => <View style={styles.itemSeparator} />;
-
-  const onDragEnd = ({
-    data: newData,
-    from,
-    to,
-  }: {
-    data: DayItem[];
-    from: number;
-    to: number;
-  }) => {
-    if (from === to) return;
-    const moved = newData[to];
-    if (!moved || moved.kind !== 'row') {
-      setGeneration((g) => g + 1);
-      return;
-    }
-    let landedSection: Section = 'notCompleted';
-    for (let i = 0; i < to; i++) {
-      if (newData[i].kind === 'completed-header') {
-        landedSection = 'completed';
-        break;
-      }
-    }
-    if (landedSection !== moved.section) {
-      setGeneration((g) => g + 1);
-      return;
-    }
-    const sectionRows: AgendaRowT[] = [];
-    let currentSection: Section = 'notCompleted';
-    for (const item of newData) {
-      if (item.kind === 'completed-header') {
-        currentSection = 'completed';
-        continue;
-      }
-      if (item.kind === 'row' && currentSection === moved.section) {
-        sectionRows.push(item.row);
-      }
-    }
-    onReorderSection(iso, moved.section, sectionRows);
-  };
-
-  return (
-    <DraggableFlatList
-      key={generation}
-      data={data}
-      keyExtractor={keyExtractor}
-      renderItem={renderItem}
-      onDragEnd={onDragEnd}
-      onScrollBeginDrag={() => closeCurrentDrawer.current?.()}
-      animationConfig={SNAPPY_DROP}
-      autoscrollSpeed={0}
-      autoscrollThreshold={0}
-      containerStyle={styles.scrollRoot}
-      contentContainerStyle={styles.scrollContent}
-      ItemSeparatorComponent={ItemSeparator}
-      keyboardShouldPersistTaps="handled"
-      simultaneousHandlers={simultaneousHandlers}
-      activationDistance={10}
-    />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  page: { width: SCREEN_WIDTH, flex: 1 },
-  scrollRoot: { flex: 1 },
-  scrollContent: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 120 },
-  itemSeparator: { height: 10 },
-  emptyState: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 32,
-  },
-  emptyText: { opacity: 0.55, fontSize: 15 },
-  allDone: { paddingVertical: 16, opacity: 0.55, fontSize: 14 },
-  completedHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingVertical: 14,
-  },
-  completedRule: {
-    flex: 1,
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: 'rgba(127,127,127,0.3)',
-  },
-  completedLabel: {
-    fontSize: 12,
-    opacity: 0.55,
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-  },
+  root: { flex: 1 },
 });

@@ -566,6 +566,10 @@ function startOfLocalDay(d: Date): Date {
   return out;
 }
 
+export function isDayFuture(dateIso: string, todayIso: string): boolean {
+  return dateIso > todayIso;
+}
+
 // ─── Query ────────────────────────────────────────────────────────────────
 
 // Fetch all completions + overrides whose display date falls in [fromIso, toIso).

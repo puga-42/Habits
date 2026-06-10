@@ -7,6 +7,7 @@ import {
   densityBucket,
   expandHabit,
   flexProgressByHabit,
+  isDayFuture,
   monthLabel,
   nDayRange,
   nextMonth,
@@ -1152,5 +1153,25 @@ describe('swipeActionsForRow', () => {
       period: 'week', count: 0, target: 3,
     };
     expect(swipeActionsForRow(row)).toEqual([]);
+  });
+});
+
+// ─── isDayFuture ──────────────────────────────────────────────────────────
+
+describe('isDayFuture', () => {
+  it('returns false for a past date', () => {
+    expect(isDayFuture('2026-06-01', '2026-06-09')).toBe(false);
+  });
+
+  it('returns false for today', () => {
+    expect(isDayFuture('2026-06-09', '2026-06-09')).toBe(false);
+  });
+
+  it('returns true for tomorrow', () => {
+    expect(isDayFuture('2026-06-10', '2026-06-09')).toBe(true);
+  });
+
+  it('returns true for a far-future date', () => {
+    expect(isDayFuture('2027-01-01', '2026-06-09')).toBe(true);
   });
 });

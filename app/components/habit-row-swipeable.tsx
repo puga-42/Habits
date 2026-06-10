@@ -47,6 +47,7 @@ type Props = {
   timeProgress?: number;
   compact?: boolean | 'tight';
   isActive?: boolean;
+  isFuture?: boolean;
 };
 
 export function HabitRowSwipeable({
@@ -62,10 +63,11 @@ export function HabitRowSwipeable({
   timeProgress,
   compact,
   isActive,
+  isFuture,
 }: Props) {
   const swipeRef = useRef<SwipeableMethods>(null);
   const reducedMotion = useReducedMotion();
-  const actions = swipeActionsForRow(row);
+  const actions = isFuture ? [] : swipeActionsForRow(row);
 
   const handleAction = useCallback(
     (action: SwipeAction) => {
@@ -89,13 +91,14 @@ export function HabitRowSwipeable({
       <AgendaRow
         row={row}
         onPress={onPress}
-        onTrailingPress={onTrailingPress}
+        onTrailingPress={isFuture ? undefined : onTrailingPress}
         onLongPress={onLongPress}
         flexProgress={flexProgress}
         timerStatus={timerStatus}
         timeProgress={timeProgress}
         compact={compact}
         isActive={isActive}
+        hideTrailing={isFuture}
       />
     );
   }
@@ -128,13 +131,14 @@ export function HabitRowSwipeable({
       <AgendaRow
         row={row}
         onPress={onPress}
-        onTrailingPress={onTrailingPress}
+        onTrailingPress={isFuture ? undefined : onTrailingPress}
         onLongPress={onLongPress}
         flexProgress={flexProgress}
         timerStatus={timerStatus}
         timeProgress={timeProgress}
         compact={compact}
         isActive={isActive}
+        hideTrailing={isFuture}
       />
     </ReanimatedSwipeable>
   );

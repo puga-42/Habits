@@ -14,7 +14,14 @@
 // shrink the leading icon.
 
 import * as Haptics from 'expo-haptics';
+import { useEffect, useRef } from 'react';
 import { Pressable, StyleSheet, useColorScheme, View } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
 import { TimeTrailingIcon, type TimerStatus } from '@/components/time-trailing-icon';
@@ -40,10 +47,8 @@ type Props = {
   // the status down so the trailing icon reflects start/stop state.
   timerStatus?: TimerStatus;
   timeProgress?: number;
-  // Accepted for API compatibility with DraggableFlatList's RenderItemParams;
-  // the row's appearance never changes — finger on the moving row is enough
-  // visual feedback.
   isActive?: boolean;
+  hideTrailing?: boolean;
 };
 
 export function AgendaRow({
@@ -55,6 +60,7 @@ export function AgendaRow({
   compact = false,
   timerStatus,
   timeProgress,
+  hideTrailing,
 }: Props) {
   const isSkip = row.kind === 'skip';
   const isCompletion = row.kind === 'completion';
@@ -94,6 +100,7 @@ export function AgendaRow({
         isTight && styles.pillTight,
         pressed && (onLongPress || onPress) && styles.pillPressed,
         isSkip && styles.pillSkipped,
+        hideTrailing && styles.pillMuted,
       ]}>
       <View
         style={[
@@ -132,7 +139,7 @@ export function AgendaRow({
         ) : null}
       </View>
 
-      {!isTight && (
+      {!isTight && !hideTrailing && (
         <Pressable
           onPress={handleTrailingPress}
           hitSlop={{ top: 11, bottom: 11, left: 11, right: 11 }}
@@ -208,22 +215,40 @@ function FlexRing({
 }) {
   const pct = target > 0 ? Math.min(count / target, 1) : 0;
   const track = 'rgba(127,127,127,0.25)';
+  const opacity = useSharedValue(1);
+  const prevCount = useRef(count);
+
+  useEffect(() => {
+    if (count !== prevCount.current) {
+      prevCount.current = count;
+      opacity.value = withSequence(
+        withTiming(0.4, { duration: 120 }),
+        withTiming(1, { duration: 180 }),
+      );
+    }
+  }, [count, opacity]);
+
+  const pulseStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+  }));
 
   return (
-    <View
-      style={[
-        styles.ring,
-        {
-          borderTopColor: pct >= 0.25 ? color : track,
-          borderRightColor: pct >= 0.5 ? color : track,
-          borderBottomColor: pct >= 0.75 ? color : track,
-          borderLeftColor: pct >= 1 ? color : track,
-        },
-      ]}>
-      {pct >= 1 ? (
-        <ThemedText style={[styles.ringCheck, { color }]}>✓</ThemedText>
-      ) : null}
-    </View>
+    <Animated.View style={pulseStyle}>
+      <View
+        style={[
+          styles.ring,
+          {
+            borderTopColor: pct >= 0.25 ? color : track,
+            borderRightColor: pct >= 0.5 ? color : track,
+            borderBottomColor: pct >= 0.75 ? color : track,
+            borderLeftColor: pct >= 1 ? color : track,
+          },
+        ]}>
+        {pct >= 1 ? (
+          <ThemedText style={[styles.ringCheck, { color }]}>✓</ThemedText>
+        ) : null}
+      </View>
+    </Animated.View>
   );
 }
 
@@ -251,6 +276,7 @@ const styles = StyleSheet.create({
   },
   pillPressed: { opacity: 0.6 },
   pillSkipped: { opacity: 0.5 },
+  pillMuted: { opacity: 0.5 },
   leading: {
     alignItems: 'center',
     justifyContent: 'center',

@@ -57,7 +57,7 @@ import {
 import { fetchProfile, type Profile } from '@/lib/profile';
 import {
   checkAndAutoComplete,
-  dateParamsForHabit,
+  dateParamsForHabitOn,
   fetchTimeEntries,
   sumDurationSeconds,
   startTimeEntry,
@@ -97,6 +97,7 @@ export default function CalendarScreen() {
   const [toastVisible, setToastVisible] = useState(false);
   const [toastCompletionId, setToastCompletionId] = useState<string | null>(null);
   const [activeTimerHabitId, setActiveTimerHabitId] = useState<string | null>(null);
+  const [activeTimerDateIso, setActiveTimerDateIso] = useState<string | null>(null);
   const activeTimerRef = useRef<{ entryId: string; startedAt: string } | null>(null);
   const [timeBaseByHabitId, setTimeBaseByHabitId] = useState<Map<string, number>>(new Map());
   const [liveElapsed, setLiveElapsed] = useState(0);
@@ -118,17 +119,18 @@ export default function CalendarScreen() {
     const earliest = new Date(anchorDate);
     const latest = new Date(anchorDate);
     if (view === 'week') {
-      earliest.setDate(earliest.getDate() - 5 * 7 - 7);
-      latest.setDate(latest.getDate() + 5 * 7 + 7);
+      earliest.setDate(earliest.getDate() - 7);
+      latest.setDate(latest.getDate() + 7);
     } else if (view === '3day') {
-      earliest.setDate(earliest.getDate() - 18);
-      latest.setDate(latest.getDate() + 18);
+      latest.setDate(latest.getDate() + 3);
     } else {
-      earliest.setDate(earliest.getDate() - 6);
-      latest.setDate(latest.getDate() + 6);
+      earliest.setDate(earliest.getDate() - 7);
+      latest.setDate(latest.getDate() + 7);
     }
     return { from: isoDate(earliest), to: isoDate(latest) };
   }, [view, anchorDate, anchorYear, anchorMonth, today, scheduleWindow]);
+
+  const anchorIso = isoDate(anchorDate);
 
   const load = useCallback(async () => {
     if (!userId) return;
@@ -146,13 +148,13 @@ export default function CalendarScreen() {
     const timeHabits = habitsRes.filter((h) => h.unit === 'time' && h.target_seconds);
     const baseTotals = await Promise.all(
       timeHabits.map(async (h) => {
-        const { occurrenceDate, periodStart } = dateParamsForHabit(h);
+        const { occurrenceDate, periodStart } = dateParamsForHabitOn(h, anchorIso);
         const te = await fetchTimeEntries(h.id, occurrenceDate, periodStart);
         return [h.id, sumDurationSeconds(te)] as const;
       }),
     );
     setTimeBaseByHabitId(new Map(baseTotals));
-  }, [userId, dataRange.from, dataRange.to]);
+  }, [userId, dataRange.from, dataRange.to, anchorIso]);
 
   useFocusEffect(
     useCallback(() => {
@@ -164,17 +166,18 @@ export default function CalendarScreen() {
 
   useEffect(() => {
     async function restoreTimer() {
-      for (const h of habits) {
-        if (h.unit !== 'time') continue;
-        const { occurrenceDate, periodStart } = dateParamsForHabit(h);
-        const key = `timer:${h.id}:${occurrenceDate ?? periodStart}`;
+      const keys = await AsyncStorage.getAllKeys();
+      const timerKeys = keys.filter((k) => k.startsWith('timer:'));
+      for (const key of timerKeys) {
         const stored = await AsyncStorage.getItem(key);
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          activeTimerRef.current = parsed;
-          setActiveTimerHabitId(h.id);
-          return;
-        }
+        if (!stored) continue;
+        const parsed = JSON.parse(stored);
+        const habitId = key.split(':')[1];
+        if (!habits.some((h) => h.id === habitId)) continue;
+        activeTimerRef.current = parsed;
+        setActiveTimerHabitId(habitId);
+        setActiveTimerDateIso(parsed.dateIso ?? isoDate(new Date()));
+        return;
       }
     }
     if (habits.length > 0) restoreTimer();
@@ -197,11 +200,13 @@ export default function CalendarScreen() {
     for (const h of habits) {
       if (h.unit !== 'time' || !h.target_seconds) continue;
       const base = timeBaseByHabitId.get(h.id) ?? 0;
-      const elapsed = h.id === activeTimerHabitId ? liveElapsed : 0;
+      const timerOnThisDay =
+        h.id === activeTimerHabitId && activeTimerDateIso === anchorIso;
+      const elapsed = timerOnThisDay ? liveElapsed : 0;
       map.set(h.id, Math.min(1, (base + elapsed) / h.target_seconds));
     }
     return map;
-  }, [habits, timeBaseByHabitId, activeTimerHabitId, liveElapsed]);
+  }, [habits, timeBaseByHabitId, activeTimerHabitId, activeTimerDateIso, anchorIso, liveElapsed]);
 
   // The days the active view needs to render.
   const daysInRange = useMemo(() => {
@@ -210,23 +215,13 @@ export default function CalendarScreen() {
       return grid.map((c) => c.iso);
     }
     if (view === 'day') {
-      const start = new Date(anchorDate);
-      start.setDate(anchorDate.getDate() - 5);
-      return nDayRange(start, 11);
+      return [isoDate(anchorDate)];
     }
     if (view === '3day') {
-      const start = new Date(anchorDate);
-      start.setDate(start.getDate() - 15);
-      return nDayRange(start, 33);
+      return nDayRange(anchorDate, 3);
     }
     if (view === 'week') {
-      const out: string[] = [];
-      for (let off = -5; off <= 5; off++) {
-        const a = new Date(anchorDate);
-        a.setDate(a.getDate() + off * 7);
-        out.push(...weekDatesFrom(a, weekStart));
-      }
-      return out;
+      return weekDatesFrom(anchorDate, weekStart);
     }
     if (view === 'schedule') {
       const days: string[] = [];
@@ -354,7 +349,7 @@ export default function CalendarScreen() {
 
   async function handleTimerToggle(habit: Habit, dateIso: string) {
     if (!userId) return;
-    const { occurrenceDate, periodStart } = dateParamsForHabit(habit);
+    const { occurrenceDate, periodStart } = dateParamsForHabitOn(habit, dateIso);
     const key = `timer:${habit.id}:${occurrenceDate ?? periodStart}`;
 
     if (activeTimerHabitId === habit.id && activeTimerRef.current) {
@@ -367,13 +362,14 @@ export default function CalendarScreen() {
         return next;
       });
       setActiveTimerHabitId(null);
+      setActiveTimerDateIso(null);
       await checkAndAutoComplete(habit.id, userId, habit, occurrenceDate, periodStart);
       await load();
     } else {
       if (activeTimerHabitId && activeTimerRef.current) {
         const prevHabit = habits.find((h) => h.id === activeTimerHabitId);
-        if (prevHabit) {
-          const prev = dateParamsForHabit(prevHabit);
+        if (prevHabit && activeTimerDateIso) {
+          const prev = dateParamsForHabitOn(prevHabit, activeTimerDateIso);
           const prevKey = `timer:${prevHabit.id}:${prev.occurrenceDate ?? prev.periodStart}`;
           await stopTimeEntry(activeTimerRef.current.entryId, activeTimerRef.current.startedAt);
           await AsyncStorage.removeItem(prevKey);
@@ -388,7 +384,8 @@ export default function CalendarScreen() {
       const { id, startedAt } = await startTimeEntry(habit.id, userId, occurrenceDate, periodStart);
       activeTimerRef.current = { entryId: id, startedAt };
       setActiveTimerHabitId(habit.id);
-      await AsyncStorage.setItem(key, JSON.stringify({ entryId: id, startedAt }));
+      setActiveTimerDateIso(dateIso);
+      await AsyncStorage.setItem(key, JSON.stringify({ entryId: id, startedAt, dateIso }));
     }
   }
 
@@ -542,12 +539,12 @@ export default function CalendarScreen() {
         ) : view === 'day' ? (
           <CalendarDayView
             anchorDate={anchorDate}
+            today={today}
             habits={habits}
             dayGroups={dayGroups}
             flexProgressByHabitId={flexProgressByHabitId}
             timeProgressByHabitId={timeProgressByHabitId}
             activeTimerHabitId={activeTimerHabitId}
-            onAnchorChange={setAnchorDate}
             onRowPress={handleTrailingPress}
             onPillPress={handlePillPress}
             onSwipeAction={handleSwipeAction}
@@ -558,7 +555,6 @@ export default function CalendarScreen() {
             anchorDate={anchorDate}
             habits={habits}
             dayGroups={dayGroups}
-            onAnchorChange={setAnchorDate}
             onRowPress={handlePillPress}
           />
         ) : view === 'week' ? (
@@ -567,7 +563,6 @@ export default function CalendarScreen() {
             weekStart={weekStart}
             habits={habits}
             dayGroups={dayGroups}
-            onAnchorChange={setAnchorDate}
             onColumnPress={onWeekColumnTap}
             onRowPress={handlePillPress}
           />

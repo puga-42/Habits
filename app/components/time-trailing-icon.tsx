@@ -1,6 +1,6 @@
 import { StyleSheet, View } from 'react-native';
 
-import { ProgressRing } from '@/components/progress-ring';
+import { AnimatedProgressRing } from '@/components/animated-progress-ring';
 import { ThemedText } from '@/components/themed-text';
 import { TRAILING_ICON_SIZE } from '@/constants/theme';
 
@@ -28,13 +28,13 @@ export function TimeTrailingIcon({ status, color, fraction = 0 }: Props) {
   }
 
   return (
-    <ProgressRing size={RING_SIZE} strokeWidth={RING_STROKE} fraction={fraction} color={color}>
+    <AnimatedProgressRing size={RING_SIZE} strokeWidth={RING_STROKE} fraction={fraction} color={color}>
       {status === 'running' ? (
         <View style={[styles.stopIcon, { backgroundColor: color }]} />
       ) : (
         <ThemedText style={[styles.icon, { color }]}>▶</ThemedText>
       )}
-    </ProgressRing>
+    </AnimatedProgressRing>
   );
 }
 
