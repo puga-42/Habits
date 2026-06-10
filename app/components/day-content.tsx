@@ -1,15 +1,16 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { LayoutAnimation, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import DraggableFlatList, {
   type RenderItemParams,
 } from 'react-native-draggable-flatlist';
-import { FadeOut } from 'react-native-reanimated';
+import Animated, { FadeOut, LinearTransition } from 'react-native-reanimated';
 
 import { AnimatedHabitRow } from '@/components/animated-habit-row';
 import { HabitRowSwipeable } from '@/components/habit-row-swipeable';
 import type { TimerStatus } from '@/components/time-trailing-icon';
 import { ThemedText } from '@/components/themed-text';
 import { diffDayHabits } from '@/lib/day-diff';
+import { dayItemKey, type DayItem, type Section } from '@/lib/day-item-key';
 import { isoDate, type Habit } from '@/lib/habits';
 import {
   partitionRows,
@@ -17,13 +18,6 @@ import {
   type DayGroup,
   type SwipeAction,
 } from '@/lib/history';
-
-export type Section = 'notCompleted' | 'completed';
-
-type DayItem =
-  | { kind: 'completed-header' }
-  | { kind: 'all-done' }
-  | { kind: 'row'; row: AgendaRowT; section: Section };
 
 const SNAPPY_DROP = { damping: 30, stiffness: 700, mass: 0.6 };
 
@@ -90,16 +84,10 @@ export function DayContent({
   const enteringIds = useRef<Set<string>>(new Set());
 
   if (iso !== prevIso.current) {
-    LayoutAnimation.configureNext(
-      LayoutAnimation.create(300, 'easeInEaseOut', 'opacity'),
-    );
     enteringIds.current = diffDayHabits(prevRows.current, rows).entering;
     prevIso.current = iso;
     prevRows.current = rows;
   } else if (rows !== prevRows.current) {
-    LayoutAnimation.configureNext(
-      LayoutAnimation.create(300, 'easeInEaseOut', 'opacity'),
-    );
     enteringIds.current = new Set();
     prevRows.current = rows;
   }
@@ -123,26 +111,23 @@ export function DayContent({
     );
   }
 
-  const keyExtractor = (item: DayItem): string => {
-    if (item.kind === 'completed-header') return '__ch';
-    if (item.kind === 'all-done') return '__ad';
-    if (item.row.kind === 'completion') return `c-${item.row.id}`;
-    return `${item.row.kind}-${item.row.habitId}`;
-  };
+  const keyExtractor = (item: DayItem): string => dayItemKey(item);
 
   const renderItem = ({ item, drag, isActive }: RenderItemParams<DayItem>) => {
     if (item.kind === 'all-done') {
       return (
-        <ThemedText style={styles.allDone}>Everything done for today.</ThemedText>
+        <Animated.View>
+          <ThemedText style={styles.allDone}>Everything done for today.</ThemedText>
+        </Animated.View>
       );
     }
     if (item.kind === 'completed-header') {
       return (
-        <View style={styles.completedHeader}>
+        <Animated.View style={styles.completedHeader}>
           <View style={styles.completedRule} />
           <ThemedText style={styles.completedLabel}>Completed</ThemedText>
           <View style={styles.completedRule} />
-        </View>
+        </Animated.View>
       );
     }
     const habitId =
@@ -230,12 +215,14 @@ export function DayContent({
       animationConfig={SNAPPY_DROP}
       autoscrollSpeed={0}
       autoscrollThreshold={0}
+      enableLayoutAnimationExperimental
+      itemLayoutAnimation={LinearTransition.duration(300)}
       containerStyle={styles.scrollRoot}
       contentContainerStyle={styles.scrollContent}
       ItemSeparatorComponent={ItemSeparator}
       keyboardShouldPersistTaps="handled"
       activationDistance={10}
-      itemExitingAnimation={FadeOut.duration(350)}
+      itemExitingAnimation={FadeOut.duration(200)}
     />
   );
 }

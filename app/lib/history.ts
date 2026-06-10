@@ -90,10 +90,19 @@ export type DayGroup = {
 
 export type SwipeAction = 'reset' | 'skip';
 
-export function swipeActionsForRow(row: AgendaRow): SwipeAction[] {
+export function swipeActionsForRow(
+  row: AgendaRow,
+  opts?: { timeProgress?: number },
+): SwipeAction[] {
   switch (row.kind) {
-    case 'scheduled':
-      return ['skip'];
+    case 'scheduled': {
+      const actions: SwipeAction[] = [];
+      if (row.habit.unit === 'time' && (opts?.timeProgress ?? 0) > 0) {
+        actions.push('reset');
+      }
+      actions.push('skip');
+      return actions;
+    }
     case 'completion':
       return ['reset'];
     case 'skip':

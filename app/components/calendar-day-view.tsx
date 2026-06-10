@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { DayContent, type Section } from '@/components/day-content';
+import { DayContent } from '@/components/day-content';
+import type { Section } from '@/lib/day-item-key';
 import { isoDate, type Habit } from '@/lib/habits';
 import { isDayFuture, type AgendaRow as AgendaRowT, type DayGroup, type SwipeAction } from '@/lib/history';
 

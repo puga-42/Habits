@@ -1154,6 +1154,24 @@ describe('swipeActionsForRow', () => {
     };
     expect(swipeActionsForRow(row)).toEqual([]);
   });
+
+  it('returns [reset, skip] for a scheduled time-based row with progress', () => {
+    const timeHabit = { ...habit, unit: 'time' as const };
+    const row: AgendaRow = { kind: 'scheduled', habitId: 'h1', habit: timeHabit, time: null };
+    expect(swipeActionsForRow(row, { timeProgress: 0.5 })).toEqual(['reset', 'skip']);
+  });
+
+  it('returns [skip] for a scheduled time-based row with no progress', () => {
+    const timeHabit = { ...habit, unit: 'time' as const };
+    const row: AgendaRow = { kind: 'scheduled', habitId: 'h1', habit: timeHabit, time: null };
+    expect(swipeActionsForRow(row, { timeProgress: 0 })).toEqual(['skip']);
+  });
+
+  it('returns [skip] for a scheduled time-based row without opts', () => {
+    const timeHabit = { ...habit, unit: 'time' as const };
+    const row: AgendaRow = { kind: 'scheduled', habitId: 'h1', habit: timeHabit, time: null };
+    expect(swipeActionsForRow(row)).toEqual(['skip']);
+  });
 });
 
 // ─── isDayFuture ──────────────────────────────────────────────────────────

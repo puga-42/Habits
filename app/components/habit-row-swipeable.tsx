@@ -67,7 +67,7 @@ export function HabitRowSwipeable({
 }: Props) {
   const swipeRef = useRef<SwipeableMethods>(null);
   const reducedMotion = useReducedMotion();
-  const actions = isFuture ? [] : swipeActionsForRow(row);
+  const actions = isFuture ? [] : swipeActionsForRow(row, { timeProgress });
 
   const handleAction = useCallback(
     (action: SwipeAction) => {

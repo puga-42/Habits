@@ -6,7 +6,7 @@ import { TRAILING_ICON_SIZE } from '@/constants/theme';
 
 export type TimerStatus = 'idle' | 'running' | 'complete';
 
-const RING_STROKE = 2.5;
+const RING_STROKE = 3;
 const RING_SIZE = TRAILING_ICON_SIZE + RING_STROKE * 2 + 8;
 const STOP_SIZE = TRAILING_ICON_SIZE * 0.45;
 
@@ -17,12 +17,6 @@ type Props = {
 };
 
 export function TimeTrailingIcon({ status, color, fraction = 0 }: Props) {
-  const showRing = status !== 'idle' || fraction > 0;
-
-  if (!showRing) {
-    return <ThemedText style={[styles.icon, { color }]}>▶</ThemedText>;
-  }
-
   if (status === 'complete') {
     return <ThemedText style={[styles.iconBold, { color }]}>✓</ThemedText>;
   }

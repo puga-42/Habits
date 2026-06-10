@@ -94,6 +94,26 @@ export async function stopTimeEntry(entryId: string, startedAt: string): Promise
   return duration;
 }
 
+export async function deleteTimeEntries(
+  habitId: string,
+  occurrenceDate: string | null,
+  periodStart: string | null,
+): Promise<void> {
+  let query = supabase
+    .from('time_entries')
+    .delete()
+    .eq('habit_id', habitId);
+
+  if (occurrenceDate) {
+    query = query.eq('occurrence_date', occurrenceDate);
+  } else if (periodStart) {
+    query = query.eq('period_start', periodStart);
+  }
+
+  const { error } = await query;
+  if (error) throw error;
+}
+
 // ─── Auto-complete ────────────────────────────────────────────────────────────
 
 export function dateParamsForHabit(habit: Habit): {

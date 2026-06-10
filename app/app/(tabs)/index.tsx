@@ -58,6 +58,7 @@ import { fetchProfile, type Profile } from '@/lib/profile';
 import {
   checkAndAutoComplete,
   dateParamsForHabitOn,
+  deleteTimeEntries,
   fetchTimeEntries,
   sumDurationSeconds,
   startTimeEntry,
@@ -406,7 +407,21 @@ export default function CalendarScreen() {
   ) {
     if (!userId) return;
     if (action === 'reset') {
-      if (row.kind === 'completion') {
+      if (row.kind === 'scheduled' && row.habit.unit === 'time') {
+        const habit = habits.find((h) => h.id === row.habitId);
+        if (!habit) return;
+        if (activeTimerHabitId === habit.id && activeTimerRef.current) {
+          const { occurrenceDate, periodStart } = dateParamsForHabitOn(habit, dateIso);
+          const key = `timer:${habit.id}:${occurrenceDate ?? periodStart}`;
+          await stopTimeEntry(activeTimerRef.current.entryId, activeTimerRef.current.startedAt);
+          await AsyncStorage.removeItem(key);
+          activeTimerRef.current = null;
+          setActiveTimerHabitId(null);
+          setActiveTimerDateIso(null);
+        }
+        const { occurrenceDate, periodStart } = dateParamsForHabitOn(habit, dateIso);
+        await deleteTimeEntries(habit.id, occurrenceDate, periodStart);
+      } else if (row.kind === 'completion') {
         await unmarkCompleted(row.id);
       } else if (row.kind === 'skip') {
         await unskipOccurrence(row.habitId, dateIso);

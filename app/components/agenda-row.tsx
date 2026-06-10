@@ -17,6 +17,8 @@ import * as Haptics from 'expo-haptics';
 import { useEffect, useRef } from 'react';
 import { Pressable, StyleSheet, useColorScheme, View } from 'react-native';
 import Animated, {
+  FadeIn,
+  FadeOut,
   useAnimatedStyle,
   useSharedValue,
   withSequence,
@@ -28,6 +30,7 @@ import { TimeTrailingIcon, type TimerStatus } from '@/components/time-trailing-i
 import { solidTint } from '@/constants/colors';
 import { TRAILING_ICON_SIZE } from '@/constants/theme';
 import type { FlexPeriod } from '@/lib/habits';
+import { useContentTransition } from '@/lib/use-content-transition';
 import type { AgendaRow as AgendaRowT } from '@/lib/history';
 
 const LONG_PRESS_MS = 300;
@@ -88,6 +91,10 @@ export function AgendaRow({
       }
     : undefined;
 
+  const titleStyleKey = isCompletion ? 'done' : isSkip ? 'skip' : 'active';
+  const titleTransition = useContentTransition(titleStyleKey);
+  const trailingKey = hideTrailing ? 'hidden' : row.kind;
+
   return (
     <Pressable
       onPress={onPress}
@@ -116,16 +123,18 @@ export function AgendaRow({
       </View>
 
       <View style={styles.body}>
-        <ThemedText
-          style={[
-            styles.title,
-            isTight && styles.titleTight,
-            isCompletion && !isFlexCompletion && styles.titleCompleted,
-            isSkip && styles.titleSkipped,
-          ]}
-          numberOfLines={1}>
-          {row.habit.title}
-        </ThemedText>
+        <Animated.View style={titleTransition}>
+          <ThemedText
+            style={[
+              styles.title,
+              isTight && styles.titleTight,
+              isCompletion && !isFlexCompletion && styles.titleCompleted,
+              isSkip && styles.titleSkipped,
+            ]}
+            numberOfLines={1}>
+            {row.habit.title}
+          </ThemedText>
+        </Animated.View>
         {!compact && flexSubtitle ? (
           <ThemedText style={styles.description} numberOfLines={1}>
             {flexSubtitle}
@@ -139,28 +148,36 @@ export function AgendaRow({
         ) : null}
       </View>
 
-      {!isTight && !hideTrailing && (
-        <Pressable
-          onPress={handleTrailingPress}
-          hitSlop={{ top: 11, bottom: 11, left: 11, right: 11 }}
-          accessibilityRole="button"
-          accessibilityLabel={trailingA11yLabel(row)}
-          accessibilityHint={trailingActionable ? trailingA11yHint(row) : undefined}
-          style={({ pressed }) => [
-            styles.trailing,
-            pressed && trailingActionable && styles.trailingPressed,
-            !trailingActionable && styles.trailingInert,
-          ]}>
-          {isTimeHabit && timerStatus ? (
-            <TimeTrailingIcon status={timerStatus} color={habitColor} fraction={timeProgress} />
-          ) : isFlex ? (
-            <FlexRing count={row.count} target={row.target} color={habitColor} />
-          ) : isFlexCompletion && flexProgress ? (
-            <FlexRing count={flexProgress.count} target={flexProgress.target} color={habitColor} />
-          ) : (
-            <Marker kind={row.kind} color={habitColor} />
+      {!isTight && (
+        <Animated.View
+          key={trailingKey}
+          entering={FadeIn.duration(200)}
+          exiting={FadeOut.duration(400)}
+        >
+          {!hideTrailing && (
+            <Pressable
+              onPress={handleTrailingPress}
+              hitSlop={{ top: 11, bottom: 11, left: 11, right: 11 }}
+              accessibilityRole="button"
+              accessibilityLabel={trailingA11yLabel(row)}
+              accessibilityHint={trailingActionable ? trailingA11yHint(row) : undefined}
+              style={({ pressed }) => [
+                styles.trailing,
+                pressed && trailingActionable && styles.trailingPressed,
+                !trailingActionable && styles.trailingInert,
+              ]}>
+              {isTimeHabit && timerStatus ? (
+                <TimeTrailingIcon status={timerStatus} color={habitColor} fraction={timeProgress} />
+              ) : isFlex ? (
+                <FlexRing count={row.count} target={row.target} color={habitColor} />
+              ) : isFlexCompletion && flexProgress ? (
+                <FlexRing count={flexProgress.count} target={flexProgress.target} color={habitColor} />
+              ) : (
+                <Marker kind={row.kind} color={habitColor} />
+              )}
+            </Pressable>
           )}
-        </Pressable>
+        </Animated.View>
       )}
     </Pressable>
   );
