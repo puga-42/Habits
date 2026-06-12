@@ -15,6 +15,9 @@ import {
   CompletionInlineEditor,
   DisabledEditorPlaceholder,
 } from '@/components/completion-inline-editor';
+import { FeedAvatar } from '@/components/feed-avatar';
+import { HabitCompletionChart } from '@/components/habit-completion-chart';
+import { OverviewSocial } from '@/components/overview-social';
 import { StopwatchPanel } from '@/components/stopwatch-panel';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -28,17 +31,21 @@ import { useHabitOverview } from '@/lib/use-habit-overview';
 export default function HabitViewScreen() {
   const router = useRouter();
   const { session } = useAuth();
-  const { id, occurrenceDate } = useLocalSearchParams<{
+  const { id, occurrenceDate, completionId, activityId } = useLocalSearchParams<{
     id: string;
     occurrenceDate?: string;
+    completionId?: string;
+    activityId?: string;
   }>();
 
   const navigation = useNavigation();
   const { seedFromHabit, update } = useHabitForm();
-  const state = useHabitOverview(id, session?.user.id, occurrenceDate);
+  const state = useHabitOverview(id, session?.user.id, occurrenceDate, completionId, activityId);
   const { habit, completions, signedUrls, loading, busy } = state;
   const { expandedId, setExpandedId, isOwner, canComplete } = state;
   const { activeIndex, setActiveIndex, effectiveNote, flushPendingChanges } = state;
+  const { ownerProfile, socialTarget, activeSocial } = state;
+  const { handleToggleLike, handleCommentCountChange } = state;
 
   const handleClose = useCallback(async () => {
     await flushPendingChanges();
@@ -103,38 +110,52 @@ export default function HabitViewScreen() {
           contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
         >
-          <View style={styles.heroRow}>
-            {habit.icon && <ThemedText type="icon" style={styles.heroIcon}>{habit.icon}</ThemedText>}
-            <View style={styles.heroText}>
-              <ThemedText type="title" style={styles.title}>{habit.title}</ThemedText>
-              {habit.description ? (
-                <ThemedText style={styles.description}>{habit.description}</ThemedText>
-              ) : null}
-            </View>
+          <Pressable
+            style={styles.ownerRow}
+            onPress={() => router.push(`/user/${habit.owner_id}`)}
+            hitSlop={6}
+          >
+            <FeedAvatar
+              url={ownerProfile?.avatar_url ?? null}
+              handle={ownerProfile?.handle ?? ''}
+              size={40}
+              tintColor={habit.color ?? undefined}
+            />
+            <ThemedText style={styles.ownerHandle} numberOfLines={1}>
+              @{ownerProfile?.handle ?? '…'}
+            </ThemedText>
+          </Pressable>
+
+          <View style={styles.titleBlock}>
+            <ThemedText type="title" style={styles.title}>{habit.title}</ThemedText>
+            {habit.description ? (
+              <ThemedText style={styles.description}>{habit.description}</ThemedText>
+            ) : null}
           </View>
 
-          {habit.unit === 'time' && session?.user.id ? (
-            <StopwatchPanel
-              habit={habit}
-              userId={session.user.id}
-              occurrenceDate={habit.kind === 'scheduled' ? (occurrenceDate ?? isoDate(new Date())) : null}
-              periodStart={
-                habit.kind === 'flex' && habit.target_period
-                  ? currentPeriodStart(occurrenceDate ?? isoDate(new Date()), habit.target_period)
-                  : null
-              }
-              isAlreadyComplete={completions.length > 0}
-            />
-          ) : (
-            <CompletionCounter
-              habit={habit}
-              completionCount={completions.length}
-              onIncrement={state.handleIncrement}
-              onDecrement={state.handleDecrement}
-              disabled={!canComplete}
-              busy={busy}
-            />
-          )}
+          {isOwner &&
+            (habit.unit === 'time' && session?.user.id ? (
+              <StopwatchPanel
+                habit={habit}
+                userId={session.user.id}
+                occurrenceDate={habit.kind === 'scheduled' ? (occurrenceDate ?? isoDate(new Date())) : null}
+                periodStart={
+                  habit.kind === 'flex' && habit.target_period
+                    ? currentPeriodStart(occurrenceDate ?? isoDate(new Date()), habit.target_period)
+                    : null
+                }
+                isAlreadyComplete={completions.length > 0}
+              />
+            ) : (
+              <CompletionCounter
+                habit={habit}
+                completionCount={completions.length}
+                onIncrement={state.handleIncrement}
+                onDecrement={state.handleDecrement}
+                disabled={!canComplete}
+                busy={busy}
+              />
+            ))}
 
           {completions.length > 0 ? (
             habit.kind === 'flex' && completions.length > 1 ? (
@@ -150,7 +171,9 @@ export default function HabitViewScreen() {
                 onAttachmentDelete={state.handleAttachmentDelete}
                 onAttachmentReorder={state.handleAttachmentReorder}
               />
-            ) : (
+            ) : isOwner ||
+              completions[0].note ||
+              completions[0].attachments.length > 0 ? (
               <View style={styles.completionsSection}>
                 {completions.map((c) => (
                   <CompletionInlineEditor
@@ -169,11 +192,25 @@ export default function HabitViewScreen() {
                   />
                 ))}
               </View>
-            )
+            ) : null
           ) : (
             isOwner && <DisabledEditorPlaceholder />
           )}
 
+          {socialTarget ? (
+            <OverviewSocial
+              targetKind={socialTarget.kind}
+              targetId={socialTarget.id}
+              targetOwnerId={socialTarget.ownerId}
+              social={activeSocial}
+              onToggleLike={handleToggleLike}
+              onCommentCountChange={handleCommentCountChange}
+            />
+          ) : null}
+
+          {session?.user.id ? (
+            <HabitCompletionChart habit={habit} viewerId={session.user.id} />
+          ) : null}
         </ScrollView>
       </SafeAreaView>
     </ThemedView>
@@ -198,9 +235,14 @@ const styles = StyleSheet.create({
   editButton: { fontWeight: '600', color: Palette.primary },
   adoptButton: { fontWeight: '600', color: Palette.primary },
   scroll: { padding: 20, paddingBottom: 40 },
-  heroRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-  heroIcon: { fontSize: 40, marginRight: 14 },
-  heroText: { flex: 1 },
+  ownerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 14,
+  },
+  ownerHandle: { fontSize: 15, fontWeight: '600' },
+  titleBlock: { alignItems: 'flex-start', marginBottom: 12 },
   title: { fontSize: 24 },
   description: { fontSize: 15, marginTop: 4, opacity: 0.7 },
   completionsSection: {

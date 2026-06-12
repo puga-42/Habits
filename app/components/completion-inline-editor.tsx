@@ -37,6 +37,12 @@ export function CompletionInlineEditor({
     );
   }
 
+  const hasMedia = completion.attachments.length > 0;
+  // Nothing to show for a viewer when the completion has no note or media.
+  if (!editable && !completion.note && !hasMedia) {
+    return null;
+  }
+
   return (
     <View style={styles.expanded}>
       <CompletionNoteEditor
@@ -45,17 +51,18 @@ export function CompletionInlineEditor({
         onSave={(note) => onNoteSave(completion.id, note)}
       />
 
-      <View style={styles.attachmentSection}>
-        <ThemedText style={styles.sectionLabel}>Attachments</ThemedText>
-        <AttachmentGrid
-          attachments={completion.attachments}
-          signedUrls={signedUrls}
-          editable={editable}
-          onReorder={(ids) => onAttachmentReorder(completion.id, ids)}
-          onDelete={(id) => onAttachmentDelete(completion.id, id)}
-          onAdd={() => onAttachmentAdd(completion.id)}
-        />
-      </View>
+      {(editable || hasMedia) && (
+        <View style={styles.attachmentSection}>
+          <AttachmentGrid
+            attachments={completion.attachments}
+            signedUrls={signedUrls}
+            editable={editable}
+            onReorder={(ids) => onAttachmentReorder(completion.id, ids)}
+            onDelete={(id) => onAttachmentDelete(completion.id, id)}
+            onAdd={() => onAttachmentAdd(completion.id)}
+          />
+        </View>
+      )}
 
       {editable && (
         <View style={styles.actionRow}>
@@ -121,10 +128,7 @@ export function DisabledEditorPlaceholder() {
           Complete this habit to add a note
         </ThemedText>
       </View>
-      <ThemedText style={[styles.placeholderLabel, { marginTop: 16 }]}>
-        Attachments
-      </ThemedText>
-      <View style={styles.placeholderInput}>
+      <View style={[styles.placeholderInput, { marginTop: 16 }]}>
         <ThemedText style={styles.placeholderText}>
           Complete this habit to add photos or videos
         </ThemedText>
@@ -136,12 +140,6 @@ export function DisabledEditorPlaceholder() {
 const styles = StyleSheet.create({
   expanded: { gap: 4 },
   attachmentSection: { paddingHorizontal: 14, marginTop: 12 },
-  sectionLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    opacity: 0.6,
-    marginBottom: 10,
-  },
   actionRow: {
     flexDirection: 'row',
     gap: 12,

@@ -84,6 +84,7 @@ const styles = StyleSheet.create({
   countRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    alignSelf: 'flex-start',
     paddingVertical: 2,
   },
   countLine: { fontSize: 14, fontWeight: '600' },

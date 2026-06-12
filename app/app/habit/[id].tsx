@@ -1,4 +1,5 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
+import { StackActions } from '@react-navigation/native';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -31,6 +32,7 @@ type EditScope = 'this' | 'future' | 'all';
 
 export default function EditHabitScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
   const { session } = useAuth();
   const { id, occurrenceDate } = useLocalSearchParams<{
     id: string;
@@ -131,7 +133,7 @@ export default function EditHabitScreen() {
       else await deleteHabitFuture(habit);
       if (session?.user.id) syncWidgetData(session.user.id);
       reset();
-      router.back();
+      navigation.getParent()?.dispatch(StackActions.pop());
     } catch (err) {
       Alert.alert('Could not delete', err instanceof Error ? err.message : String(err));
     } finally {

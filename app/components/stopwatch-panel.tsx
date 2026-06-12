@@ -39,20 +39,38 @@ export function StopwatchPanel({
   const displayUnit = habit.display_unit ?? 'minutes';
   const color = habit.color ?? Palette.primary;
   const ringSize = Math.round(containerWidth * 0.3);
+  const stopSize = Math.round(ringSize * 0.2);
+  const playSize = Math.round(ringSize * 0.32);
+  const isComplete = sw.status === 'complete';
+
+  const handleRingPress = () => {
+    if (sw.status === 'idle') sw.start();
+    else if (sw.status === 'running') sw.stop();
+  };
 
   return (
     <View style={styles.container} onLayout={handleLayout}>
       {containerWidth > 0 && (
-        <ProgressRing
-          size={ringSize}
-          strokeWidth={6}
-          fraction={sw.progressFraction}
-          color={color}
-          trackColor="rgba(127,127,127,0.2)">
-          {sw.progressFraction >= 1 && (
-            <ThemedText style={[styles.ringCheck, { color }]}>✓</ThemedText>
-          )}
-        </ProgressRing>
+        <Pressable
+          onPress={handleRingPress}
+          disabled={isComplete}
+          style={({ pressed }) => pressed && !isComplete && styles.pressed}
+        >
+          <ProgressRing
+            size={ringSize}
+            strokeWidth={8}
+            fraction={sw.progressFraction}
+            color={color}
+            trackColor="rgba(127,127,127,0.2)">
+            {isComplete ? (
+              <ThemedText style={[styles.ringCheck, { color, fontSize: Math.round(ringSize * 0.3) }]}>✓</ThemedText>
+            ) : sw.status === 'running' ? (
+              <View style={[styles.stopIcon, { width: stopSize, height: stopSize, backgroundColor: color }]} />
+            ) : (
+              <ThemedText style={[styles.playIcon, { color, fontSize: playSize, lineHeight: playSize }]}>▶</ThemedText>
+            )}
+          </ProgressRing>
+        </Pressable>
       )}
 
       <ThemedText style={styles.elapsed}>
@@ -63,24 +81,6 @@ export function StopwatchPanel({
         {sw.totalSeconds > 0 ? `${formatElapsed(sw.totalSeconds, displayUnit)} / ` : ''}
         {formatTarget(sw.targetSeconds, displayUnit)}
       </ThemedText>
-
-      {sw.status === 'complete' ? (
-        <View style={[styles.button, styles.buttonComplete, { borderColor: color }]}>
-          <ThemedText style={[styles.buttonText, { color }]}>Completed</ThemedText>
-        </View>
-      ) : sw.status === 'running' ? (
-        <Pressable
-          onPress={sw.stop}
-          style={[styles.button, { backgroundColor: color }]}>
-          <ThemedText style={styles.buttonTextLight}>Stop</ThemedText>
-        </Pressable>
-      ) : (
-        <Pressable
-          onPress={sw.start}
-          style={[styles.button, { backgroundColor: color }]}>
-          <ThemedText style={styles.buttonTextLight}>Start</ThemedText>
-        </Pressable>
-      )}
     </View>
   );
 }
@@ -92,7 +92,9 @@ const styles = StyleSheet.create({
     gap: 16,
     overflow: 'visible',
   },
-  ringCheck: { fontSize: 28, lineHeight: 34, fontWeight: '700' },
+  ringCheck: { lineHeight: 34, fontWeight: '700', marginTop: 2 },
+  playIcon: { marginLeft: 5, marginTop: 4, includeFontPadding: false },
+  stopIcon: { borderRadius: 2 },
   elapsed: {
     fontSize: 32,
     lineHeight: 38,
@@ -104,24 +106,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     opacity: 0.6,
   },
-  button: {
-    marginTop: 8,
-    paddingVertical: 14,
-    paddingHorizontal: 40,
-    borderRadius: 28,
-    alignItems: 'center',
-  },
-  buttonComplete: {
-    backgroundColor: 'transparent',
-    borderWidth: 2,
-  },
-  buttonText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  buttonTextLight: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#fff',
-  },
+  pressed: { opacity: 0.6 },
 });

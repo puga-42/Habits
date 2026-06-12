@@ -3,12 +3,12 @@
 // optional note excerpt, action bar.
 
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
 import { FeedActionBar } from '@/components/feed-action-bar';
 import { FeedAttachmentCarousel } from '@/components/feed-attachment-carousel';
 import { FeedAvatar } from '@/components/feed-avatar';
+import { FeedCardStats } from '@/components/feed-card-stats';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import type { FeedItem } from '@/lib/feed';
@@ -40,7 +40,6 @@ export function FeedCard({
   onMute,
 }: Props) {
   const router = useRouter();
-  const [noteExpanded, setNoteExpanded] = useState(false);
   const isSelf = item.owner_id === viewerId;
   const goToUser = () => router.push(`/user/${item.owner_id}`);
 
@@ -58,7 +57,7 @@ export function FeedCard({
   const fallbackColor = item.habit_color ?? 'rgba(127,127,127,0.45)';
 
   return (
-    <View style={styles.card}>
+    <Pressable style={styles.card} onPress={onHabitPress}>
       <View style={styles.header}>
         <FeedAvatar
           url={item.owner_avatar_url}
@@ -87,18 +86,28 @@ export function FeedCard({
         </Pressable>
       </View>
 
-      <Pressable style={styles.habitLine} onPress={onHabitPress}>
-        <ThemedText style={styles.habitVerb}>completed </ThemedText>
-        <ThemedText style={styles.habitTitle}>{item.habit_title}</ThemedText>
-        {item.habit_icon ? (
-          <ThemedText style={styles.habitIcon}> {item.habit_icon}</ThemedText>
-        ) : null}
-        {item.flex_position != null && item.flex_target != null && (
-          <ThemedText style={styles.flexProgress}>
-            {' '}{item.flex_position}/{item.flex_target}
-          </ThemedText>
-        )}
-      </Pressable>
+      <View style={styles.body}>
+        <View style={styles.bodyMain}>
+          <View style={styles.habitLine}>
+            <ThemedText style={styles.habitVerb}>completed </ThemedText>
+            <ThemedText style={styles.habitTitle}>{item.habit_title}</ThemedText>
+            {item.habit_icon ? (
+              <ThemedText style={styles.habitIcon}> {item.habit_icon}</ThemedText>
+            ) : null}
+            {item.flex_position != null && item.flex_target != null && (
+              <ThemedText style={styles.flexProgress}>
+                {' '}{item.flex_position}/{item.flex_target}
+              </ThemedText>
+            )}
+          </View>
+          {item.habit_description ? (
+            <ThemedText style={styles.description} numberOfLines={5}>
+              {item.habit_description}
+            </ThemedText>
+          ) : null}
+        </View>
+        <FeedCardStats item={item} now={now} />
+      </View>
 
       {item.attachments.length > 0 ? (
         <View style={styles.attachmentWrap}>
@@ -107,11 +116,11 @@ export function FeedCard({
       ) : null}
 
       {item.note ? (
-        <Pressable onPress={() => setNoteExpanded((v) => !v)} style={styles.noteWrap}>
-          <ThemedText style={styles.note} numberOfLines={noteExpanded ? undefined : 2}>
+        <View style={styles.noteWrap}>
+          <ThemedText style={styles.note} numberOfLines={2}>
             {item.note}
           </ThemedText>
-        </Pressable>
+        </View>
       ) : null}
 
       <View style={styles.actionWrap}>
@@ -125,7 +134,7 @@ export function FeedCard({
           onOpenComments={onOpenComments}
         />
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -141,18 +150,27 @@ const styles = StyleSheet.create({
   handle: { fontSize: 15, fontWeight: '600' },
   meta: { fontSize: 12, opacity: 0.55, marginTop: 1 },
   menuButton: { padding: 4 },
-  habitLine: {
+  // Two columns above the media: text on the left, stats under the ••• menu on
+  // the right, top-aligned so the stats sit level with the title.
+  body: {
     flexDirection: 'row',
-    alignItems: 'baseline',
+    alignItems: 'flex-start',
     paddingHorizontal: 14,
     marginTop: 6,
     marginBottom: 10,
+    gap: 8,
+  },
+  bodyMain: { flex: 1 },
+  habitLine: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
     flexWrap: 'wrap',
   },
   habitVerb: { fontSize: 14, opacity: 0.7 },
   habitTitle: { fontSize: 15, fontWeight: '600' },
   habitIcon: { fontSize: 16 },
   flexProgress: { fontSize: 13, opacity: 0.5, fontWeight: '500' },
+  description: { fontSize: 14, lineHeight: 19, opacity: 0.7, marginTop: 4 },
   attachmentWrap: { marginBottom: 4 },
   actionWrap: { paddingHorizontal: 14, marginTop: 6 },
   noteWrap: { paddingHorizontal: 14, marginTop: 4 },

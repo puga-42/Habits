@@ -35,6 +35,15 @@ function makeItem(overrides: Partial<FeedItem> = {}): FeedItem {
     flex_target: null,
     event_type: null,
     adopted_from_handle: null,
+    habit_description: null,
+    habit_lineage_id: 'h1',
+    completion_count: 0,
+    habit_rrule: null,
+    habit_dtstart: null,
+    habit_until: null,
+    habit_target_period: null,
+    completion_history: [],
+    skip_history: [],
     ...overrides,
   };
 }
@@ -65,6 +74,15 @@ function makeActivityItem(overrides: Partial<FeedItem> = {}): FeedItem {
     flex_target: null,
     event_type: 'created',
     adopted_from_handle: null,
+    habit_description: null,
+    habit_lineage_id: 'h2',
+    completion_count: 0,
+    habit_rrule: null,
+    habit_dtstart: null,
+    habit_until: null,
+    habit_target_period: null,
+    completion_history: [],
+    skip_history: [],
     ...overrides,
   };
 }

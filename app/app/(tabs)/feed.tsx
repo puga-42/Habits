@@ -230,7 +230,7 @@ export default function FeedScreen() {
                   onHabitPress={() =>
                     router.push({
                       pathname: '/habit/view',
-                      params: { id: item.habit_id },
+                      params: { id: item.habit_id, activityId: item.id },
                     })
                   }
                   onReport={() =>
@@ -269,6 +269,7 @@ export default function FeedScreen() {
                       pathname: '/habit/view',
                       params: {
                         id: item.habit_id,
+                        completionId: item.id,
                         ...(item.occurrence_date
                           ? { occurrenceDate: item.occurrence_date }
                           : item.period_start

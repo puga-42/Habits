@@ -159,19 +159,31 @@ object — no soft-delete, no version history.
 
 ## Stats and history (resolved)
 
-The app intentionally has **no streaks and no completion-rate stats**. Each habit
-occurrence is either completed or not; that's the only state. The primary
-backward-looking surface is a **history view** — a calendar/agenda showing which
-habits the user completed on which days over weeks and months.
+The app surfaces **raw counts and a streak**, but still **no completion-rate
+percentages** and **no freeze tokens / point systems**. Each habit occurrence is
+either completed or not; that's the only state. The primary backward-looking
+surface is a **history view** — a calendar/agenda showing which habits the user
+completed on which days over weeks and months.
 
-For flex habits, a period (week/day/month) is "hit" or "missed" based on whether
-the target was reached, but periods are not chained into streaks. The history view
-renders each individual completion as a discrete event, with period markers showing
-whether the target was met.
+**Streaks (revised 2026-06-12).** Earlier this app deliberately had no streaks.
+Product reversed that: feed cards now show a habit's **current streak**
+("completions without missing"), computed **cadence-aware per kind**:
 
-Do not propose streak counters, "X day streak," freeze tokens, "X% completion,"
-or similar gamification anywhere in UI or copy. Feed entries celebrate the act
-("completed Meditate"), not a streak number.
+- **Flex habit** — consecutive `target_period` buckets (day/week/month) that
+  reached `target_count`, counting back from the current period. The
+  in-progress period never breaks the streak.
+- **Scheduled habit** — consecutive completed occurrences (RRULE-expanded,
+  respecting `until`), counting back from the most recent past occurrence. A
+  `skip` override is neutral; today's not-yet-done occurrence is neutral; any
+  other missed occurrence breaks the streak.
+
+Streak is computed in a **pure client function** (`lib/streak.ts`) because RRULE
+expansion is client-only (see § Recurrence); the feed RPC returns the per-habit
+completion history it needs. Feed cards also show the habit's **total
+completion count** (lineage-wide, all-time) and its **description**.
+
+Still off the table: completion-rate **percentages**, "X% complete," freeze
+tokens, and point/level systems. Raw counts and the streak number are fine.
 
 ## Notifications (resolved)
 

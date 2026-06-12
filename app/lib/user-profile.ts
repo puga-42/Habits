@@ -192,5 +192,20 @@ function mapFeedRows(rows: unknown[]): FeedItem[] {
     flex_target: (r.flex_target as number) ?? null,
     event_type: (r.event_type as FeedItem['event_type']) ?? null,
     adopted_from_handle: (r.adopted_from_handle as string) ?? null,
+    // Habit context + streak inputs. `get_user_feed_page` does not yet return
+    // these, so they fall back to safe defaults (streak/count read as 0 here)
+    // until that RPC is extended — see PLAN.md follow-up.
+    habit_description: (r.habit_description ?? r.description ?? null) as string | null,
+    habit_lineage_id: (r.habit_lineage_id ?? r.lineage_id ?? r.habit_id) as string,
+    completion_count: (r.completion_count as number) ?? 0,
+    habit_rrule: (r.habit_rrule ?? r.rrule ?? null) as string | null,
+    habit_dtstart: (r.habit_dtstart ?? r.dtstart ?? null) as string | null,
+    habit_until: (r.habit_until ?? r.until ?? null) as string | null,
+    habit_target_period:
+      (r.habit_target_period ?? r.target_period ?? null) as FeedItem['habit_target_period'],
+    completion_history: Array.isArray(r.completion_history)
+      ? (r.completion_history as string[])
+      : [],
+    skip_history: Array.isArray(r.skip_history) ? (r.skip_history as string[]) : [],
   }));
 }

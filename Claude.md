@@ -7,7 +7,7 @@
 
 ## Code Standards
 - Max 200 lines per file. Split if larger.
-- No streaks, completion rates, or gamification (see CONTEXT.md § Stats and history).
+- Streaks and raw completion counts are allowed (see CONTEXT.md § Stats and history). Still NO completion-rate percentages, freeze tokens, or point/level systems.
 - No new npm dependencies without justification in PLAN.md.
 - Follow existing patterns: check similar files before writing new ones.
 - Colocate tests in `lib/__tests__/` matching the source filename.
@@ -34,4 +34,4 @@
 - Do not delete or rename existing public API functions.
 - Maximum 10 files changed per PR. Implement the smallest viable slice.
 - PR description must reference the GitHub issue number.
-- No UI copy that mentions streaks, percentages, or "days in a row."
+- Streaks are allowed in UI copy. Still no completion-rate percentages.

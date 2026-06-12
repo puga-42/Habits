@@ -6,7 +6,7 @@
 // See /FEED_PLAN.md for the architectural rationale.
 
 import { supabase } from './supabase';
-import type { HabitKind, Visibility } from './habits';
+import type { FlexPeriod, HabitKind, Visibility } from './habits';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -49,6 +49,18 @@ export type FeedItem = {
   flex_target: number | null;
   event_type: 'created' | 'adopted' | null;
   adopted_from_handle: string | null;
+  // Habit context (for the card body + streak). All lineage-scoped.
+  habit_description: string | null;
+  habit_lineage_id: string;
+  completion_count: number;
+  // Streak inputs — see lib/streak.ts. completion_history / skip_history are
+  // the most recent ~100 dates (YYYY-MM-DD), newest first.
+  habit_rrule: string | null;
+  habit_dtstart: string | null;
+  habit_until: string | null;
+  habit_target_period: FlexPeriod | null;
+  completion_history: string[];
+  skip_history: string[];
 };
 
 export type Comment = {
@@ -69,6 +81,15 @@ export type Liker = {
   handle: string;
   avatar_url: string | null;
   liked_at: string;
+};
+
+// Social counts (likes/comments) for a single feed target — a completion or a
+// "started habit" activity. The feed gets these from `fetch_feed_page`; screens
+// keyed by habit (e.g. the habit overview) fetch them on demand.
+export type SocialCounts = {
+  like_count: number;
+  comment_count: number;
+  viewer_liked: boolean;
 };
 
 export type FeedCursor = { sort_key: string; id: string };
@@ -119,6 +140,70 @@ export async function fetchLikers(
   });
   if (error) throw error;
   return (data ?? []) as Liker[];
+}
+
+// Like/comment counts + viewer-liked for one completion. RLS scopes the rows
+// to what the viewer may read, so head counts and the viewer check are safe.
+export async function fetchCompletionSocial(
+  completionId: string,
+  viewerId: string,
+): Promise<SocialCounts> {
+  const [likes, comments, mine] = await Promise.all([
+    supabase
+      .from('completion_likes')
+      .select('*', { count: 'exact', head: true })
+      .eq('completion_id', completionId),
+    supabase
+      .from('completion_comments')
+      .select('*', { count: 'exact', head: true })
+      .eq('completion_id', completionId),
+    supabase
+      .from('completion_likes')
+      .select('user_id')
+      .eq('completion_id', completionId)
+      .eq('user_id', viewerId)
+      .maybeSingle(),
+  ]);
+  if (likes.error) throw likes.error;
+  if (comments.error) throw comments.error;
+  if (mine.error) throw mine.error;
+  return {
+    like_count: likes.count ?? 0,
+    comment_count: comments.count ?? 0,
+    viewer_liked: mine.data != null,
+  };
+}
+
+// Same as fetchCompletionSocial, for a "started habit" activity. RLS scopes the
+// rows via can_view_activity, so head counts and the viewer check are safe.
+export async function fetchActivitySocial(
+  activityId: string,
+  viewerId: string,
+): Promise<SocialCounts> {
+  const [likes, comments, mine] = await Promise.all([
+    supabase
+      .from('activity_likes')
+      .select('*', { count: 'exact', head: true })
+      .eq('activity_id', activityId),
+    supabase
+      .from('activity_comments')
+      .select('*', { count: 'exact', head: true })
+      .eq('activity_id', activityId),
+    supabase
+      .from('activity_likes')
+      .select('user_id')
+      .eq('activity_id', activityId)
+      .eq('user_id', viewerId)
+      .maybeSingle(),
+  ]);
+  if (likes.error) throw likes.error;
+  if (comments.error) throw comments.error;
+  if (mine.error) throw mine.error;
+  return {
+    like_count: likes.count ?? 0,
+    comment_count: comments.count ?? 0,
+    viewer_liked: mine.data != null,
+  };
 }
 
 // ─── Mutations ─────────────────────────────────────────────────────────────
@@ -567,6 +652,22 @@ export function applyLikeToggle(item: FeedItem, liked: boolean): FeedItem {
     like_count: liked
       ? item.like_count + 1
       : Math.max(0, item.like_count - 1),
+  };
+}
+
+// Optimistic like toggle for a target's social counts. Idempotent; never drives
+// like_count below zero; leaves comment_count untouched.
+export function toggleSocialLike(
+  social: SocialCounts,
+  liked: boolean,
+): SocialCounts {
+  if (social.viewer_liked === liked) return social;
+  return {
+    ...social,
+    viewer_liked: liked,
+    like_count: liked
+      ? social.like_count + 1
+      : Math.max(0, social.like_count - 1),
   };
 }
 

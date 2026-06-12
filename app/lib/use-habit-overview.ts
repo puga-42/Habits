@@ -7,8 +7,10 @@ import {
   reorderCompletionAttachments,
 } from '@/lib/attachment-actions';
 import { updateNote } from '@/lib/completions';
-import { signedUrlsForPaths } from '@/lib/feed';
+import { signedUrlsForPaths, type FeedKind, type SocialCounts } from '@/lib/feed';
 import { consumeNavHabit } from '@/lib/habit-nav-cache';
+import { fetchProfile } from '@/lib/profile';
+import { useSocialTarget, type SocialTarget } from '@/lib/use-social-target';
 import {
   currentPeriodStart,
   fetchHabitCompletions,
@@ -26,6 +28,12 @@ import {
 } from '@/lib/habits';
 import { syncWidgetData } from '@/lib/widget-sync';
 
+export type OwnerProfile = { handle: string; avatar_url: string | null };
+
+// The completion or activity whose likes/comments the overview's social bar
+// acts on. ownerId is the habit owner (= the comment sheet's target owner).
+export type OverviewSocialTarget = { kind: FeedKind; id: string; ownerId: string };
+
 export type HabitOverviewState = {
   habit: Habit | null;
   completions: OverviewCompletion[];
@@ -36,6 +44,11 @@ export type HabitOverviewState = {
   activeIndex: number;
   isOwner: boolean;
   canComplete: boolean;
+  ownerProfile: OwnerProfile | null;
+  socialTarget: OverviewSocialTarget | null;
+  activeSocial: SocialCounts;
+  handleToggleLike: () => void;
+  handleCommentCountChange: (delta: number) => void;
   setExpandedId: (id: string | null) => void;
   setActiveIndex: (index: number) => void;
   handleIncrement: () => void;
@@ -52,6 +65,8 @@ export function useHabitOverview(
   habitId: string | undefined,
   userId: string | undefined,
   dateParam: string | undefined,
+  completionId?: string,
+  activityId?: string,
 ): HabitOverviewState {
   const [cachedHabit] = useState(() => consumeNavHabit());
   const [habit, setHabit] = useState<Habit | null>(cachedHabit);
@@ -61,11 +76,29 @@ export function useHabitOverview(
   const [busy, setBusy] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [ownerProfile, setOwnerProfile] = useState<OwnerProfile | null>(null);
   const pendingNotes = useRef(new Map<string, string | null>());
 
   const dateIso = dateParam ?? isoDate(new Date());
   const isOwner = habit?.owner_id === userId;
   const canComplete = isOwner && canCompleteOn(dateIso, new Date());
+  const activeCompletion = completions[activeIndex] ?? completions[0] ?? null;
+  // Navigating from a "started habit" activity card targets that activity;
+  // otherwise the bar acts on the active completion.
+  const socialTargetRef: SocialTarget | null = activityId
+    ? { kind: 'habit_created', id: activityId }
+    : activeCompletion
+      ? { kind: 'completion', id: activeCompletion.id }
+      : null;
+  const {
+    social: activeSocial,
+    handleToggleLike,
+    handleCommentCountChange,
+  } = useSocialTarget(socialTargetRef, userId);
+  const socialTarget: OverviewSocialTarget | null =
+    socialTargetRef && habit
+      ? { ...socialTargetRef, ownerId: habit.owner_id }
+      : null;
 
   const loadCompletions = useCallback(
     async (h: Habit) => {
@@ -76,7 +109,9 @@ export function useHabitOverview(
           : null;
       const list = await fetchHabitCompletions(h.id, occDate, perStart);
       setCompletions(list);
-      setActiveIndex(0);
+      setActiveIndex(
+        completionId ? Math.max(0, list.findIndex((c) => c.id === completionId)) : 0,
+      );
       pendingNotes.current.clear();
       if (list.length > 0) setExpandedId(list[0].id);
       const paths = list.flatMap((c) => c.attachments.map((a) => a.storage_path));
@@ -89,7 +124,7 @@ export function useHabitOverview(
         });
       }
     },
-    [dateIso],
+    [dateIso, completionId],
   );
 
   useEffect(() => {
@@ -106,6 +141,23 @@ export function useHabitOverview(
       })
       .finally(() => setLoading(false));
   }, [habitId, cachedHabit, loadCompletions]);
+
+  // Owner identity for the avatar + handle block.
+  useEffect(() => {
+    const ownerId = habit?.owner_id;
+    if (!ownerId) return;
+    let cancelled = false;
+    fetchProfile(ownerId)
+      .then((p) => {
+        if (!cancelled) setOwnerProfile({ handle: p.handle, avatar_url: p.avatar_url });
+      })
+      .catch(() => {
+        /* non-fatal: the avatar block falls back to an initial bubble */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [habit?.owner_id]);
 
   const handleIncrement = useCallback(async () => {
     if (!habit || !userId || busy) return;
@@ -199,6 +251,11 @@ export function useHabitOverview(
     activeIndex,
     isOwner,
     canComplete,
+    ownerProfile,
+    socialTarget,
+    activeSocial,
+    handleToggleLike,
+    handleCommentCountChange,
     setExpandedId,
     setActiveIndex,
     handleIncrement,

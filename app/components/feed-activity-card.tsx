@@ -57,7 +57,7 @@ export function FeedActivityCard({
   const fallbackColor = item.habit_color ?? 'rgba(127,127,127,0.45)';
 
   return (
-    <View style={styles.card}>
+    <Pressable style={styles.card} onPress={onHabitPress}>
       <View style={styles.header}>
         <FeedAvatar
           url={item.owner_avatar_url}
@@ -88,7 +88,7 @@ export function FeedActivityCard({
         </Pressable>
       </View>
 
-      <Pressable style={styles.habitLine} onPress={onHabitPress}>
+      <View style={styles.habitLine}>
         <ThemedText style={styles.habitVerb}>
           {item.event_type === 'adopted' ? 'adopted ' : 'started '}
         </ThemedText>
@@ -101,7 +101,7 @@ export function FeedActivityCard({
             {' '}from @{item.adopted_from_handle}
           </ThemedText>
         ) : null}
-      </Pressable>
+      </View>
 
       <View style={styles.actionWrap}>
         <FeedActionBar
@@ -114,7 +114,7 @@ export function FeedActivityCard({
           onOpenComments={onOpenComments}
         />
       </View>
-    </View>
+    </Pressable>
   );
 }
 

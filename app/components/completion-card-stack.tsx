@@ -156,17 +156,18 @@ function CompletionCard({
         onSave={(note) => onNoteSave(completion.id, note)}
         inputBackgroundColor={lavenderBg}
       />
-      <View style={styles.attachmentSection}>
-        <ThemedText style={styles.sectionLabel}>Attachments</ThemedText>
-        <AttachmentGrid
-          attachments={completion.attachments}
-          signedUrls={signedUrls}
-          editable={editable}
-          onReorder={(ids) => onAttachmentReorder(completion.id, ids)}
-          onDelete={(id) => onAttachmentDelete(completion.id, id)}
-          onAdd={() => onAttachmentAdd(completion.id)}
-        />
-      </View>
+      {(editable || completion.attachments.length > 0) && (
+        <View style={styles.attachmentSection}>
+          <AttachmentGrid
+            attachments={completion.attachments}
+            signedUrls={signedUrls}
+            editable={editable}
+            onReorder={(ids) => onAttachmentReorder(completion.id, ids)}
+            onDelete={(id) => onAttachmentDelete(completion.id, id)}
+            onAdd={() => onAttachmentAdd(completion.id)}
+          />
+        </View>
+      )}
       {editable && (
         <View style={styles.actionRow}>
           <Pressable
@@ -217,12 +218,6 @@ const styles = StyleSheet.create({
   cardContent: { paddingVertical: 12, gap: 4 },
   cardTime: { fontSize: 13, opacity: 0.5, paddingHorizontal: 14 },
   attachmentSection: { paddingHorizontal: 14, marginTop: 8 },
-  sectionLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    opacity: 0.6,
-    marginBottom: 10,
-  },
   actionRow: {
     flexDirection: 'row',
     gap: 12,

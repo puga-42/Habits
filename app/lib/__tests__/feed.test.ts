@@ -5,7 +5,9 @@ import {
   formatRelativeTime,
   mergeFeedPages,
   parseLikerKind,
+  toggleSocialLike,
   type Comment,
+  type SocialCounts,
   type FeedItem,
 } from '../feed';
 
@@ -35,6 +37,15 @@ function makeItem(overrides: Partial<FeedItem> = {}): FeedItem {
     flex_target: null,
     event_type: null,
     adopted_from_handle: null,
+    habit_description: null,
+    habit_lineage_id: 'h1',
+    completion_count: 0,
+    habit_rrule: null,
+    habit_dtstart: null,
+    habit_until: null,
+    habit_target_period: null,
+    completion_history: [],
+    skip_history: [],
     ...overrides,
   };
 }
@@ -65,6 +76,15 @@ function makeActivityItem(overrides: Partial<FeedItem> = {}): FeedItem {
     flex_target: null,
     event_type: 'created',
     adopted_from_handle: null,
+    habit_description: null,
+    habit_lineage_id: 'h2',
+    completion_count: 0,
+    habit_rrule: null,
+    habit_dtstart: null,
+    habit_until: null,
+    habit_target_period: null,
+    completion_history: [],
+    skip_history: [],
     ...overrides,
   };
 }
@@ -80,6 +100,15 @@ function makeComment(overrides: Partial<Comment> = {}): Comment {
     created_at: '2026-05-14T08:00:00Z',
     updated_at: '2026-05-14T08:00:00Z',
     like_count: 0,
+    viewer_liked: false,
+    ...overrides,
+  };
+}
+
+function makeSocial(overrides: Partial<SocialCounts> = {}): SocialCounts {
+  return {
+    like_count: 0,
+    comment_count: 0,
     viewer_liked: false,
     ...overrides,
   };
@@ -193,6 +222,40 @@ describe('applyCommentLikeToggle', () => {
   it('is idempotent when already in the target state', () => {
     const liked = makeComment({ like_count: 1, viewer_liked: true });
     expect(applyCommentLikeToggle(liked, true)).toEqual(liked);
+  });
+});
+
+describe('toggleSocialLike', () => {
+  it('toggling on increments like_count and sets viewer_liked', () => {
+    const social = makeSocial({ like_count: 3, viewer_liked: false });
+    const result = toggleSocialLike(social, true);
+    expect(result.like_count).toBe(4);
+    expect(result.viewer_liked).toBe(true);
+  });
+
+  it('toggling off decrements like_count and clears viewer_liked', () => {
+    const social = makeSocial({ like_count: 3, viewer_liked: true });
+    const result = toggleSocialLike(social, false);
+    expect(result.like_count).toBe(2);
+    expect(result.viewer_liked).toBe(false);
+  });
+
+  it('is idempotent when already in the target state', () => {
+    const liked = makeSocial({ like_count: 1, viewer_liked: true });
+    expect(toggleSocialLike(liked, true)).toEqual(liked);
+    const unliked = makeSocial({ like_count: 0, viewer_liked: false });
+    expect(toggleSocialLike(unliked, false)).toEqual(unliked);
+  });
+
+  it('never drives like_count below zero', () => {
+    const social = makeSocial({ like_count: 0, viewer_liked: false });
+    const result = toggleSocialLike(social, false);
+    expect(result.like_count).toBe(0);
+  });
+
+  it('leaves comment_count untouched', () => {
+    const social = makeSocial({ comment_count: 5, viewer_liked: false });
+    expect(toggleSocialLike(social, true).comment_count).toBe(5);
   });
 });
 
