@@ -1,27 +1,26 @@
 // Feed tab — reverse-chronological stream of the viewer's own + friends'
 // visible completions. See /FEED_PLAN.md for the architectural details.
 
-import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useRef, useState } from 'react';
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
   RefreshControl,
   StyleSheet,
   View,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-import { Palette } from '@/constants/colors';
-import { useDrawer } from '@/components/drawer-provider';
-import { FeedActivityCard } from '@/components/feed-activity-card';
-import { FeedCard } from '@/components/feed-card';
-import { FeedCommentsSheet } from '@/components/feed-comments-sheet';
-import { FeedEmpty } from '@/components/feed-empty';
-import { FeedNewPill } from '@/components/feed-new-pill';
-import { TabTopBar } from '@/components/tab-top-bar';
-import { ThemedView } from '@/components/themed-view';
-import { useAuth } from '@/lib/auth';
+import { Palette } from "@/constants/colors";
+import { useDrawer } from "@/components/drawer-provider";
+import { FeedCommentsSheet } from "@/components/feed-comments-sheet";
+import { FeedEmpty } from "@/components/feed-empty";
+import { FeedNewPill } from "@/components/feed-new-pill";
+import { FeedRow } from "@/components/feed-row";
+import { TabTopBar } from "@/components/tab-top-bar";
+import { ThemedView } from "@/components/themed-view";
+import { useAuth } from "@/lib/auth";
 import {
   applyLikeToggle,
   blockUser,
@@ -37,7 +36,7 @@ import {
   unlikeCompletion,
   type FeedItem,
   type FeedKind,
-} from '@/lib/feed';
+} from "@/lib/feed";
 
 const PAGE_SIZE = 20;
 
@@ -79,18 +78,18 @@ export default function FeedScreen() {
       loadFirstPage();
       const unsub = subscribeToFeed({
         onCompletion: (event, id) => {
-          if (event === 'INSERT') {
+          if (event === "INSERT") {
             if (isAtTopRef.current) {
               loadFirstPage();
             } else {
               setPendingNew((n) => n + 1);
             }
-          } else if (event === 'DELETE') {
+          } else if (event === "DELETE") {
             setItems((prev) => prev.filter((i) => i.id !== id));
           }
         },
         onActivity: (event) => {
-          if (event === 'INSERT') {
+          if (event === "INSERT") {
             if (isAtTopRef.current) {
               loadFirstPage();
             } else {
@@ -102,7 +101,7 @@ export default function FeedScreen() {
           setItems((prev) =>
             prev.map((i) =>
               i.id === completionId
-                ? applyLikeToggle(i, event === 'INSERT' ? true : i.viewer_liked)
+                ? applyLikeToggle(i, event === "INSERT" ? true : i.viewer_liked)
                 : i,
             ),
           );
@@ -116,9 +115,9 @@ export default function FeedScreen() {
                 ? {
                     ...i,
                     comment_count:
-                      event === 'INSERT'
+                      event === "INSERT"
                         ? i.comment_count + 1
-                        : event === 'DELETE'
+                        : event === "DELETE"
                           ? Math.max(0, i.comment_count - 1)
                           : i.comment_count,
                   }
@@ -167,8 +166,10 @@ export default function FeedScreen() {
         prev.map((i) => (i.id === item.id ? applyLikeToggle(i, next) : i)),
       );
       try {
-        const like = item.feed_kind === 'completion' ? likeCompletion : likeActivity;
-        const unlike = item.feed_kind === 'completion' ? unlikeCompletion : unlikeActivity;
+        const like =
+          item.feed_kind === "completion" ? likeCompletion : likeActivity;
+        const unlike =
+          item.feed_kind === "completion" ? unlikeCompletion : unlikeActivity;
         if (next) await like(item.id, viewerId);
         else await unlike(item.id, viewerId);
       } catch {
@@ -180,6 +181,103 @@ export default function FeedScreen() {
     [viewerId],
   );
 
+  // Stable per-screen handlers. Each takes the item so the closures can live up
+  // here (referentially stable) instead of being rebuilt per row on every
+  // render — that's what lets the memoized FeedRow skip re-rendering.
+  const openComments = useCallback((item: FeedItem) => {
+    setActiveCommentTarget({
+      targetId: item.id,
+      targetKind:
+        item.feed_kind === "habit_created" ? "habit_created" : "completion",
+      ownerId: item.owner_id,
+    });
+  }, []);
+
+  const openEdit = useCallback(
+    (item: FeedItem) => router.push(`/completion/${item.id}`),
+    [router],
+  );
+
+  const openHabit = useCallback(
+    (item: FeedItem) => {
+      if (item.feed_kind === "habit_created") {
+        router.push({
+          pathname: "/habit/view",
+          params: { id: item.habit_id, activityId: item.id },
+        });
+        return;
+      }
+      router.push({
+        pathname: "/habit/view",
+        params: {
+          id: item.habit_id,
+          completionId: item.id,
+          ...(item.occurrence_date
+            ? { occurrenceDate: item.occurrence_date }
+            : item.period_start
+              ? { occurrenceDate: item.period_start }
+              : {}),
+        },
+      });
+    },
+    [router],
+  );
+
+  const report = useCallback(
+    (item: FeedItem) => {
+      if (!viewerId) return;
+      reportContent(viewerId, { kind: "completion", id: item.id });
+    },
+    [viewerId],
+  );
+
+  const block = useCallback(
+    (item: FeedItem) => {
+      if (!viewerId) return;
+      blockUser(viewerId, item.owner_id).then(loadFirstPage);
+    },
+    [viewerId, loadFirstPage],
+  );
+
+  const mute = useCallback(
+    (item: FeedItem) => {
+      if (!viewerId) return;
+      muteHabit(viewerId, item.habit_id).then(loadFirstPage);
+    },
+    [viewerId, loadFirstPage],
+  );
+
+  const renderItem = useCallback(
+    ({ item }: { item: FeedItem }) => {
+      if (!viewerId) return null;
+      return (
+        <FeedRow
+          item={item}
+          viewerId={viewerId}
+          now={now}
+          onToggleLike={handleToggleLike}
+          onOpenComments={openComments}
+          onEditCompletion={openEdit}
+          onHabitPress={openHabit}
+          onReport={report}
+          onBlock={block}
+          onMute={mute}
+        />
+      );
+    },
+    [
+      viewerId,
+      now,
+      handleToggleLike,
+      openComments,
+      openEdit,
+      openHabit,
+      report,
+      block,
+      mute,
+    ],
+  );
+
   const handleScrollToTop = useCallback(() => {
     listRef.current?.scrollToOffset({ offset: 0, animated: true });
     loadFirstPage();
@@ -188,7 +286,7 @@ export default function FeedScreen() {
   if (!viewerId) {
     return (
       <ThemedView style={styles.root}>
-        <SafeAreaView edges={['top']} style={styles.content}>
+        <SafeAreaView edges={["top"]} style={styles.content}>
           <TabTopBar title="Feed" onMenuPress={openDrawer} />
         </SafeAreaView>
       </ThemedView>
@@ -199,7 +297,7 @@ export default function FeedScreen() {
 
   return (
     <ThemedView style={styles.root}>
-      <SafeAreaView edges={['top']} style={styles.safe}>
+      <SafeAreaView edges={["top"]} style={styles.safe}>
         <TabTopBar title="Feed" onMenuPress={openDrawer} />
 
         {loading && items.length === 0 ? (
@@ -213,86 +311,7 @@ export default function FeedScreen() {
             ref={listRef}
             data={items}
             keyExtractor={(i) => i.id}
-            renderItem={({ item }) =>
-              item.feed_kind === 'habit_created' ? (
-                <FeedActivityCard
-                  item={item}
-                  viewerId={viewerId}
-                  now={now}
-                  onToggleLike={() => handleToggleLike(item)}
-                  onOpenComments={() =>
-                    setActiveCommentTarget({
-                      targetId: item.id,
-                      targetKind: 'habit_created',
-                      ownerId: item.owner_id,
-                    })
-                  }
-                  onHabitPress={() =>
-                    router.push({
-                      pathname: '/habit/view',
-                      params: { id: item.habit_id, activityId: item.id },
-                    })
-                  }
-                  onReport={() =>
-                    reportContent(viewerId, {
-                      kind: 'completion',
-                      id: item.id,
-                    })
-                  }
-                  onBlock={() =>
-                    blockUser(viewerId, item.owner_id).then(loadFirstPage)
-                  }
-                  onMute={() =>
-                    muteHabit(viewerId, item.habit_id).then(loadFirstPage)
-                  }
-                />
-              ) : (
-                <FeedCard
-                  item={item}
-                  viewerId={viewerId}
-                  now={now}
-                  onToggleLike={() => handleToggleLike(item)}
-                  onOpenComments={() =>
-                    setActiveCommentTarget({
-                      targetId: item.id,
-                      targetKind: 'completion',
-                      ownerId: item.owner_id,
-                    })
-                  }
-                  onEdit={
-                    item.owner_id === viewerId
-                      ? () => router.push(`/completion/${item.id}`)
-                      : undefined
-                  }
-                  onHabitPress={() =>
-                    router.push({
-                      pathname: '/habit/view',
-                      params: {
-                        id: item.habit_id,
-                        completionId: item.id,
-                        ...(item.occurrence_date
-                          ? { occurrenceDate: item.occurrence_date }
-                          : item.period_start
-                            ? { occurrenceDate: item.period_start }
-                            : {}),
-                      },
-                    })
-                  }
-                  onReport={() =>
-                    reportContent(viewerId, {
-                      kind: 'completion',
-                      id: item.id,
-                    })
-                  }
-                  onBlock={() =>
-                    blockUser(viewerId, item.owner_id).then(loadFirstPage)
-                  }
-                  onMute={() =>
-                    muteHabit(viewerId, item.habit_id).then(loadFirstPage)
-                  }
-                />
-              )
-            }
+            renderItem={renderItem}
             ItemSeparatorComponent={Separator}
             // Stories rail hook: an empty header today, slotted with a
             // <FeedStoriesRail /> in the follow-up plan.
@@ -321,7 +340,7 @@ export default function FeedScreen() {
         <FeedCommentsSheet
           visible={activeCommentTarget !== null}
           targetId={activeCommentTarget?.targetId ?? null}
-          targetKind={activeCommentTarget?.targetKind ?? 'completion'}
+          targetKind={activeCommentTarget?.targetKind ?? "completion"}
           targetOwnerId={activeCommentTarget?.ownerId ?? null}
           onClose={() => setActiveCommentTarget(null)}
           onCountChange={(delta) => {
@@ -351,11 +370,11 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   safe: { flex: 1 },
   content: { flex: 1, paddingHorizontal: 20, paddingTop: 16 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  center: { flex: 1, alignItems: "center", justifyContent: "center" },
   separator: {
     height: 2,
     backgroundColor: Palette.primary,
     marginHorizontal: 0,
   },
-  footer: { paddingVertical: 18, alignItems: 'center' },
+  footer: { paddingVertical: 18, alignItems: "center" },
 });

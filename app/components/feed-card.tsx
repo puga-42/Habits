@@ -3,6 +3,7 @@
 // optional note excerpt, action bar.
 
 import { useRouter } from 'expo-router';
+import { memo } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
 import { FeedActionBar } from '@/components/feed-action-bar';
@@ -27,7 +28,10 @@ type Props = {
   onMute: () => void;
 };
 
-export function FeedCard({
+// Memoized: the feed re-renders on every realtime like/comment tick, but a card
+// only needs to update when its own `item` (or a callback) actually changes.
+// The parent (feed-row.tsx) keeps these props referentially stable per item.
+export const FeedCard = memo(function FeedCard({
   item,
   viewerId,
   now,
@@ -106,7 +110,7 @@ export function FeedCard({
             </ThemedText>
           ) : null}
         </View>
-        <FeedCardStats item={item} now={now} />
+        <FeedCardStats streak={item.streak} />
       </View>
 
       {item.attachments.length > 0 ? (
@@ -136,7 +140,7 @@ export function FeedCard({
       </View>
     </Pressable>
   );
-}
+});
 
 const styles = StyleSheet.create({
   card: { paddingTop: 12, paddingBottom: 18 },

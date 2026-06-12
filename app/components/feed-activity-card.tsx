@@ -1,4 +1,5 @@
 import { useRouter } from 'expo-router';
+import { memo } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
 import { FeedActionBar } from '@/components/feed-action-bar';
@@ -20,7 +21,8 @@ type Props = {
   onMute: () => void;
 };
 
-export function FeedActivityCard({
+// Memoized for the same reason as FeedCard — see that component's note.
+export const FeedActivityCard = memo(function FeedActivityCard({
   item,
   viewerId,
   now,
@@ -116,7 +118,7 @@ export function FeedActivityCard({
       </View>
     </Pressable>
   );
-}
+});
 
 const styles = StyleSheet.create({
   card: { paddingTop: 12, paddingBottom: 18 },

@@ -1,22 +1,31 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Alert } from "react-native";
 
 import {
   pickAndUpload,
   removeAttachment,
   reorderCompletionAttachments,
-} from '@/lib/attachment-actions';
-import { updateNote } from '@/lib/completions';
-import { signedUrlsForPaths, type FeedKind, type SocialCounts } from '@/lib/feed';
-import { consumeNavHabit } from '@/lib/habit-nav-cache';
-import { fetchProfile } from '@/lib/profile';
-import { useSocialTarget, type SocialTarget } from '@/lib/use-social-target';
+} from "@/lib/attachment-actions";
+import { updateNote } from "@/lib/completions";
+import {
+  fetchHabitStats,
+  habitStreak,
+  type HabitStats,
+} from "@/lib/habit-stats";
+import {
+  signedUrlsForPaths,
+  type FeedKind,
+  type SocialCounts,
+} from "@/lib/feed";
+import { consumeNavHabit } from "@/lib/habit-nav-cache";
+import { fetchProfile } from "@/lib/profile";
+import { useSocialTarget, type SocialTarget } from "@/lib/use-social-target";
 import {
   currentPeriodStart,
   fetchHabitCompletions,
   resolveEffectiveNote,
   type OverviewCompletion,
-} from '@/lib/habit-overview';
+} from "@/lib/habit-overview";
 import {
   canCompleteOn,
   fetchHabit,
@@ -25,14 +34,18 @@ import {
   markScheduledCompleted,
   unmarkCompleted,
   type Habit,
-} from '@/lib/habits';
-import { syncWidgetData } from '@/lib/widget-sync';
+} from "@/lib/habits";
+import { syncWidgetData } from "@/lib/widget-sync";
 
 export type OwnerProfile = { handle: string; avatar_url: string | null };
 
 // The completion or activity whose likes/comments the overview's social bar
 // acts on. ownerId is the habit owner (= the comment sheet's target owner).
-export type OverviewSocialTarget = { kind: FeedKind; id: string; ownerId: string };
+export type OverviewSocialTarget = {
+  kind: FeedKind;
+  id: string;
+  ownerId: string;
+};
 
 export type HabitOverviewState = {
   habit: Habit | null;
@@ -44,6 +57,8 @@ export type HabitOverviewState = {
   activeIndex: number;
   isOwner: boolean;
   canComplete: boolean;
+  // Lineage-wide, cadence-aware current streak (matches the feed's).
+  streak: number;
   ownerProfile: OwnerProfile | null;
   socialTarget: OverviewSocialTarget | null;
   activeSocial: SocialCounts;
@@ -77,18 +92,24 @@ export function useHabitOverview(
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
   const [ownerProfile, setOwnerProfile] = useState<OwnerProfile | null>(null);
+  const [stats, setStats] = useState<HabitStats | null>(null);
   const pendingNotes = useRef(new Map<string, string | null>());
+  const now = useRef(new Date()).current;
 
   const dateIso = dateParam ?? isoDate(new Date());
   const isOwner = habit?.owner_id === userId;
+  const streak = useMemo(
+    () => (habit && stats ? habitStreak(habit, stats, now) : 0),
+    [habit, stats, now],
+  );
   const canComplete = isOwner && canCompleteOn(dateIso, new Date());
   const activeCompletion = completions[activeIndex] ?? completions[0] ?? null;
   // Navigating from a "started habit" activity card targets that activity;
   // otherwise the bar acts on the active completion.
   const socialTargetRef: SocialTarget | null = activityId
-    ? { kind: 'habit_created', id: activityId }
+    ? { kind: "habit_created", id: activityId }
     : activeCompletion
-      ? { kind: 'completion', id: activeCompletion.id }
+      ? { kind: "completion", id: activeCompletion.id }
       : null;
   const {
     social: activeSocial,
@@ -102,19 +123,26 @@ export function useHabitOverview(
 
   const loadCompletions = useCallback(
     async (h: Habit) => {
-      const occDate = h.kind === 'scheduled' ? dateIso : null;
+      const occDate = h.kind === "scheduled" ? dateIso : null;
       const perStart =
-        h.kind === 'flex' && h.target_period
+        h.kind === "flex" && h.target_period
           ? currentPeriodStart(dateIso, h.target_period)
           : null;
       const list = await fetchHabitCompletions(h.id, occDate, perStart);
       setCompletions(list);
       setActiveIndex(
-        completionId ? Math.max(0, list.findIndex((c) => c.id === completionId)) : 0,
+        completionId
+          ? Math.max(
+              0,
+              list.findIndex((c) => c.id === completionId),
+            )
+          : 0,
       );
       pendingNotes.current.clear();
       if (list.length > 0) setExpandedId(list[0].id);
-      const paths = list.flatMap((c) => c.attachments.map((a) => a.storage_path));
+      const paths = list.flatMap((c) =>
+        c.attachments.map((a) => a.storage_path),
+      );
       if (paths.length > 0) {
         const urls = await signedUrlsForPaths(paths);
         setSignedUrls((prev) => {
@@ -127,20 +155,38 @@ export function useHabitOverview(
     [dateIso, completionId],
   );
 
+  // Lineage stats (count + streak inputs). Non-fatal: on any failure the badges
+  // are simply hidden. Re-run after each completion mutation so the numbers move
+  // with the user's actions.
+  const loadStats = useCallback(
+    async (h: Habit) => {
+      if (!userId) return;
+      try {
+        setStats(await fetchHabitStats(h.owner_id, userId, h.lineage_id));
+      } catch {
+        /* non-fatal */
+      }
+    },
+    [userId],
+  );
+
   useEffect(() => {
     if (!habitId) return;
     const loadAll = cachedHabit
-      ? loadCompletions(cachedHabit)
+      ? loadCompletions(cachedHabit).then(() => loadStats(cachedHabit))
       : fetchHabit(habitId).then((h) => {
           setHabit(h);
-          return loadCompletions(h);
+          return loadCompletions(h).then(() => loadStats(h));
         });
     loadAll
       .catch((err) => {
-        Alert.alert('Could not load habit', err instanceof Error ? err.message : String(err));
+        Alert.alert(
+          "Could not load habit",
+          err instanceof Error ? err.message : String(err),
+        );
       })
       .finally(() => setLoading(false));
-  }, [habitId, cachedHabit, loadCompletions]);
+  }, [habitId, cachedHabit, loadCompletions, loadStats]);
 
   // Owner identity for the avatar + handle block.
   useEffect(() => {
@@ -149,7 +195,8 @@ export function useHabitOverview(
     let cancelled = false;
     fetchProfile(ownerId)
       .then((p) => {
-        if (!cancelled) setOwnerProfile({ handle: p.handle, avatar_url: p.avatar_url });
+        if (!cancelled)
+          setOwnerProfile({ handle: p.handle, avatar_url: p.avatar_url });
       })
       .catch(() => {
         /* non-fatal: the avatar block falls back to an initial bubble */
@@ -163,19 +210,20 @@ export function useHabitOverview(
     if (!habit || !userId || busy) return;
     setBusy(true);
     try {
-      if (habit.kind === 'scheduled') {
+      if (habit.kind === "scheduled") {
         await markScheduledCompleted(habit.id, userId, dateIso);
       } else {
         await markFlexCompleted(habit.id, userId);
       }
       await loadCompletions(habit);
+      loadStats(habit);
       syncWidgetData(userId);
     } catch (err) {
-      Alert.alert('Error', err instanceof Error ? err.message : String(err));
+      Alert.alert("Error", err instanceof Error ? err.message : String(err));
     } finally {
       setBusy(false);
     }
-  }, [habit, userId, dateIso, busy, loadCompletions]);
+  }, [habit, userId, dateIso, busy, loadCompletions, loadStats]);
 
   const handleDecrement = useCallback(async () => {
     if (!habit || !userId || busy || completions.length === 0) return;
@@ -183,13 +231,14 @@ export function useHabitOverview(
     try {
       await unmarkCompleted(completions[0].id);
       await loadCompletions(habit);
+      loadStats(habit);
       syncWidgetData(userId);
     } catch (err) {
-      Alert.alert('Error', err instanceof Error ? err.message : String(err));
+      Alert.alert("Error", err instanceof Error ? err.message : String(err));
     } finally {
       setBusy(false);
     }
-  }, [habit, userId, busy, completions, loadCompletions]);
+  }, [habit, userId, busy, completions, loadCompletions, loadStats]);
 
   const handleNoteSave = useCallback(
     (completionId: string, note: string | null) => {
@@ -217,9 +266,18 @@ export function useHabitOverview(
       if (!userId) return;
       setBusy(true);
       try {
-        await pickAndUpload(completionId, userId, completions, setCompletions, setSignedUrls);
+        await pickAndUpload(
+          completionId,
+          userId,
+          completions,
+          setCompletions,
+          setSignedUrls,
+        );
       } catch (err) {
-        Alert.alert('Upload failed', err instanceof Error ? err.message : String(err));
+        Alert.alert(
+          "Upload failed",
+          err instanceof Error ? err.message : String(err),
+        );
       } finally {
         setBusy(false);
       }
@@ -251,6 +309,7 @@ export function useHabitOverview(
     activeIndex,
     isOwner,
     canComplete,
+    streak,
     ownerProfile,
     socialTarget,
     activeSocial,

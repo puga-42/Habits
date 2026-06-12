@@ -5,14 +5,15 @@
 // returns fat rows with attachments and aggregate counts already joined.
 // See /FEED_PLAN.md for the architectural rationale.
 
-import { supabase } from './supabase';
-import type { FlexPeriod, HabitKind, Visibility } from './habits';
+import { supabase } from "./supabase";
+import { computeStreak } from "./streak";
+import type { FlexPeriod, HabitKind, Visibility } from "./habits";
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
 export type Attachment = {
   id: string;
-  kind: 'photo' | 'video';
+  kind: "photo" | "video";
   storage_path: string;
   mime_type: string;
   width: number | null;
@@ -20,9 +21,9 @@ export type Attachment = {
   duration_seconds: number | null;
 };
 
-export type FeedKind = 'completion' | 'habit_created';
+export type FeedKind = "completion" | "habit_created";
 
-export type LikerTargetKind = 'completion' | 'comment' | 'activity';
+export type LikerTargetKind = "completion" | "comment" | "activity";
 
 export type FeedItem = {
   id: string;
@@ -47,7 +48,7 @@ export type FeedItem = {
   viewer_liked: boolean;
   flex_position: number | null;
   flex_target: number | null;
-  event_type: 'created' | 'adopted' | null;
+  event_type: "created" | "adopted" | null;
   adopted_from_handle: string | null;
   // Habit context (for the card body + streak). All lineage-scoped.
   habit_description: string | null;
@@ -61,6 +62,10 @@ export type FeedItem = {
   habit_target_period: FlexPeriod | null;
   completion_history: string[];
   skip_history: string[];
+  // Current streak, derived from the history above via lib/streak.ts. Computed
+  // once per page in fetchFeedPage so cards never expand RRULEs while rendering
+  // or scrolling. 0 for activity (habit_created) items.
+  streak: number;
 };
 
 export type Comment = {
@@ -102,13 +107,15 @@ export async function fetchFeedPage(
   cursor?: FeedCursor,
   limit = 20,
 ): Promise<FeedItem[]> {
-  const { data, error } = await supabase.rpc('fetch_feed_page', {
+  const { data, error } = await supabase.rpc("fetch_feed_page", {
     cursor_completed_at: cursor?.sort_key ?? null,
     cursor_id: cursor?.id ?? null,
     page_limit: limit,
   });
   if (error) throw error;
-  return (data ?? []) as FeedItem[];
+  const rows = (data ?? []) as Omit<FeedItem, "streak">[];
+  const now = new Date();
+  return rows.map((row) => ({ ...row, streak: feedItemStreak(row, now) }));
 }
 
 export async function fetchComments(
@@ -116,7 +123,7 @@ export async function fetchComments(
   cursor?: CommentCursor,
   limit = 50,
 ): Promise<Comment[]> {
-  const { data, error } = await supabase.rpc('fetch_comments_page', {
+  const { data, error } = await supabase.rpc("fetch_comments_page", {
     target_completion_id: completionId,
     cursor_created_at: cursor?.created_at ?? null,
     cursor_id: cursor?.id ?? null,
@@ -131,7 +138,7 @@ export async function fetchLikers(
   cursor?: LikerCursor,
   limit = 50,
 ): Promise<Liker[]> {
-  const { data, error } = await supabase.rpc('fetch_likers_page', {
+  const { data, error } = await supabase.rpc("fetch_likers_page", {
     target_kind: target.kind,
     target_id: target.id,
     cursor_liked_at: cursor?.liked_at ?? null,
@@ -150,18 +157,18 @@ export async function fetchCompletionSocial(
 ): Promise<SocialCounts> {
   const [likes, comments, mine] = await Promise.all([
     supabase
-      .from('completion_likes')
-      .select('*', { count: 'exact', head: true })
-      .eq('completion_id', completionId),
+      .from("completion_likes")
+      .select("*", { count: "exact", head: true })
+      .eq("completion_id", completionId),
     supabase
-      .from('completion_comments')
-      .select('*', { count: 'exact', head: true })
-      .eq('completion_id', completionId),
+      .from("completion_comments")
+      .select("*", { count: "exact", head: true })
+      .eq("completion_id", completionId),
     supabase
-      .from('completion_likes')
-      .select('user_id')
-      .eq('completion_id', completionId)
-      .eq('user_id', viewerId)
+      .from("completion_likes")
+      .select("user_id")
+      .eq("completion_id", completionId)
+      .eq("user_id", viewerId)
       .maybeSingle(),
   ]);
   if (likes.error) throw likes.error;
@@ -182,18 +189,18 @@ export async function fetchActivitySocial(
 ): Promise<SocialCounts> {
   const [likes, comments, mine] = await Promise.all([
     supabase
-      .from('activity_likes')
-      .select('*', { count: 'exact', head: true })
-      .eq('activity_id', activityId),
+      .from("activity_likes")
+      .select("*", { count: "exact", head: true })
+      .eq("activity_id", activityId),
     supabase
-      .from('activity_comments')
-      .select('*', { count: 'exact', head: true })
-      .eq('activity_id', activityId),
+      .from("activity_comments")
+      .select("*", { count: "exact", head: true })
+      .eq("activity_id", activityId),
     supabase
-      .from('activity_likes')
-      .select('user_id')
-      .eq('activity_id', activityId)
-      .eq('user_id', viewerId)
+      .from("activity_likes")
+      .select("user_id")
+      .eq("activity_id", activityId)
+      .eq("user_id", viewerId)
       .maybeSingle(),
   ]);
   if (likes.error) throw likes.error;
@@ -213,7 +220,7 @@ export async function likeCompletion(
   viewerId: string,
 ): Promise<void> {
   const { error } = await supabase
-    .from('completion_likes')
+    .from("completion_likes")
     .insert({ completion_id: completionId, user_id: viewerId });
   if (error && !isUniqueViolation(error)) throw error;
 }
@@ -223,10 +230,10 @@ export async function unlikeCompletion(
   viewerId: string,
 ): Promise<void> {
   const { error } = await supabase
-    .from('completion_likes')
+    .from("completion_likes")
     .delete()
-    .eq('completion_id', completionId)
-    .eq('user_id', viewerId);
+    .eq("completion_id", completionId)
+    .eq("user_id", viewerId);
   if (error) throw error;
 }
 
@@ -235,7 +242,7 @@ export async function likeComment(
   viewerId: string,
 ): Promise<void> {
   const { error } = await supabase
-    .from('comment_likes')
+    .from("comment_likes")
     .insert({ comment_id: commentId, user_id: viewerId });
   if (error && !isUniqueViolation(error)) throw error;
 }
@@ -245,10 +252,10 @@ export async function unlikeComment(
   viewerId: string,
 ): Promise<void> {
   const { error } = await supabase
-    .from('comment_likes')
+    .from("comment_likes")
     .delete()
-    .eq('comment_id', commentId)
-    .eq('user_id', viewerId);
+    .eq("comment_id", commentId)
+    .eq("user_id", viewerId);
   if (error) throw error;
 }
 
@@ -259,10 +266,10 @@ export async function postComment(
 ): Promise<Comment> {
   const trimmed = body.trim();
   if (trimmed.length === 0 || trimmed.length > 500) {
-    throw new Error('Comment must be 1-500 characters');
+    throw new Error("Comment must be 1-500 characters");
   }
   const { data, error } = await supabase
-    .from('completion_comments')
+    .from("completion_comments")
     .insert({
       completion_id: completionId,
       author_id: authorId,
@@ -302,9 +309,9 @@ export async function postComment(
 
 export async function deleteComment(commentId: string): Promise<void> {
   const { error } = await supabase
-    .from('completion_comments')
+    .from("completion_comments")
     .delete()
-    .eq('id', commentId);
+    .eq("id", commentId);
   if (error) throw error;
 }
 
@@ -315,7 +322,7 @@ export async function likeActivity(
   viewerId: string,
 ): Promise<void> {
   const { error } = await supabase
-    .from('activity_likes')
+    .from("activity_likes")
     .insert({ activity_id: activityId, user_id: viewerId });
   if (error && !isUniqueViolation(error)) throw error;
 }
@@ -325,10 +332,10 @@ export async function unlikeActivity(
   viewerId: string,
 ): Promise<void> {
   const { error } = await supabase
-    .from('activity_likes')
+    .from("activity_likes")
     .delete()
-    .eq('activity_id', activityId)
-    .eq('user_id', viewerId);
+    .eq("activity_id", activityId)
+    .eq("user_id", viewerId);
   if (error) throw error;
 }
 
@@ -337,7 +344,7 @@ export async function fetchActivityComments(
   cursor?: CommentCursor,
   limit = 50,
 ): Promise<Comment[]> {
-  const { data, error } = await supabase.rpc('fetch_activity_comments_page', {
+  const { data, error } = await supabase.rpc("fetch_activity_comments_page", {
     target_activity_id: activityId,
     cursor_created_at: cursor?.created_at ?? null,
     cursor_id: cursor?.id ?? null,
@@ -354,10 +361,10 @@ export async function postActivityComment(
 ): Promise<Comment> {
   const trimmed = body.trim();
   if (trimmed.length === 0 || trimmed.length > 500) {
-    throw new Error('Comment must be 1-500 characters');
+    throw new Error("Comment must be 1-500 characters");
   }
   const { data, error } = await supabase
-    .from('activity_comments')
+    .from("activity_comments")
     .insert({
       activity_id: activityId,
       author_id: authorId,
@@ -395,13 +402,11 @@ export async function postActivityComment(
   };
 }
 
-export async function deleteActivityComment(
-  commentId: string,
-): Promise<void> {
+export async function deleteActivityComment(commentId: string): Promise<void> {
   const { error } = await supabase
-    .from('activity_comments')
+    .from("activity_comments")
     .delete()
-    .eq('id', commentId);
+    .eq("id", commentId);
   if (error) throw error;
 }
 
@@ -410,7 +415,7 @@ export async function likeActivityComment(
   viewerId: string,
 ): Promise<void> {
   const { error } = await supabase
-    .from('activity_comment_likes')
+    .from("activity_comment_likes")
     .insert({ comment_id: commentId, user_id: viewerId });
   if (error && !isUniqueViolation(error)) throw error;
 }
@@ -420,10 +425,10 @@ export async function unlikeActivityComment(
   viewerId: string,
 ): Promise<void> {
   const { error } = await supabase
-    .from('activity_comment_likes')
+    .from("activity_comment_likes")
     .delete()
-    .eq('comment_id', commentId)
-    .eq('user_id', viewerId);
+    .eq("comment_id", commentId)
+    .eq("user_id", viewerId);
   if (error) throw error;
 }
 
@@ -431,10 +436,10 @@ export async function unlikeActivityComment(
 
 export async function reportContent(
   reporterId: string,
-  target: { kind: 'completion' | 'comment'; id: string },
+  target: { kind: "completion" | "comment"; id: string },
   reason?: string,
 ): Promise<void> {
-  const { error } = await supabase.from('content_reports').insert({
+  const { error } = await supabase.from("content_reports").insert({
     reporter_id: reporterId,
     target_kind: target.kind,
     target_id: target.id,
@@ -448,7 +453,7 @@ export async function muteHabit(
   habitId: string,
 ): Promise<void> {
   const { error } = await supabase
-    .from('muted_habits')
+    .from("muted_habits")
     .insert({ user_id: userId, habit_id: habitId });
   if (error && !isUniqueViolation(error)) throw error;
 }
@@ -458,7 +463,7 @@ export async function blockUser(
   blockedId: string,
 ): Promise<void> {
   const { error } = await supabase
-    .from('blocks')
+    .from("blocks")
     .insert({ blocker_id: blockerId, blocked_id: blockedId });
   if (error && !isUniqueViolation(error)) throw error;
 }
@@ -474,7 +479,7 @@ export async function signedUrlsForPaths(
   const out = new Map<string, string>();
   if (paths.length === 0) return out;
   const { data, error } = await supabase.storage
-    .from('completion-media')
+    .from("completion-media")
     .createSignedUrls(paths, 60 * 60); // 1 hour
   if (error) throw error;
   for (const row of data ?? []) {
@@ -488,81 +493,82 @@ export async function signedUrlsForPaths(
 // ─── Realtime ──────────────────────────────────────────────────────────────
 
 export type RealtimeHandlers = {
-  onCompletion: (event: 'INSERT' | 'UPDATE' | 'DELETE', id: string) => void;
-  onActivity: (event: 'INSERT' | 'DELETE', id: string) => void;
-  onLike: (event: 'INSERT' | 'DELETE', completionId: string) => void;
+  onCompletion: (event: "INSERT" | "UPDATE" | "DELETE", id: string) => void;
+  onActivity: (event: "INSERT" | "DELETE", id: string) => void;
+  onLike: (event: "INSERT" | "DELETE", completionId: string) => void;
   onComment: (
-    event: 'INSERT' | 'UPDATE' | 'DELETE',
+    event: "INSERT" | "UPDATE" | "DELETE",
     completionId: string,
     commentId: string,
   ) => void;
-  onCommentLike: (event: 'INSERT' | 'DELETE', commentId: string) => void;
+  onCommentLike: (event: "INSERT" | "DELETE", commentId: string) => void;
 };
 
 export function subscribeToFeed(
   handlers: RealtimeHandlers,
-  channelName = 'feed',
+  channelName = "feed",
 ): () => void {
   const channel = supabase
     .channel(channelName)
     .on(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      'postgres_changes' as any,
-      { event: '*', schema: 'public', table: 'habit_completions' },
+      "postgres_changes" as any,
+      { event: "*", schema: "public", table: "habit_completions" },
       (payload: {
-        eventType: 'INSERT' | 'UPDATE' | 'DELETE';
+        eventType: "INSERT" | "UPDATE" | "DELETE";
         new: { id?: string };
         old: { id?: string };
       }) => {
         const id =
-          payload.eventType === 'DELETE' ? payload.old.id : payload.new.id;
+          payload.eventType === "DELETE" ? payload.old.id : payload.new.id;
         if (id) handlers.onCompletion(payload.eventType, id);
       },
     )
     .on(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      'postgres_changes' as any,
-      { event: '*', schema: 'public', table: 'habit_activity' },
+      "postgres_changes" as any,
+      { event: "*", schema: "public", table: "habit_activity" },
       (payload: {
-        eventType: 'INSERT' | 'UPDATE' | 'DELETE';
+        eventType: "INSERT" | "UPDATE" | "DELETE";
         new: { id?: string };
         old: { id?: string };
       }) => {
         const id =
-          payload.eventType === 'DELETE' ? payload.old.id : payload.new.id;
-        if (id && payload.eventType !== 'UPDATE') {
+          payload.eventType === "DELETE" ? payload.old.id : payload.new.id;
+        if (id && payload.eventType !== "UPDATE") {
           handlers.onActivity(payload.eventType, id);
         }
       },
     )
     .on(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      'postgres_changes' as any,
-      { event: '*', schema: 'public', table: 'completion_likes' },
+      "postgres_changes" as any,
+      { event: "*", schema: "public", table: "completion_likes" },
       (payload: {
-        eventType: 'INSERT' | 'UPDATE' | 'DELETE';
+        eventType: "INSERT" | "UPDATE" | "DELETE";
         new: { completion_id?: string };
         old: { completion_id?: string };
       }) => {
         const completionId =
-          payload.eventType === 'DELETE'
+          payload.eventType === "DELETE"
             ? payload.old.completion_id
             : payload.new.completion_id;
-        if (completionId && payload.eventType !== 'UPDATE') {
+        if (completionId && payload.eventType !== "UPDATE") {
           handlers.onLike(payload.eventType, completionId);
         }
       },
     )
     .on(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      'postgres_changes' as any,
-      { event: '*', schema: 'public', table: 'completion_comments' },
+      "postgres_changes" as any,
+      { event: "*", schema: "public", table: "completion_comments" },
       (payload: {
-        eventType: 'INSERT' | 'UPDATE' | 'DELETE';
+        eventType: "INSERT" | "UPDATE" | "DELETE";
         new: { id?: string; completion_id?: string };
         old: { id?: string; completion_id?: string };
       }) => {
-        const record = payload.eventType === 'DELETE' ? payload.old : payload.new;
+        const record =
+          payload.eventType === "DELETE" ? payload.old : payload.new;
         if (record.id && record.completion_id) {
           handlers.onComment(
             payload.eventType,
@@ -574,18 +580,18 @@ export function subscribeToFeed(
     )
     .on(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      'postgres_changes' as any,
-      { event: '*', schema: 'public', table: 'comment_likes' },
+      "postgres_changes" as any,
+      { event: "*", schema: "public", table: "comment_likes" },
       (payload: {
-        eventType: 'INSERT' | 'UPDATE' | 'DELETE';
+        eventType: "INSERT" | "UPDATE" | "DELETE";
         new: { comment_id?: string };
         old: { comment_id?: string };
       }) => {
         const commentId =
-          payload.eventType === 'DELETE'
+          payload.eventType === "DELETE"
             ? payload.old.comment_id
             : payload.new.comment_id;
-        if (commentId && payload.eventType !== 'UPDATE') {
+        if (commentId && payload.eventType !== "UPDATE") {
           handlers.onCommentLike(payload.eventType, commentId);
         }
       },
@@ -605,24 +611,60 @@ export function formatRelativeTime(timestampIso: string, now: Date): string {
   const then = new Date(timestampIso).getTime();
   const diffMs = now.getTime() - then;
   const sec = Math.max(0, Math.floor(diffMs / 1000));
-  if (sec < 60) return 'just now';
+  if (sec < 60) return "just now";
   const min = Math.floor(sec / 60);
   if (min < 60) return `${min}m`;
   const hr = Math.floor(min / 60);
   if (hr < 24) return `${hr}h`;
   const day = Math.floor(hr / 24);
-  if (day === 1) return 'yesterday';
+  if (day === 1) return "yesterday";
   if (day < 7) {
-    return new Date(then).toLocaleDateString('en-US', { weekday: 'short' });
+    return new Date(then).toLocaleDateString("en-US", { weekday: "short" });
   }
-  return new Date(then).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
+  return new Date(then).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
   });
 }
 
+// The streak-relevant subset of a feed row. Kept structural so this works on a
+// FeedItem or a row that doesn't have `streak` attached yet (the fetch paths
+// build the streak from these fields).
+type StreakFields = Pick<
+  FeedItem,
+  | "feed_kind"
+  | "habit_kind"
+  | "habit_rrule"
+  | "habit_dtstart"
+  | "habit_until"
+  | "flex_target"
+  | "habit_target_period"
+  | "completion_history"
+  | "skip_history"
+>;
+
+// Derive the current streak for a feed row. Pure; reuses lib/streak.ts so the
+// feed and habit screens share one cadence-aware definition. Activity
+// (habit_created) rows have no completion of their own, so their streak is 0.
+export function feedItemStreak(item: StreakFields, now: Date): number {
+  if (item.feed_kind !== "completion") return 0;
+  return computeStreak(
+    {
+      kind: item.habit_kind,
+      rrule: item.habit_rrule,
+      dtstart: item.habit_dtstart,
+      until: item.habit_until,
+      target_count: item.flex_target,
+      target_period: item.habit_target_period,
+      completion_dates: item.completion_history,
+      skip_dates: item.skip_history,
+    },
+    now,
+  );
+}
+
 export function feedItemSortKey(item: FeedItem): string {
-  return item.feed_kind === 'completion'
+  return item.feed_kind === "completion"
     ? (item.completed_at ?? item.created_at)
     : item.created_at;
 }
@@ -649,9 +691,7 @@ export function applyLikeToggle(item: FeedItem, liked: boolean): FeedItem {
   return {
     ...item,
     viewer_liked: liked,
-    like_count: liked
-      ? item.like_count + 1
-      : Math.max(0, item.like_count - 1),
+    like_count: liked ? item.like_count + 1 : Math.max(0, item.like_count - 1),
   };
 }
 
@@ -686,16 +726,17 @@ export function applyCommentLikeToggle(
 }
 
 export function parseLikerKind(raw: string): LikerTargetKind {
-  if (raw === 'completion' || raw === 'comment' || raw === 'activity') return raw;
-  return 'completion';
+  if (raw === "completion" || raw === "comment" || raw === "activity")
+    return raw;
+  return "completion";
 }
 
 // Postgres unique-violation SQLSTATE.
 function isUniqueViolation(err: unknown): boolean {
   return (
-    typeof err === 'object' &&
+    typeof err === "object" &&
     err !== null &&
-    'code' in err &&
-    (err as { code: string }).code === '23505'
+    "code" in err &&
+    (err as { code: string }).code === "23505"
   );
 }

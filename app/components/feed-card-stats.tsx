@@ -1,64 +1,32 @@
-// The right-hand stats column of a feed card: current streak and all-time
-// completion count, right-aligned to sit under the card's overflow (•••) menu
-// and top-aligned with the habit title. Streak is cadence-aware (lib/streak.ts)
-// and computed here so FeedCard stays focused on layout.
+// A small streak badge (🔥 N) shown on feed cards and the habit overview.
+// Hidden when there's no active streak. Purely presentational — the streak is
+// derived once per page in lib/feed.ts (feedItemStreak) / on the overview by
+// lib/habit-stats.ts, never in render.
+//
+// An all-time completion count (# N) used to sit beside the streak here; it was
+// removed as not visually important. The count still flows from the RPCs, so
+// re-adding it is a UI-only change.
 
-import { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import type { FeedItem } from '@/lib/feed';
-import { computeStreak } from '@/lib/streak';
 
-type Props = { item: FeedItem; now: Date };
+// `inline` is kept for call-site symmetry; with a single metric the wrapper just
+// controls right-alignment.
+type Props = { streak: number; inline?: boolean };
 
-export function FeedCardStats({ item, now }: Props) {
-  // Memoized because the scheduled path expands the habit's RRULE.
-  const streak = useMemo(
-    () =>
-      computeStreak(
-        {
-          kind: item.habit_kind,
-          rrule: item.habit_rrule,
-          dtstart: item.habit_dtstart,
-          until: item.habit_until,
-          target_count: item.flex_target,
-          target_period: item.habit_target_period,
-          completion_dates: item.completion_history,
-          skip_dates: item.skip_history,
-        },
-        now,
-      ),
-    [
-      item.habit_kind,
-      item.habit_rrule,
-      item.habit_dtstart,
-      item.habit_until,
-      item.flex_target,
-      item.habit_target_period,
-      item.completion_history,
-      item.skip_history,
-      now,
-    ],
-  );
-
-  const count = item.completion_count;
-  if (count === 0) return null;
+export function FeedCardStats({ streak, inline = false }: Props) {
+  if (streak <= 0) return null;
 
   return (
-    <View style={styles.container}>
-      {streak > 0 ? (
-        <ThemedText style={styles.streak}>🔥 {streak}</ThemedText>
-      ) : null}
-      <ThemedText style={styles.count}># {count}</ThemedText>
+    <View style={[styles.container, inline && styles.inline]}>
+      <ThemedText style={styles.streak}>🔥 {streak}</ThemedText>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  // paddingRight matches the overflow button's padding so the column lines up
-  // under the ••• glyph.
-  container: { alignItems: 'flex-end', paddingRight: 4, gap: 2 },
+  container: { alignItems: 'flex-end', paddingRight: 4 },
+  inline: { paddingRight: 0 },
   streak: { fontSize: 14, fontWeight: '700' },
-  count: { fontSize: 12, opacity: 0.55, fontWeight: '500' },
 });

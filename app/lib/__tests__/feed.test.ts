@@ -2,6 +2,7 @@ import {
   applyCommentLikeToggle,
   applyLikeToggle,
   feedItemSortKey,
+  feedItemStreak,
   formatRelativeTime,
   mergeFeedPages,
   parseLikerKind,
@@ -46,6 +47,7 @@ function makeItem(overrides: Partial<FeedItem> = {}): FeedItem {
     habit_target_period: null,
     completion_history: [],
     skip_history: [],
+    streak: 0,
     ...overrides,
   };
 }
@@ -85,6 +87,7 @@ function makeActivityItem(overrides: Partial<FeedItem> = {}): FeedItem {
     habit_target_period: null,
     completion_history: [],
     skip_history: [],
+    streak: 0,
     ...overrides,
   };
 }
@@ -318,5 +321,41 @@ describe('parseLikerKind', () => {
   it('defaults to "completion" for unknown strings', () => {
     expect(parseLikerKind('garbage')).toBe('completion');
     expect(parseLikerKind('')).toBe('completion');
+  });
+});
+
+describe('feedItemStreak', () => {
+  // Noon on 2026-06-12, local — the streak's "today".
+  const now = new Date(2026, 5, 12, 12, 0, 0);
+
+  it('counts consecutive completed days for a scheduled daily habit', () => {
+    const item = makeItem({
+      habit_kind: 'scheduled',
+      habit_rrule: 'FREQ=DAILY',
+      habit_dtstart: '2026-06-01T08:00:00Z',
+      // Newest first, as the feed RPC returns it.
+      completion_history: ['2026-06-12', '2026-06-11', '2026-06-10'],
+    });
+    expect(feedItemStreak(item, now)).toBe(3);
+  });
+
+  it('is 0 when a completion history is empty', () => {
+    const item = makeItem({
+      habit_kind: 'scheduled',
+      habit_rrule: 'FREQ=DAILY',
+      habit_dtstart: '2026-06-01T08:00:00Z',
+      completion_history: [],
+    });
+    expect(feedItemStreak(item, now)).toBe(0);
+  });
+
+  it('is 0 for activity (habit_created) items regardless of history', () => {
+    const item = makeActivityItem({
+      habit_kind: 'scheduled',
+      habit_rrule: 'FREQ=DAILY',
+      habit_dtstart: '2026-06-01T08:00:00Z',
+      completion_history: ['2026-06-12', '2026-06-11'],
+    });
+    expect(feedItemStreak(item, now)).toBe(0);
   });
 });

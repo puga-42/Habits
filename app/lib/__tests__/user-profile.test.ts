@@ -44,6 +44,7 @@ function makeItem(overrides: Partial<FeedItem> = {}): FeedItem {
     habit_target_period: null,
     completion_history: [],
     skip_history: [],
+    streak: 0,
     ...overrides,
   };
 }
@@ -83,6 +84,7 @@ function makeActivityItem(overrides: Partial<FeedItem> = {}): FeedItem {
     habit_target_period: null,
     completion_history: [],
     skip_history: [],
+    streak: 0,
     ...overrides,
   };
 }
