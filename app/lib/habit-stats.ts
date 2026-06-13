@@ -65,3 +65,58 @@ export function habitStreak(
     now,
   );
 }
+
+// Per-lineage streak inputs, keyed by lineage_id — what fetchMyHabitsStats
+// returns and what the day-view feeds into streaksByHabit. The completion_count
+// the overview shows isn't needed for streaks, so it's omitted here.
+export type LineageStats = {
+  completion_history: string[];
+  skip_history: string[];
+};
+
+// Streak per habit id for a set of habits, looked up by each habit's lineage.
+// Pure (tested without mocks): the day-view memoizes this over its loaded
+// habits + batched stats so streaks recompute only when that data changes, not
+// on every render. Habits whose lineage has no stats entry map to 0.
+export function streaksByHabit(
+  habits: Habit[],
+  statsByLineage: Map<string, LineageStats>,
+  now: Date,
+): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const habit of habits) {
+    const stats = statsByLineage.get(habit.lineage_id);
+    out.set(
+      habit.id,
+      stats ? habitStreak(habit, { completion_count: 0, ...stats }, now) : 0,
+    );
+  }
+  return out;
+}
+
+// Batched, owner-only stats for every habit the viewer owns — one round-trip
+// for the whole day-view. Unlike fetchHabitStats (one lineage, visibility-
+// checked), this is always the user's own habits, so the RPC skips visibility
+// and returns a row per lineage. Returns an empty map on failure so the caller
+// simply hides the streak badges rather than erroring.
+export async function fetchMyHabitsStats(
+  viewerId: string,
+): Promise<Map<string, LineageStats>> {
+  const { data, error } = await supabase.rpc("fetch_my_habits_stats", {
+    p_viewer_id: viewerId,
+  });
+  if (error) throw error;
+  const rows = (data ?? []) as Array<{
+    lineage_id: string;
+    completion_history: string[] | null;
+    skip_history: string[] | null;
+  }>;
+  const map = new Map<string, LineageStats>();
+  for (const row of rows) {
+    map.set(row.lineage_id, {
+      completion_history: row.completion_history ?? [],
+      skip_history: row.skip_history ?? [],
+    });
+  }
+  return map;
+}

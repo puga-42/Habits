@@ -13,6 +13,7 @@ type Props = {
   dayGroups: DayGroup[];
   flexProgressByHabitId: Map<string, { count: number; target: number }>;
   timeProgressByHabitId: Map<string, number>;
+  streakByHabitId: Map<string, number>;
   activeTimerHabitId?: string | null;
   onRowPress: (row: AgendaRowT, dateIso: string) => void;
   onPillPress?: (row: AgendaRowT, dateIso: string) => void;
@@ -27,6 +28,7 @@ export function CalendarDayView({
   dayGroups,
   flexProgressByHabitId,
   timeProgressByHabitId,
+  streakByHabitId,
   activeTimerHabitId,
   onRowPress,
   onPillPress,
@@ -57,6 +59,7 @@ export function CalendarDayView({
         habitMap={habitMap}
         flexProgressByHabitId={flexProgressByHabitId}
         timeProgressByHabitId={timeProgressByHabitId}
+        streakByHabitId={streakByHabitId}
         activeTimerHabitId={activeTimerHabitId}
         isFuture={isFuture}
         onRowPress={onRowPress}

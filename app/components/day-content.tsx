@@ -27,6 +27,7 @@ type Props = {
   habitMap: Map<string, Habit>;
   flexProgressByHabitId: Map<string, { count: number; target: number }>;
   timeProgressByHabitId: Map<string, number>;
+  streakByHabitId: Map<string, number>;
   activeTimerHabitId?: string | null;
   isFuture: boolean;
   onRowPress: (row: AgendaRowT, dateIso: string) => void;
@@ -45,6 +46,7 @@ export function DayContent({
   habitMap,
   flexProgressByHabitId,
   timeProgressByHabitId,
+  streakByHabitId,
   activeTimerHabitId,
   isFuture,
   onRowPress,
@@ -155,6 +157,7 @@ export function DayContent({
           flexProgress={flexProgressByHabitId.get(habitId)}
           timerStatus={timerStatus}
           timeProgress={timeProgressByHabitId.get(habitId)}
+          streak={streakByHabitId.get(habitId)}
           isActive={isActive}
           isFuture={isFuture}
         />

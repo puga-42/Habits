@@ -165,7 +165,6 @@ export function friendshipActionLabel(status: FriendshipStatus): string | null {
 // ─── Internal ─────────────────────────────────────────────────────────────
 
 function mapFeedRows(rows: unknown[]): FeedItem[] {
-  const now = new Date();
   return (rows as Array<Record<string, unknown>>).map((r) => {
     const base = {
       id: r.id as string,
@@ -216,6 +215,6 @@ function mapFeedRows(rows: unknown[]): FeedItem[] {
         ? (r.skip_history as string[])
         : [],
     };
-    return { ...base, streak: feedItemStreak(base, now) };
+    return { ...base, streak: feedItemStreak(base) };
   });
 }

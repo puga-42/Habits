@@ -54,6 +54,11 @@ import {
   type DayGroup,
   type SwipeAction,
 } from '@/lib/history';
+import {
+  fetchMyHabitsStats,
+  streaksByHabit,
+  type LineageStats,
+} from '@/lib/habit-stats';
 import { fetchProfile, type Profile } from '@/lib/profile';
 import {
   checkAndAutoComplete,
@@ -91,6 +96,9 @@ export default function CalendarScreen() {
   const [habits, setHabits] = useState<Habit[]>([]);
   const [completions, setCompletions] = useState<CompletionWithHabit[]>([]);
   const [overrides, setOverrides] = useState<HabitOverride[]>([]);
+  // Lineage-wide completion/skip history per lineage, used only to derive the
+  // 🔥 streak badge on day-view pills. Empty on fetch failure → badges hidden.
+  const [statsByLineage, setStatsByLineage] = useState<Map<string, LineageStats>>(new Map());
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const scheduleExtendingRef = useRef(false);
@@ -135,14 +143,16 @@ export default function CalendarScreen() {
 
   const load = useCallback(async () => {
     if (!userId) return;
-    const [habitsRes, rangeRes, profileRes] = await Promise.all([
+    const [habitsRes, rangeRes, profileRes, statsRes] = await Promise.all([
       fetchHabits(userId),
       fetchRange(userId, dataRange.from, dataRange.to),
       fetchProfile(userId).catch(() => null),
+      fetchMyHabitsStats(userId).catch(() => new Map<string, LineageStats>()),
     ]);
     setHabits(habitsRes);
     setCompletions(rangeRes.completions);
     setOverrides(rangeRes.overrides);
+    setStatsByLineage(statsRes);
     if (profileRes) setProfile(profileRes);
     scheduleExtendingRef.current = false;
 
@@ -262,6 +272,14 @@ export default function CalendarScreen() {
   const flexProgressByHabitId = useMemo(
     () => flexProgressByHabit(habits, completions, today),
     [habits, completions, today],
+  );
+
+  // Current streak per habit, derived from the batched lineage history. Memoized
+  // so it recomputes only when habits/stats change — never on render (this is
+  // the client-side compute path; see lib/habit-stats.ts streaksByHabit).
+  const streakByHabitId = useMemo(
+    () => streaksByHabit(habits, statsByLineage, today),
+    [habits, statsByLineage, today],
   );
 
   const groupByIso = useMemo(() => {
@@ -559,6 +577,7 @@ export default function CalendarScreen() {
             dayGroups={dayGroups}
             flexProgressByHabitId={flexProgressByHabitId}
             timeProgressByHabitId={timeProgressByHabitId}
+            streakByHabitId={streakByHabitId}
             activeTimerHabitId={activeTimerHabitId}
             onRowPress={handleTrailingPress}
             onPillPress={handlePillPress}

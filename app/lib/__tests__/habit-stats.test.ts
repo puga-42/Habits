@@ -1,4 +1,4 @@
-import { habitStreak, type HabitStats } from '../habit-stats';
+import { habitStreak, streaksByHabit, type HabitStats } from '../habit-stats';
 import type { Habit } from '../habits';
 
 function makeHabit(overrides: Partial<Habit> = {}): Habit {
@@ -80,5 +80,38 @@ describe('habitStreak', () => {
       ],
     });
     expect(habitStreak(habit, stats, now)).toBe(2);
+  });
+});
+
+describe('streaksByHabit', () => {
+  const now = new Date(2026, 5, 12, 12, 0, 0);
+  type LineageStats = { completion_history: string[]; skip_history: string[] };
+
+  it('maps each habit id to its lineage streak', () => {
+    const a = makeHabit({ id: 'a', lineage_id: 'lin-a' });
+    const b = makeHabit({ id: 'b', lineage_id: 'lin-b' });
+    const stats = new Map<string, LineageStats>([
+      ['lin-a', { completion_history: ['2026-06-12', '2026-06-11', '2026-06-10'], skip_history: [] }],
+      ['lin-b', { completion_history: ['2026-06-12'], skip_history: [] }],
+    ]);
+
+    const result = streaksByHabit([a, b], stats, now);
+    expect(result.get('a')).toBe(3);
+    expect(result.get('b')).toBe(1);
+  });
+
+  it('looks up stats by lineage_id, not habit id', () => {
+    // A habit whose id differs from its lineage (e.g. an edited later version).
+    const h = makeHabit({ id: 'v2', lineage_id: 'lin' });
+    const stats = new Map<string, LineageStats>([
+      ['lin', { completion_history: ['2026-06-12', '2026-06-11'], skip_history: [] }],
+    ]);
+    expect(streaksByHabit([h], stats, now).get('v2')).toBe(2);
+  });
+
+  it('yields 0 for a habit whose lineage has no stats entry', () => {
+    const h = makeHabit({ id: 'a', lineage_id: 'lin-missing' });
+    const result = streaksByHabit([h], new Map(), now);
+    expect(result.get('a')).toBe(0);
   });
 });

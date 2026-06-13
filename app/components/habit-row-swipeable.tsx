@@ -48,6 +48,7 @@ type Props = {
   compact?: boolean | 'tight';
   isActive?: boolean;
   isFuture?: boolean;
+  streak?: number;
 };
 
 export function HabitRowSwipeable({
@@ -64,6 +65,7 @@ export function HabitRowSwipeable({
   compact,
   isActive,
   isFuture,
+  streak,
 }: Props) {
   const swipeRef = useRef<SwipeableMethods>(null);
   const reducedMotion = useReducedMotion();
@@ -99,6 +101,7 @@ export function HabitRowSwipeable({
         compact={compact}
         isActive={isActive}
         hideTrailing={isFuture}
+        streak={streak}
       />
     );
   }
@@ -139,6 +142,7 @@ export function HabitRowSwipeable({
         compact={compact}
         isActive={isActive}
         hideTrailing={isFuture}
+        streak={streak}
       />
     </ReanimatedSwipeable>
   );

@@ -325,18 +325,25 @@ describe('parseLikerKind', () => {
 });
 
 describe('feedItemStreak', () => {
-  // Noon on 2026-06-12, local — the streak's "today".
-  const now = new Date(2026, 5, 12, 12, 0, 0);
+  const scheduledDaily = {
+    habit_kind: 'scheduled' as const,
+    habit_rrule: 'FREQ=DAILY',
+    habit_dtstart: '2026-06-01T08:00:00Z',
+    // Newest first, as the feed RPC returns it.
+    completion_history: ['2026-06-12', '2026-06-11', '2026-06-10'],
+  };
 
-  it('counts consecutive completed days for a scheduled daily habit', () => {
-    const item = makeItem({
-      habit_kind: 'scheduled',
-      habit_rrule: 'FREQ=DAILY',
-      habit_dtstart: '2026-06-01T08:00:00Z',
-      // Newest first, as the feed RPC returns it.
-      completion_history: ['2026-06-12', '2026-06-11', '2026-06-10'],
-    });
-    expect(feedItemStreak(item, now)).toBe(3);
+  it('counts consecutive completed days as of the item\'s own date', () => {
+    const item = makeItem({ ...scheduledDaily, occurrence_date: '2026-06-12' });
+    expect(feedItemStreak(item)).toBe(3);
+  });
+
+  it('shows each completion\'s streak at the time it happened, not the current streak', () => {
+    // Same lineage history on every card; each card reflects its own day. The
+    // 6/11 card must keep saying 2 even though the streak has since grown to 3.
+    expect(feedItemStreak(makeItem({ ...scheduledDaily, occurrence_date: '2026-06-12' }))).toBe(3);
+    expect(feedItemStreak(makeItem({ ...scheduledDaily, occurrence_date: '2026-06-11' }))).toBe(2);
+    expect(feedItemStreak(makeItem({ ...scheduledDaily, occurrence_date: '2026-06-10' }))).toBe(1);
   });
 
   it('is 0 when a completion history is empty', () => {
@@ -344,9 +351,10 @@ describe('feedItemStreak', () => {
       habit_kind: 'scheduled',
       habit_rrule: 'FREQ=DAILY',
       habit_dtstart: '2026-06-01T08:00:00Z',
+      occurrence_date: '2026-06-12',
       completion_history: [],
     });
-    expect(feedItemStreak(item, now)).toBe(0);
+    expect(feedItemStreak(item)).toBe(0);
   });
 
   it('is 0 for activity (habit_created) items regardless of history', () => {
@@ -356,6 +364,6 @@ describe('feedItemStreak', () => {
       habit_dtstart: '2026-06-01T08:00:00Z',
       completion_history: ['2026-06-12', '2026-06-11'],
     });
-    expect(feedItemStreak(item, now)).toBe(0);
+    expect(feedItemStreak(item)).toBe(0);
   });
 });

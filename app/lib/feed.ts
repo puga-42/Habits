@@ -114,8 +114,7 @@ export async function fetchFeedPage(
   });
   if (error) throw error;
   const rows = (data ?? []) as Omit<FeedItem, "streak">[];
-  const now = new Date();
-  return rows.map((row) => ({ ...row, streak: feedItemStreak(row, now) }));
+  return rows.map((row) => ({ ...row, streak: feedItemStreak(row) }));
 }
 
 export async function fetchComments(
@@ -639,15 +638,28 @@ type StreakFields = Pick<
   | "habit_until"
   | "flex_target"
   | "habit_target_period"
+  | "occurrence_date"
+  | "period_start"
   | "completion_history"
   | "skip_history"
 >;
 
-// Derive the current streak for a feed row. Pure; reuses lib/streak.ts so the
-// feed and habit screens share one cadence-aware definition. Activity
+// Streak for a feed row, computed *as of that completion's own date* — not the
+// current date. A feed card is a permanent record of one completion, so the
+// 6/11 card must keep showing "2" even after the streak later grows to 3. We
+// reuse the shared, cadence-aware computeStreak (so the feed and habit screens
+// never disagree) but anchor its "now" to the item's occurrence_date (scheduled)
+// / period_start (flex): computeStreak excludes occurrences after that anchor,
+// so the same lineage history yields the right number per card. Activity
 // (habit_created) rows have no completion of their own, so their streak is 0.
-export function feedItemStreak(item: StreakFields, now: Date): number {
+//
+// Note: completion_history is capped at the most recent ~100 dates, so a card
+// older than the viewer's 100 most recent completions of this habit may
+// under-report — the same pre-existing cap the live streak already carries.
+export function feedItemStreak(item: StreakFields): number {
   if (item.feed_kind !== "completion") return 0;
+  const anchorIso = item.occurrence_date ?? item.period_start;
+  if (!anchorIso) return 0;
   return computeStreak(
     {
       kind: item.habit_kind,
@@ -659,8 +671,16 @@ export function feedItemStreak(item: StreakFields, now: Date): number {
       completion_dates: item.completion_history,
       skip_dates: item.skip_history,
     },
-    now,
+    parseLocalDate(anchorIso),
   );
+}
+
+// Parse a YYYY-MM-DD date as local noon, avoiding the UTC-midnight rollback that
+// `new Date('YYYY-MM-DD')` causes in negative-offset timezones. Noon keeps
+// computeStreak's local-day math (isoDate/endOfLocalDay) on the intended day.
+function parseLocalDate(iso: string): Date {
+  const [y, m, d] = iso.split("-").map((n) => parseInt(n, 10));
+  return new Date(y, m - 1, d, 12, 0, 0);
 }
 
 export function feedItemSortKey(item: FeedItem): string {

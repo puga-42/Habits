@@ -25,6 +25,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
+import { StreakBadge } from '@/components/streak-badge';
 import { ThemedText } from '@/components/themed-text';
 import { TimeTrailingIcon, type TimerStatus } from '@/components/time-trailing-icon';
 import { solidTint } from '@/constants/colors';
@@ -52,6 +53,10 @@ type Props = {
   timeProgress?: number;
   isActive?: boolean;
   hideTrailing?: boolean;
+  // Current streak for this habit's lineage. Rendered as a 🔥 N badge just
+  // inside the trailing control on the full day-view only (omitted in the
+  // compact 3-day/week columns where there's no room).
+  streak?: number;
 };
 
 export function AgendaRow({
@@ -64,6 +69,7 @@ export function AgendaRow({
   timerStatus,
   timeProgress,
   hideTrailing,
+  streak = 0,
 }: Props) {
   const isSkip = row.kind === 'skip';
   const isCompletion = row.kind === 'completion';
@@ -147,6 +153,8 @@ export function AgendaRow({
           </ThemedText>
         ) : null}
       </View>
+
+      {!compact && !hideTrailing && <StreakBadge streak={streak} />}
 
       {!isTight && (
         <Animated.View
