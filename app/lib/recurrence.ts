@@ -3,7 +3,14 @@
 // strings, then store those strings on the habit. The full RRULE space stays
 // available for power-users via a future "custom" mode.
 
-export type Pattern = 'oneoff' | 'daily' | 'weekday' | 'weekly' | 'interval' | 'monthly';
+export type Pattern =
+  | 'oneoff'
+  | 'daily'
+  | 'weekday'
+  | 'weekly'
+  | 'interval'
+  | 'monthly'
+  | 'monthlyDays';
 
 export type WeekDay = 'SU' | 'MO' | 'TU' | 'WE' | 'TH' | 'FR' | 'SA';
 
@@ -33,7 +40,19 @@ export type RecurrenceState = {
   pattern: Pattern;
   byDays: WeekDay[]; // used for 'weekly'
   interval: number;  // used for 'interval'
+  byMonthDays?: number[]; // used for 'monthlyDays' (calendar days 1–31)
 };
+
+// 1 → "1st", 2 → "2nd", 21 → "21st", 11 → "11th".
+function ordinal(n: number): string {
+  const suffixes = ['th', 'st', 'nd', 'rd'];
+  const v = n % 100;
+  return `${n}${suffixes[(v - 20) % 10] ?? suffixes[v] ?? suffixes[0]}`;
+}
+
+function sortedMonthDays(state: RecurrenceState): number[] {
+  return [...(state.byMonthDays ?? [])].sort((a, b) => a - b);
+}
 
 export function buildRrule(state: RecurrenceState): string {
   switch (state.pattern) {
@@ -53,6 +72,10 @@ export function buildRrule(state: RecurrenceState): string {
       return `FREQ=DAILY;INTERVAL=${Math.max(1, state.interval)}`;
     case 'monthly':
       return 'FREQ=MONTHLY';
+    case 'monthlyDays': {
+      const days = sortedMonthDays(state);
+      return `FREQ=MONTHLY;BYMONTHDAY=${days.length > 0 ? days.join(',') : '1'}`;
+    }
   }
 }
 
@@ -76,6 +99,11 @@ export function describeRrule(state: RecurrenceState): string {
     }
     case 'monthly':
       return 'Monthly';
+    case 'monthlyDays': {
+      const days = sortedMonthDays(state);
+      if (days.length === 0) return 'Monthly';
+      return `Monthly on the ${days.map(ordinal).join(', ')}`;
+    }
   }
 }
 
@@ -106,6 +134,15 @@ export function parseRrule(rrule: string): RecurrenceState {
   if (rrule.startsWith('FREQ=DAILY;INTERVAL=')) {
     const n = parseInt(rrule.slice('FREQ=DAILY;INTERVAL='.length), 10);
     return { pattern: 'interval', byDays: [], interval: isNaN(n) ? 2 : n };
+  }
+
+  if (rrule.startsWith('FREQ=MONTHLY;BYMONTHDAY=')) {
+    const days = rrule
+      .slice('FREQ=MONTHLY;BYMONTHDAY='.length)
+      .split(',')
+      .map((d) => parseInt(d, 10))
+      .filter((n) => !isNaN(n) && n >= 1 && n <= 31);
+    return { pattern: 'monthlyDays', byDays: [], interval: 1, byMonthDays: days };
   }
 
   if (rrule === 'FREQ=MONTHLY')

@@ -107,3 +107,33 @@ describe('parseRrule', () => {
     expect(parseRrule('FREQ=YEARLY').pattern).toBe('daily');
   });
 });
+
+describe('monthlyDays (specific days of month)', () => {
+  const md = (days: number[]): RecurrenceState => ({
+    pattern: 'monthlyDays',
+    byDays: [],
+    interval: 1,
+    byMonthDays: days,
+  });
+
+  it('builds BYMONTHDAY sorted ascending', () => {
+    expect(buildRrule(md([15, 1]))).toBe('FREQ=MONTHLY;BYMONTHDAY=1,15');
+  });
+  it('falls back to day 1 when none selected', () => {
+    expect(buildRrule(md([]))).toBe('FREQ=MONTHLY;BYMONTHDAY=1');
+  });
+  it('describes with ordinals', () => {
+    expect(describeRrule(md([1, 15]))).toBe('Monthly on the 1st, 15th');
+  });
+  it('describes 21st/22nd/23rd correctly', () => {
+    expect(describeRrule(md([21, 22, 23]))).toBe('Monthly on the 21st, 22nd, 23rd');
+  });
+  it('round-trips through parse', () => {
+    expect(parseRrule('FREQ=MONTHLY;BYMONTHDAY=1,15')).toEqual({
+      pattern: 'monthlyDays',
+      byDays: [],
+      interval: 1,
+      byMonthDays: [1, 15],
+    });
+  });
+});

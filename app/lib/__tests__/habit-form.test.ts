@@ -1,4 +1,4 @@
-import { draftToInsert, habitToDraft } from '../habit-form';
+import { describeGoal, describeRepeat, draftToInsert, habitToDraft } from '../habit-form';
 import type { Habit } from '../habits';
 
 const scheduledHabit: Habit = {
@@ -91,6 +91,50 @@ describe('draftToInsert', () => {
     draft.adoptedFromUserId = 'user-xyz';
     const insert = draftToInsert(draft);
     expect(insert.adopted_from_user_id).toBe('user-xyz');
+  });
+});
+
+describe('describeGoal', () => {
+  it('count plural', () => {
+    const d = habitToDraft(scheduledHabit);
+    d.unit = 'count';
+    d.targetCount = 3;
+    expect(describeGoal(d)).toBe('3 times');
+  });
+  it('count singular', () => {
+    const d = habitToDraft(scheduledHabit);
+    d.unit = 'count';
+    d.targetCount = 1;
+    expect(describeGoal(d)).toBe('1 time');
+  });
+  it('time in minutes', () => {
+    const d = habitToDraft(scheduledHabit);
+    d.unit = 'time';
+    d.targetValue = 30;
+    d.displayUnit = 'minutes';
+    expect(describeGoal(d)).toBe('30 minutes');
+  });
+  it('time singular hour', () => {
+    const d = habitToDraft(scheduledHabit);
+    d.unit = 'time';
+    d.targetValue = 1;
+    d.displayUnit = 'hours';
+    expect(describeGoal(d)).toBe('1 hour');
+  });
+});
+
+describe('describeRepeat', () => {
+  it('scheduled uses the recurrence description', () => {
+    const d = habitToDraft(scheduledHabit);
+    d.kind = 'scheduled';
+    d.recurrence = { pattern: 'daily', byDays: [], interval: 1 };
+    expect(describeRepeat(d)).toBe('Every day');
+  });
+  it('flex reads as per period', () => {
+    const d = habitToDraft(scheduledHabit);
+    d.kind = 'flex';
+    d.targetPeriod = 'week';
+    expect(describeRepeat(d)).toBe('Per week');
   });
 });
 

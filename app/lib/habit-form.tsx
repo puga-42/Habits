@@ -4,6 +4,7 @@ import { Palette } from '@/constants/colors';
 
 import {
   buildRrule,
+  describeRrule,
   parseRrule,
   type RecurrenceState,
 } from './recurrence';
@@ -49,7 +50,7 @@ function defaultDraft(): HabitDraft {
     targetValue: 30,
     displayUnit: 'minutes',
     color: Palette.primary,
-    icon: '✨',
+    icon: '',
     visibility: 'private',
     adoptedFromUserId: null,
   };
@@ -77,7 +78,7 @@ export function habitToDraft(habit: Habit): HabitDraft {
       targetPeriod: 'week',
       ...unitFields,
       color: habit.color ?? Palette.primary,
-      icon: habit.icon ?? '✨',
+      icon: habit.icon ?? '',
       visibility: habit.visibility,
       adoptedFromUserId: null,
     };
@@ -148,6 +149,23 @@ export function draftToInsert(draft: HabitDraft): HabitInsert {
     ...timeFields,
     ...adoptionFields,
   };
+}
+
+// Short summaries for the iOS-style menu rows on the habit form.
+
+export function describeGoal(draft: HabitDraft): string {
+  if (draft.unit === 'time') {
+    const n = draft.targetValue;
+    const singular = draft.displayUnit.slice(0, -1); // 'minute' | 'hour' | 'second'
+    return `${n} ${n === 1 ? singular : draft.displayUnit}`;
+  }
+  const n = draft.targetCount;
+  return `${n} ${n === 1 ? 'time' : 'times'}`;
+}
+
+export function describeRepeat(draft: HabitDraft): string {
+  if (draft.kind === 'flex') return `Per ${draft.targetPeriod}`;
+  return describeRrule(draft.recurrence);
 }
 
 type Ctx = {

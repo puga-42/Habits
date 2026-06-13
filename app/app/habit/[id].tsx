@@ -11,6 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { HabitFormFields } from '@/components/habit-form-fields';
+import { HabitPillEditor } from '@/components/habit-pill-editor';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useAuth } from '@/lib/auth';
@@ -183,6 +184,7 @@ export default function EditHabitScreen() {
             </ThemedText>
           </Pressable>
         </View>
+        <HabitPillEditor />
         <HabitFormFields lockKind onDelete={onDelete} />
       </SafeAreaView>
     </ThemedView>

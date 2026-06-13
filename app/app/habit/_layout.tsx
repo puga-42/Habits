@@ -8,7 +8,8 @@ export default function HabitLayout() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="view" />
         <Stack.Screen name="new" />
-        <Stack.Screen name="recurrence" />
+        <Stack.Screen name="goal" />
+        <Stack.Screen name="repeat" />
       </Stack>
     </HabitFormProvider>
   );
