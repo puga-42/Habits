@@ -6,7 +6,7 @@
 // See /FEED_PLAN.md for the architectural rationale.
 
 import { supabase } from "./supabase";
-import { computeStreak } from "./streak";
+import { computeStreak, type ScheduleSegment } from "./streak";
 import type { FlexPeriod, HabitKind, Visibility } from "./habits";
 
 // ─── Types ─────────────────────────────────────────────────────────────────
@@ -55,11 +55,15 @@ export type FeedItem = {
   habit_lineage_id: string;
   completion_count: number;
   // Streak inputs — see lib/streak.ts. completion_history / skip_history are
-  // the most recent ~100 dates (YYYY-MM-DD), newest first.
+  // the most recent ~100 dates (YYYY-MM-DD), newest first. habit_segments is one
+  // entry per lineage row (oldest first) so the streak spans schedule edits; the
+  // flat habit_rrule/dtstart/until/target_period below are the active row, kept
+  // as a fallback for clients/RPCs that predate segments.
   habit_rrule: string | null;
   habit_dtstart: string | null;
   habit_until: string | null;
   habit_target_period: FlexPeriod | null;
+  habit_segments?: ScheduleSegment[];
   completion_history: string[];
   skip_history: string[];
   // Current streak, derived from the history above via lib/streak.ts. Computed
@@ -638,6 +642,7 @@ type StreakFields = Pick<
   | "habit_until"
   | "flex_target"
   | "habit_target_period"
+  | "habit_segments"
   | "occurrence_date"
   | "period_start"
   | "completion_history"
@@ -660,14 +665,22 @@ export function feedItemStreak(item: StreakFields): number {
   if (item.feed_kind !== "completion") return 0;
   const anchorIso = item.occurrence_date ?? item.period_start;
   if (!anchorIso) return 0;
+  const segments: ScheduleSegment[] =
+    item.habit_segments && item.habit_segments.length > 0
+      ? item.habit_segments
+      : [
+          {
+            rrule: item.habit_rrule,
+            dtstart: item.habit_dtstart,
+            until: item.habit_until,
+            target_count: item.flex_target,
+            target_period: item.habit_target_period,
+          },
+        ];
   return computeStreak(
     {
       kind: item.habit_kind,
-      rrule: item.habit_rrule,
-      dtstart: item.habit_dtstart,
-      until: item.habit_until,
-      target_count: item.flex_target,
-      target_period: item.habit_target_period,
+      segments,
       completion_dates: item.completion_history,
       skip_dates: item.skip_history,
     },

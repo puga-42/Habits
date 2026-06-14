@@ -208,6 +208,9 @@ function mapFeedRows(rows: unknown[]): FeedItem[] {
       habit_target_period: (r.habit_target_period ??
         r.target_period ??
         null) as FeedItem["habit_target_period"],
+      habit_segments: Array.isArray(r.habit_segments)
+        ? (r.habit_segments as FeedItem["habit_segments"])
+        : undefined,
       completion_history: Array.isArray(r.completion_history)
         ? (r.completion_history as string[])
         : [],

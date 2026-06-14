@@ -64,6 +64,28 @@ describe('habitStreak', () => {
     expect(habitStreak(makeHabit(), makeStats(), now)).toBe(0);
   });
 
+  it('spans a fork: uses lineage segments, not just the active row', () => {
+    // Active row is weekly-Friday starting at the edit moment (June 12) — on its
+    // own it would only see 06-05 and 06-12. The lineage's prior daily era is
+    // supplied via stats.segments, so the streak bridges the edit.
+    const active = makeHabit({
+      id: 'v2',
+      lineage_id: 'lin',
+      rrule: 'FREQ=WEEKLY;BYDAY=FR',
+      dtstart: '2026-06-12T12:00:00Z',
+    });
+    const stats = makeStats({
+      completion_history: [
+        '2026-06-12', '2026-06-11', '2026-06-10', '2026-06-09', '2026-06-08',
+      ],
+      segments: [
+        { rrule: 'FREQ=DAILY', dtstart: '2026-06-08T12:00:00Z', until: '2026-06-11T12:00:00Z', target_count: null, target_period: null },
+        { rrule: 'FREQ=WEEKLY;BYDAY=FR', dtstart: '2026-06-12T12:00:00Z', until: null, target_count: null, target_period: null },
+      ],
+    });
+    expect(habitStreak(active, stats, now)).toBe(5);
+  });
+
   it('counts hit periods for a flex habit', () => {
     const habit = makeHabit({
       kind: 'flex',

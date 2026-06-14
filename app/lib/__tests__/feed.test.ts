@@ -366,4 +366,21 @@ describe('feedItemStreak', () => {
     });
     expect(feedItemStreak(item)).toBe(0);
   });
+
+  it('spans a fork via habit_segments rather than the active row alone', () => {
+    // Active row (flat fields) is weekly-Friday from the edit moment; alone it
+    // would yield 1. habit_segments carries the prior daily era → continuous 5.
+    const item = makeItem({
+      habit_kind: 'scheduled',
+      habit_rrule: 'FREQ=WEEKLY;BYDAY=FR',
+      habit_dtstart: '2026-06-12T12:00:00Z',
+      occurrence_date: '2026-06-12',
+      completion_history: ['2026-06-12', '2026-06-11', '2026-06-10', '2026-06-09', '2026-06-08'],
+      habit_segments: [
+        { rrule: 'FREQ=DAILY', dtstart: '2026-06-08T12:00:00Z', until: '2026-06-11T12:00:00Z', target_count: null, target_period: null },
+        { rrule: 'FREQ=WEEKLY;BYDAY=FR', dtstart: '2026-06-12T12:00:00Z', until: null, target_count: null, target_period: null },
+      ],
+    });
+    expect(feedItemStreak(item)).toBe(5);
+  });
 });

@@ -4,17 +4,38 @@
 // same lib/streak.ts computeStreak). Pure helpers are TDD'd; see
 // __tests__/habit-stats.test.ts.
 
-import { computeStreak } from "./streak";
+import { computeStreak, type ScheduleSegment } from "./streak";
 import { supabase } from "./supabase";
 import type { Habit } from "./habits";
 
 // All-time, lineage-scoped. completion_history / skip_history are the most
 // recent ~100 dates (YYYY-MM-DD), newest first — same cap and shape as the feed.
+// `segments` is one entry per lineage row (oldest first) so the streak can span
+// schedule edits; absent when the RPC predates it (we fall back to the row).
 export type HabitStats = {
   completion_count: number;
   completion_history: string[];
   skip_history: string[];
+  segments?: ScheduleSegment[];
 };
+
+// The lineage's schedule eras, or — when the RPC hasn't shipped them yet — a
+// single segment from the habit row itself (the prior behavior).
+function segmentsFor(
+  habit: Habit,
+  segments: ScheduleSegment[] | undefined,
+): ScheduleSegment[] {
+  if (segments && segments.length > 0) return segments;
+  return [
+    {
+      rrule: habit.rrule,
+      dtstart: habit.dtstart,
+      until: habit.until,
+      target_count: habit.target_count,
+      target_period: habit.target_period,
+    },
+  ];
+}
 
 // Fetch a lineage's stats, RLS/visibility enforced server-side. Returns null
 // when the viewer may not see the habit (or the RPC isn't deployed yet), so the
@@ -34,6 +55,7 @@ export async function fetchHabitStats(
     completion_count: number | null;
     completion_history: string[] | null;
     skip_history: string[] | null;
+    segments: ScheduleSegment[] | null;
   }>;
   if (rows.length === 0) return null;
   const row = rows[0];
@@ -41,6 +63,7 @@ export async function fetchHabitStats(
     completion_count: row.completion_count ?? 0,
     completion_history: row.completion_history ?? [],
     skip_history: row.skip_history ?? [],
+    segments: row.segments ?? undefined,
   };
 }
 
@@ -54,11 +77,7 @@ export function habitStreak(
   return computeStreak(
     {
       kind: habit.kind,
-      rrule: habit.rrule,
-      dtstart: habit.dtstart,
-      until: habit.until,
-      target_count: habit.target_count,
-      target_period: habit.target_period,
+      segments: segmentsFor(habit, stats.segments),
       completion_dates: stats.completion_history,
       skip_dates: stats.skip_history,
     },
@@ -72,6 +91,7 @@ export function habitStreak(
 export type LineageStats = {
   completion_history: string[];
   skip_history: string[];
+  segments?: ScheduleSegment[];
 };
 
 // Streak per habit id for a set of habits, looked up by each habit's lineage.
@@ -84,6 +104,8 @@ export function streaksByHabit(
   now: Date,
 ): Map<string, number> {
   const out = new Map<string, number>();
+  // habitStreak applies segmentsFor: it uses stats.segments when present, else
+  // the habit row — so an un-updated RPC still yields the prior single-row streak.
   for (const habit of habits) {
     const stats = statsByLineage.get(habit.lineage_id);
     out.set(
@@ -110,12 +132,14 @@ export async function fetchMyHabitsStats(
     lineage_id: string;
     completion_history: string[] | null;
     skip_history: string[] | null;
+    segments: ScheduleSegment[] | null;
   }>;
   const map = new Map<string, LineageStats>();
   for (const row of rows) {
     map.set(row.lineage_id, {
       completion_history: row.completion_history ?? [],
       skip_history: row.skip_history ?? [],
+      segments: row.segments ?? undefined,
     });
   }
   return map;
