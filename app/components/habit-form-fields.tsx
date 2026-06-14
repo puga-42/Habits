@@ -1,5 +1,8 @@
 // Shared form fields used by both the create (`/habit/new`) and edit
 // (`/habit/[id]`) screens. The screens own their own header + save logic.
+// Fields are grouped into iOS-style cards (see FormCard): "General" (Name /
+// Description / Icon / Color, via HabitIdentityFields) and a placeholder "More"
+// card holding everything else, to be split into finer groups later.
 
 import DateTimePicker, {
   type DateTimePickerEvent,
@@ -8,16 +11,24 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
+import { CardList, FormCard } from '@/components/form-card';
+import { HabitIdentityFields } from '@/components/habit-identity-fields';
 import { ThemedText } from '@/components/themed-text';
+import { Palette } from '@/constants/colors';
 import { describeGoal, describeRepeat, useHabitForm } from '@/lib/habit-form';
 import { clampEndDate, defaultEndDate } from '@/lib/habit-ends';
 import type { Visibility } from '@/lib/habits';
 
 const VISIBILITY_OPTIONS: Visibility[] = ['public', 'friends', 'private'];
-const VISIBILITY_LABELS: Record<Visibility, string> = {
-  public: 'Public — anyone can see',
-  friends: 'Friends — only your friends',
-  private: 'Private — only you',
+const VISIBILITY_TITLES: Record<Visibility, string> = {
+  public: 'Public',
+  friends: 'Friends',
+  private: 'Private',
+};
+const VISIBILITY_DESCS: Record<Visibility, string> = {
+  public: 'Anyone can see',
+  friends: 'Only your friends',
+  private: 'Only you',
 };
 
 type Props = {
@@ -35,48 +46,48 @@ export function HabitFormFields({ lockKind = false, onDelete }: Props) {
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="interactive"
       automaticallyAdjustKeyboardInsets>
-      {/* Title, description, and icon are edited from the pinned preview pill. */}
+      <HabitIdentityFields />
 
-      <Row label="Goal" onPress={() => router.push('/habit/goal')}>
-        <ThemedText style={styles.rowValue}>{describeGoal(draft)}</ThemedText>
-        <ThemedText style={styles.chevron}>›</ThemedText>
-      </Row>
+      {/* Placeholder group — to be split into finer sections later. */}
+      <FormCard title="More">
+        <CardList>
+          <Row label="Goal" onPress={() => router.push('/habit/goal')}>
+            <ThemedText style={styles.rowValue}>{describeGoal(draft)}</ThemedText>
+            <ThemedText style={styles.chevron}>›</ThemedText>
+          </Row>
 
-      <Row
-        label="Repeat"
-        onPress={() => router.push(lockKind ? '/habit/repeat?lock=1' : '/habit/repeat')}>
-        <ThemedText style={styles.rowValue}>{describeRepeat(draft)}</ThemedText>
-        <ThemedText style={styles.chevron}>›</ThemedText>
-      </Row>
+          <Row
+            label="Repeat"
+            onPress={() => router.push(lockKind ? '/habit/repeat?lock=1' : '/habit/repeat')}>
+            <ThemedText style={styles.rowValue}>{describeRepeat(draft)}</ThemedText>
+            <ThemedText style={styles.chevron}>›</ThemedText>
+          </Row>
 
-      {draft.kind === 'scheduled' && (
-        <>
-          <StartsOnRow value={draft.startsOn} onChange={(d) => update({ startsOn: d })} />
-          <EndsOnRow
-            start={draft.startsOn}
-            value={draft.endsOn}
-            onChange={(d) => update({ endsOn: d })}
-          />
-        </>
-      )}
+          {draft.kind === 'scheduled' && (
+            <StartsOnRow value={draft.startsOn} onChange={(d) => update({ startsOn: d })} />
+          )}
+          {draft.kind === 'scheduled' && (
+            <EndsOnRow
+              start={draft.startsOn}
+              value={draft.endsOn}
+              onChange={(d) => update({ endsOn: d })}
+            />
+          )}
 
-      {/* Visibility */}
-      <View style={styles.section}>
-        <ThemedText style={styles.label}>Visibility</ThemedText>
-        {VISIBILITY_OPTIONS.map((v) => (
-          <Pressable
-            key={v}
-            onPress={() => update({ visibility: v })}
-            style={styles.visibilityRow}>
-            <ThemedText style={styles.radio}>
-              {draft.visibility === v ? '●' : '○'}
-            </ThemedText>
-            <ThemedText style={styles.visibilityText}>
-              {VISIBILITY_LABELS[v]}
-            </ThemedText>
-          </Pressable>
-        ))}
-      </View>
+          {VISIBILITY_OPTIONS.map((v) => (
+            <Pressable
+              key={v}
+              onPress={() => update({ visibility: v })}
+              style={styles.row}>
+              <View style={styles.visMain}>
+                <ThemedText style={styles.rowLabel}>{VISIBILITY_TITLES[v]}</ThemedText>
+                <ThemedText style={styles.visSub}>{VISIBILITY_DESCS[v]}</ThemedText>
+              </View>
+              {draft.visibility === v && <ThemedText style={styles.check}>✓</ThemedText>}
+            </Pressable>
+          ))}
+        </CardList>
+      </FormCard>
 
       {onDelete && (
         <Pressable onPress={onDelete} style={styles.deleteButton}>
@@ -97,17 +108,13 @@ function StartsOnRow({ value, onChange }: { value: Date; onChange: (d: Date) => 
 
   if (Platform.OS === 'android') {
     return (
-      <>
-        <Row label="Starts" onPress={() => setShowPicker(true)}>
-          <ThemedText style={styles.rowValue}>
-            {value.toLocaleDateString()}
-          </ThemedText>
-          <ThemedText style={styles.chevron}>›</ThemedText>
-        </Row>
+      <Row label="Starts" onPress={() => setShowPicker(true)}>
+        <ThemedText style={styles.rowValue}>{value.toLocaleDateString()}</ThemedText>
+        <ThemedText style={styles.chevron}>›</ThemedText>
         {showPicker && (
           <DateTimePicker value={value} mode="date" display="default" onChange={handleChange} />
         )}
-      </>
+      </Row>
     );
   }
 
@@ -150,13 +157,11 @@ function EndsOnRow({
 
   if (Platform.OS === 'android') {
     return (
-      <>
-        <Row label="Ends" onPress={() => setShowPicker(true)}>
-          <ThemedText style={styles.rowValue}>{value.toLocaleDateString()}</ThemedText>
-          <Pressable onPress={() => onChange(null)} hitSlop={8}>
-            <ThemedText style={styles.clear}>Never</ThemedText>
-          </Pressable>
-        </Row>
+      <Row label="Ends" onPress={() => setShowPicker(true)}>
+        <ThemedText style={styles.rowValue}>{value.toLocaleDateString()}</ThemedText>
+        <Pressable onPress={() => onChange(null)} hitSlop={8}>
+          <ThemedText style={styles.clear}>Never</ThemedText>
+        </Pressable>
         {showPicker && (
           <DateTimePicker
             value={value}
@@ -166,7 +171,7 @@ function EndsOnRow({
             onChange={handleChange}
           />
         )}
-      </>
+      </Row>
     );
   }
 
@@ -205,37 +210,24 @@ function Row({
 }
 
 const styles = StyleSheet.create({
-  scroll: { padding: 20, paddingBottom: 80, gap: 18 },
-  section: { gap: 8 },
-  label: {
-    fontSize: 12,
-    opacity: 0.6,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
+  scroll: { padding: 20, paddingBottom: 80, gap: 28 },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(127,127,127,0.25)',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
   },
   rowLabel: { fontSize: 16 },
   rowRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   rowValue: { fontSize: 16, opacity: 0.65 },
   clear: { fontSize: 14, opacity: 0.55 },
   chevron: { fontSize: 22, opacity: 0.4 },
-  visibilityRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 8,
-  },
-  radio: { fontSize: 18, width: 24 },
-  visibilityText: { fontSize: 15, flex: 1 },
+  visMain: { flex: 1 },
+  visSub: { fontSize: 13, opacity: 0.55, marginTop: 2 },
+  check: { fontSize: 17, fontWeight: '700', color: Palette.primary },
   deleteButton: {
-    marginTop: 16,
+    marginTop: 8,
     paddingVertical: 14,
     borderRadius: 8,
     backgroundColor: 'rgba(239,68,68,0.1)',
