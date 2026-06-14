@@ -1,12 +1,14 @@
-// Compact streak badge (🔥 N) shown on day-view habit pills, just inside the
-// trailing completion control. Purely presentational — the streak is computed
-// once per load in lib/habit-stats.ts (streaksByHabit), never in render. Hidden
-// when there's no active streak. Mirrors the feed/overview treatment
-// (FeedCardStats) so the same number reads the same everywhere.
+// Streak badge for day-view habit pills: the streak count sits on top of a
+// flame icon (StreakFlameIcon), placed just inside the trailing completion
+// control. Purely presentational — the streak is computed once per load in
+// lib/habit-stats.ts (streaksByHabit), never in render. Hidden when there's no
+// active streak.
 
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
-import { ThemedText } from '@/components/themed-text';
+import { StreakFlameIcon } from '@/components/streak-flame-icon';
+
+const SIZE = 30;
 
 type Props = { streak: number };
 
@@ -15,14 +17,32 @@ export function StreakBadge({ streak }: Props) {
 
   return (
     <View style={styles.container}>
-      <ThemedText style={styles.icon}>🔥</ThemedText>
-      <ThemedText style={styles.count}>{streak}</ThemedText>
+      <StreakFlameIcon size={SIZE} />
+      {/* Bold white count nudged down into the flame's bulb, with a soft shadow
+          so it stays legible over the brightest part of the gradient. */}
+      <Text style={styles.count} allowFontScaling={false} numberOfLines={1}>
+        {streak}
+      </Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { alignItems: 'center', justifyContent: 'center' },
-  icon: { fontSize: 16, lineHeight: 18 },
-  count: { fontSize: 11, fontWeight: '700', lineHeight: 13, opacity: 0.85 },
+  container: {
+    width: SIZE,
+    height: SIZE,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  count: {
+    position: 'absolute',
+    bottom: '-8%',
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '800',
+    textAlign: 'center',
+    textShadowColor: 'rgba(0,0,0,0.4)',
+    textShadowOffset: { width: 0, height: 0.5 },
+    textShadowRadius: 1.5,
+  },
 });
