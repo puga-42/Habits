@@ -107,6 +107,9 @@ export function WeekStrip({
       const bucket = densityBucket(count);
       const isSelected = iso === anchorIso;
       const isToday = iso === todayIso;
+      // Both the selected day and today get a solid fill; today (lavender) wins
+      // when it is also the selected day.
+      const filled = isSelected || isToday;
 
       return (
         <Pressable
@@ -120,21 +123,20 @@ export function WeekStrip({
           <View
             style={[
               styles.cellInner,
+              isSelected && !isToday && styles.cellSelected,
               isToday && styles.cellToday,
-              isSelected && styles.cellSelected,
             ]}>
             <ThemedText
               style={[
                 styles.weekdayLetter,
-                isToday && styles.todayText,
-                isSelected && styles.selectedText,
+                filled && styles.filledText,
               ]}>
               {letter}
             </ThemedText>
             <View
               style={[
                 styles.dayBubble,
-                bucket > 0 && !isToday && {
+                bucket > 0 && !filled && {
                   backgroundColor: solidTint(
                     ACCENT,
                     DENSITY_ALPHA[bucket],
@@ -145,8 +147,8 @@ export function WeekStrip({
               <ThemedText
                 style={[
                   styles.dayNumber,
-                  isToday && styles.todayText,
-                  isSelected && styles.selectedText,
+                  filled && styles.selectedText,
+                  filled && styles.filledText,
                 ]}>
                 {day}
               </ThemedText>
@@ -200,8 +202,7 @@ const styles = StyleSheet.create({
     backgroundColor: TODAY_ACCENT,
   },
   cellSelected: {
-    borderWidth: 1.5,
-    borderColor: ACCENT,
+    backgroundColor: ACCENT,
   },
   cellPressed: { opacity: 0.6 },
   weekdayLetter: {
@@ -219,5 +220,5 @@ const styles = StyleSheet.create({
   },
   dayNumber: { fontSize: 15, fontWeight: '500' },
   selectedText: { fontWeight: '700' },
-  todayText: { color: '#fff', opacity: 1 },
+  filledText: { color: '#fff', opacity: 1 },
 });

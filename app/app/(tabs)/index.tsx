@@ -4,8 +4,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ActivityIndicator, Pressable, StyleSheet, useColorScheme, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Palette } from '@/constants/colors';
 import { Calendar3DayView } from '@/components/calendar-3day-view';
@@ -503,66 +503,76 @@ export default function CalendarScreen() {
 
   // ─── Render ────────────────────────────────────────────────────────────
 
+  const insets = useSafeAreaInsets();
+  const headerBg =
+    useColorScheme() !== 'light' ? Palette.charcoalElevated : '#FFFFFF';
+
   const isOnToday = isoDate(anchorDate) === isoDate(today);
   const showBack =
     view === 'day' && (previousView === 'month' || previousView === 'week');
 
   return (
     <ThemedView style={styles.root}>
-      <SafeAreaView edges={['top']} style={styles.content}>
-        <TabTopBar
-          title={headerLabel(view, anchorDate, weekStart)}
-          onMenuPress={openDrawer}
-          rightSlot={
-            !isOnToday ? (
-              <Pressable onPress={jumpToToday} hitSlop={8}>
-                <ThemedText style={styles.todayBtn}>Today</ThemedText>
-              </Pressable>
-            ) : undefined
-          }
-        />
-
-        {/* Day view: optional back-to-prev-view affordance, then the week strip. */}
-        {view === 'day' && showBack && (
-          <View style={styles.subBar}>
-            <Pressable onPress={onBack} hitSlop={12} style={styles.subSide}>
-              <ThemedText style={styles.backText}>
-                ‹ {previousView === 'month'
-                  ? monthLabel(anchorYear, anchorMonth)
-                  : 'Week'}
-              </ThemedText>
-            </Pressable>
-            <View style={styles.subSpacer} />
-          </View>
-        )}
-        {view === 'day' && (
-          <WeekStrip
-            anchorDate={anchorDate}
-            weekStart={weekStart}
-            today={today}
-            countByDate={completionCountByIso}
-            onSelect={setAnchorDate}
+      <View style={styles.content}>
+        {/* Elevated header surface: top bar + date wheel sit on a lighter
+            surface (with a hairline divider) so they read as one navigation
+            band, distinct from the content scrolling on the base background. */}
+        <View
+          style={[styles.header, { paddingTop: insets.top, backgroundColor: headerBg }]}>
+          <TabTopBar
+            title={headerLabel(view, anchorDate, weekStart)}
+            onMenuPress={openDrawer}
+            rightSlot={
+              !isOnToday ? (
+                <Pressable onPress={jumpToToday} hitSlop={8}>
+                  <ThemedText style={styles.todayBtn}>Today</ThemedText>
+                </Pressable>
+              ) : undefined
+            }
           />
-        )}
 
-        {/* Other views: keep the step-arrow sub-bar. */}
-        {view !== 'day' && view !== 'schedule' && (
-          <View style={styles.subBar}>
-            <Pressable
-              onPress={() => stepAnchor(-1)}
-              hitSlop={16}
-              style={styles.subSide}>
-              <ThemedText style={styles.arrow}>‹</ThemedText>
-            </Pressable>
-            <View style={styles.subSpacer} />
-            <Pressable
-              onPress={() => stepAnchor(1)}
-              hitSlop={16}
-              style={styles.subSideRight}>
-              <ThemedText style={styles.arrow}>›</ThemedText>
-            </Pressable>
-          </View>
-        )}
+          {/* Day view: optional back-to-prev-view affordance, then the week strip. */}
+          {view === 'day' && showBack && (
+            <View style={styles.subBar}>
+              <Pressable onPress={onBack} hitSlop={12} style={styles.subSide}>
+                <ThemedText style={styles.backText}>
+                  ‹ {previousView === 'month'
+                    ? monthLabel(anchorYear, anchorMonth)
+                    : 'Week'}
+                </ThemedText>
+              </Pressable>
+              <View style={styles.subSpacer} />
+            </View>
+          )}
+          {view === 'day' && (
+            <WeekStrip
+              anchorDate={anchorDate}
+              weekStart={weekStart}
+              today={today}
+              countByDate={completionCountByIso}
+              onSelect={setAnchorDate}
+            />
+          )}
+
+          {/* Other views: keep the step-arrow sub-bar. */}
+          {view !== 'day' && view !== 'schedule' && (
+            <View style={styles.subBar}>
+              <Pressable
+                onPress={() => stepAnchor(-1)}
+                hitSlop={16}
+                style={styles.subSide}>
+                <ThemedText style={styles.arrow}>‹</ThemedText>
+              </Pressable>
+              <View style={styles.subSpacer} />
+              <Pressable
+                onPress={() => stepAnchor(1)}
+                hitSlop={16}
+                style={styles.subSideRight}>
+                <ThemedText style={styles.arrow}>›</ThemedText>
+              </Pressable>
+            </View>
+          )}
+        </View>
 
         {/* Body */}
         {loading ? (
@@ -638,7 +648,7 @@ export default function CalendarScreen() {
             },
           ]}
         />
-      </SafeAreaView>
+      </View>
 
       <CompletionToast
         visible={toastVisible}
@@ -697,6 +707,10 @@ function parseIsoLocal(iso: string): Date {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   content: { flex: 1 },
+  header: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(127,127,127,0.25)',
+  },
   todayBtn: { fontSize: 14, color: Palette.lavender, fontWeight: '600' },
   subBar: {
     flexDirection: 'row',

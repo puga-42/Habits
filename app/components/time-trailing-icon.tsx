@@ -6,8 +6,10 @@ import { TRAILING_ICON_SIZE } from '@/constants/theme';
 
 export type TimerStatus = 'idle' | 'running' | 'complete';
 
-const RING_STROKE = 3;
-const RING_SIZE = TRAILING_ICON_SIZE + RING_STROKE * 2 + 8;
+// Exported so other trailing controls (e.g. the scheduled "incomplete" ring in
+// agenda-row) can match this progress ring's outer diameter and stroke exactly.
+export const RING_STROKE = 3;
+export const RING_SIZE = TRAILING_ICON_SIZE + RING_STROKE * 2 + 8;
 const STOP_SIZE = TRAILING_ICON_SIZE * 0.45;
 
 type Props = {

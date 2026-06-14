@@ -27,7 +27,12 @@ import Animated, {
 
 import { StreakBadge } from '@/components/streak-badge';
 import { ThemedText } from '@/components/themed-text';
-import { TimeTrailingIcon, type TimerStatus } from '@/components/time-trailing-icon';
+import {
+  RING_SIZE,
+  RING_STROKE,
+  TimeTrailingIcon,
+  type TimerStatus,
+} from '@/components/time-trailing-icon';
 import { solidTint } from '@/constants/colors';
 import { TRAILING_ICON_SIZE } from '@/constants/theme';
 import type { FlexPeriod } from '@/lib/habits';
@@ -221,8 +226,10 @@ function Marker({
   if (kind === 'skip') {
     return <ThemedText style={styles.markerDim}>—</ThemedText>;
   }
-  // scheduled
-  return <ThemedText style={styles.markerDim}>○</ThemedText>;
+  // scheduled — an empty ring whose outer diameter and stroke match the timer's
+  // circular progress ring (and play/pause button), so the trailing control is
+  // the same size across habit kinds.
+  return <View style={styles.incompleteCircle} />;
 }
 
 // A quarter-stepped ring rendered via four border-color sides on a circular
@@ -315,13 +322,24 @@ const styles = StyleSheet.create({
   description: { fontSize: 13, opacity: 0.55, marginTop: 2 },
   descriptionSkipped: { textDecorationLine: 'line-through' },
   trailing: {
-    width: 22,
+    // Width matches the largest trailing control (the timer / incomplete ring),
+    // so its right edge sits at the pill's horizontal padding — the same gap the
+    // leading icon has on the left. Smaller controls (flex ring, markers) center
+    // within this column.
+    width: RING_SIZE,
     alignItems: 'center',
     justifyContent: 'center',
   },
   trailingPressed: { opacity: 0.6 },
   trailingInert: { opacity: 0.5 },
   markerDim: { fontSize: TRAILING_ICON_SIZE, opacity: 0.5 },
+  incompleteCircle: {
+    width: RING_SIZE,
+    height: RING_SIZE,
+    borderRadius: RING_SIZE / 2,
+    borderWidth: RING_STROKE,
+    borderColor: 'rgba(127,127,127,0.5)',
+  },
   markerCheck: { fontSize: TRAILING_ICON_SIZE, fontWeight: '700' },
   ring: {
     width: 18,
