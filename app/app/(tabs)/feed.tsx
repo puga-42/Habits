@@ -18,6 +18,7 @@ import { FeedCommentsSheet } from "@/components/feed-comments-sheet";
 import { FeedEmpty } from "@/components/feed-empty";
 import { FeedNewPill } from "@/components/feed-new-pill";
 import { FeedRow } from "@/components/feed-row";
+import { ScreenHeader } from "@/components/screen-header";
 import { TabTopBar } from "@/components/tab-top-bar";
 import { ThemedView } from "@/components/themed-view";
 import { useAuth } from "@/lib/auth";
@@ -286,8 +287,10 @@ export default function FeedScreen() {
   if (!viewerId) {
     return (
       <ThemedView style={styles.root}>
-        <SafeAreaView edges={["top"]} style={styles.content}>
-          <TabTopBar title="Feed" onMenuPress={openDrawer} />
+        <SafeAreaView edges={[]} style={styles.content}>
+          <ScreenHeader>
+            <TabTopBar title="Feed" onMenuPress={openDrawer} />
+          </ScreenHeader>
         </SafeAreaView>
       </ThemedView>
     );
@@ -297,8 +300,10 @@ export default function FeedScreen() {
 
   return (
     <ThemedView style={styles.root}>
-      <SafeAreaView edges={["top"]} style={styles.safe}>
-        <TabTopBar title="Feed" onMenuPress={openDrawer} />
+      <SafeAreaView edges={[]} style={styles.safe}>
+        <ScreenHeader>
+          <TabTopBar title="Feed" onMenuPress={openDrawer} />
+        </ScreenHeader>
 
         {loading && items.length === 0 ? (
           <View style={styles.center}>

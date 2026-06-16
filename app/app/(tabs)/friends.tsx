@@ -17,6 +17,7 @@ import { FriendRequestRow } from '@/components/friend-request-row';
 import { FriendRow } from '@/components/friend-row';
 import { FriendSearchBar } from '@/components/friend-search-bar';
 import { FriendSearchResultRow } from '@/components/friend-search-result-row';
+import { ScreenHeader } from '@/components/screen-header';
 import { TabTopBar } from '@/components/tab-top-bar';
 import { ThemedText } from '@/components/themed-text';
 import { useThemeColor } from '@/hooks/use-theme-color';
@@ -279,8 +280,10 @@ export default function FriendsScreen() {
   if (!viewerId) {
     return (
       <Pressable style={[styles.root, { backgroundColor }]} onPress={Keyboard.dismiss}>
-        <SafeAreaView edges={['top']} style={styles.content}>
-          <TabTopBar title="Friends" onMenuPress={openDrawer} />
+        <SafeAreaView edges={[]} style={styles.content}>
+          <ScreenHeader>
+            <TabTopBar title="Friends" onMenuPress={openDrawer} />
+          </ScreenHeader>
         </SafeAreaView>
       </Pressable>
     );
@@ -292,14 +295,15 @@ export default function FriendsScreen() {
 
   return (
     <Pressable style={[styles.root, { backgroundColor }]} onPress={Keyboard.dismiss}>
-      <SafeAreaView edges={['top']} style={styles.safe}>
-        <TabTopBar title="Friends" onMenuPress={openDrawer} />
-
-        <FriendSearchBar
-          value={searchQuery}
-          onChangeText={handleSearchChange}
-          onClear={handleSearchClear}
-        />
+      <SafeAreaView edges={[]} style={styles.safe}>
+        <ScreenHeader>
+          <TabTopBar title="Friends" onMenuPress={openDrawer} />
+          <FriendSearchBar
+            value={searchQuery}
+            onChangeText={handleSearchChange}
+            onClear={handleSearchClear}
+          />
+        </ScreenHeader>
 
         {isSearchActive ? (
           searching ? (

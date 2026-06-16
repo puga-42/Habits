@@ -12,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useDrawer } from '@/components/drawer-provider';
 import { NotificationItem } from '@/components/notification-item';
+import { ScreenHeader } from '@/components/screen-header';
 import { TabTopBar } from '@/components/tab-top-bar';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -117,12 +118,14 @@ export default function NotificationsScreen() {
 
   return (
     <ThemedView style={styles.root}>
-      <SafeAreaView edges={['top']} style={styles.safe}>
-        <TabTopBar
-          title="Notifications"
-          onMenuPress={openDrawer}
-          rightSlot={markAllButton}
-        />
+      <SafeAreaView edges={[]} style={styles.safe}>
+        <ScreenHeader>
+          <TabTopBar
+            title="Notifications"
+            onMenuPress={openDrawer}
+            rightSlot={markAllButton}
+          />
+        </ScreenHeader>
         <FlatList
           data={items}
           keyExtractor={(item) => item.id}

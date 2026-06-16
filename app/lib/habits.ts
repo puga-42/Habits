@@ -2,6 +2,7 @@ import * as Crypto from 'expo-crypto';
 import { rrulestr } from 'rrule';
 
 import { supabase } from './supabase';
+import type { CountUnit } from './units';
 
 export type HabitKind = 'scheduled' | 'flex';
 export type Visibility = 'public' | 'friends' | 'private';
@@ -26,6 +27,7 @@ export type Habit = {
   target_count: number | null;
   target_period: FlexPeriod | null;
   unit: HabitUnit;
+  count_unit: CountUnit | null;
   target_seconds: number | null;
   display_unit: TimeDisplayUnit | null;
   sort_index: number;
@@ -167,6 +169,8 @@ export type HabitInsert = {
   unit?: HabitUnit;
   target_seconds?: number;
   display_unit?: TimeDisplayUnit;
+  // count label (steps / reps / meters / …); null/absent → generic "times"
+  count_unit?: CountUnit | null;
   // adoption provenance
   adopted_from_user_id?: string;
 };

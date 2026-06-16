@@ -17,6 +17,7 @@ import type {
   Visibility,
 } from './habits';
 import { secondsFromInput, inputFromSeconds } from './time-format';
+import { describeAmount, normalizeCountUnit, type CountUnit } from './units';
 
 export type HabitDraft = {
   title: string;
@@ -28,6 +29,7 @@ export type HabitDraft = {
   targetCount: number;
   targetPeriod: FlexPeriod;
   unit: HabitUnit;
+  countUnit: CountUnit;
   targetValue: number;
   displayUnit: TimeDisplayUnit;
   color: string;
@@ -44,10 +46,11 @@ function defaultDraft(): HabitDraft {
     recurrence: { pattern: 'daily', byDays: ['MO', 'WE', 'FR'], interval: 2 },
     startsOn: new Date(),
     endsOn: null,
-    targetCount: 3,
+    targetCount: 1,
     targetPeriod: 'week',
     unit: 'count',
-    targetValue: 30,
+    countUnit: 'count',
+    targetValue: 1,
     displayUnit: 'minutes',
     color: Palette.primary,
     icon: '',
@@ -59,9 +62,10 @@ function defaultDraft(): HabitDraft {
 export function habitToDraft(habit: Habit): HabitDraft {
   const unitFields = {
     unit: habit.unit ?? 'count' as HabitUnit,
+    countUnit: normalizeCountUnit(habit.count_unit),
     targetValue: habit.target_seconds
       ? inputFromSeconds(habit.target_seconds, habit.display_unit ?? 'minutes')
-      : 30,
+      : 1,
     displayUnit: habit.display_unit ?? 'minutes' as TimeDisplayUnit,
   };
 
@@ -74,7 +78,7 @@ export function habitToDraft(habit: Habit): HabitDraft {
       recurrence: parseRrule(habit.rrule ?? 'FREQ=DAILY'),
       startsOn: dtstart,
       endsOn: habit.until ? new Date(habit.until) : null,
-      targetCount: 3,
+      targetCount: 1,
       targetPeriod: 'week',
       ...unitFields,
       color: habit.color ?? Palette.primary,
@@ -90,7 +94,7 @@ export function habitToDraft(habit: Habit): HabitDraft {
     recurrence: { pattern: 'daily', byDays: [], interval: 1 },
     startsOn: new Date(),
     endsOn: null,
-    targetCount: habit.target_count ?? 3,
+    targetCount: habit.target_count ?? 1,
     targetPeriod: habit.target_period ?? 'week',
     ...unitFields,
     color: habit.color ?? Palette.primary,
@@ -112,7 +116,7 @@ export function draftToInsert(draft: HabitDraft): HabitInsert {
         target_seconds: secondsFromInput(draft.targetValue, draft.displayUnit),
         display_unit: draft.displayUnit,
       }
-    : { unit: 'count' as const };
+    : { unit: 'count' as const, count_unit: draft.countUnit };
 
   const adoptionFields = draft.adoptedFromUserId
     ? { adopted_from_user_id: draft.adoptedFromUserId }
@@ -159,8 +163,7 @@ export function describeGoal(draft: HabitDraft): string {
     const singular = draft.displayUnit.slice(0, -1); // 'minute' | 'hour' | 'second'
     return `${n} ${n === 1 ? singular : draft.displayUnit}`;
   }
-  const n = draft.targetCount;
-  return `${n} ${n === 1 ? 'time' : 'times'}`;
+  return describeAmount(draft.targetCount, draft.countUnit);
 }
 
 export function describeRepeat(draft: HabitDraft): string {
