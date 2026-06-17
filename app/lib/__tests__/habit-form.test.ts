@@ -18,6 +18,7 @@ const scheduledHabit: Habit = {
   target_count: null,
   target_period: null,
   unit: 'count',
+  count_unit: null,
   target_seconds: null,
   display_unit: null,
   sort_index: 0,

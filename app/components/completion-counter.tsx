@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { Palette } from '@/constants/colors';
 import type { Habit } from '@/lib/habits';
+import { normalizeCountUnit, unitNoun } from '@/lib/units';
 
 type Props = {
   habit: Habit;
@@ -39,6 +40,7 @@ export function CompletionCounter({
     <FlexCounter
       count={completionCount}
       target={target}
+      unit={unitNoun(normalizeCountUnit(habit.count_unit), target)}
       color={color}
       onIncrement={onIncrement}
       onDecrement={onDecrement}
@@ -85,6 +87,7 @@ function ScheduledCounter({
 function FlexCounter({
   count,
   target,
+  unit,
   color,
   onIncrement,
   onDecrement,
@@ -92,6 +95,7 @@ function FlexCounter({
 }: {
   count: number;
   target: number;
+  unit: string;
   color: string;
   onIncrement: () => void;
   onDecrement: () => void;
@@ -117,7 +121,7 @@ function FlexCounter({
           <ThemedText style={[styles.countText, { color }]}>
             {count}
           </ThemedText>
-          <ThemedText style={styles.targetText}>/ {target}</ThemedText>
+          <ThemedText style={styles.targetText}>/ {target} {unit}</ThemedText>
         </View>
 
         <Pressable

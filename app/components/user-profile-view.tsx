@@ -1,5 +1,5 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 
 import { ActivityHeatmap } from '@/components/activity-heatmap';
@@ -9,12 +9,21 @@ import { FeedCard } from '@/components/feed-card';
 import { FeedCommentsSheet } from '@/components/feed-comments-sheet';
 import { MutualFriendsModal } from '@/components/mutual-friends-modal';
 import { MutualFriendsRow } from '@/components/mutual-friends-row';
+import { ProfileDayAgenda } from '@/components/profile-day-agenda';
+import { SegmentedControl } from '@/components/segmented-control';
 import { ThemedText } from '@/components/themed-text';
-import { UserHabitChips } from '@/components/user-habit-chips';
 import { UserHero } from '@/components/user-hero';
 import { applyLikeToggle, blockUser, likeActivity, likeCompletion, muteHabit, reportContent, unlikeActivity, unlikeCompletion, type FeedItem, type FeedKind } from '@/lib/feed';
 import type { FriendProfile } from '@/lib/friends';
-import { fetchMutualFriends, fetchUserFeedPage, fetchUserHabits, fetchUserProfile, filterItemsByDate, filterItemsByLineage, habitsCompletedOnDate, mergeUserFeedPages, userFeedSortKey, type UserHabit, type UserProfileData } from '@/lib/user-profile';
+import { isoDate } from '@/lib/habits';
+import { buildDayGroups, nDayRange, type DayGroup } from '@/lib/history';
+import { fetchMutualFriends, fetchUserDayData, fetchUserFeedPage, fetchUserHabits, fetchUserProfile, filterItemsByDate, filterItemsByLineage, mergeUserFeedPages, userFeedSortKey, userHabitsToHabits, type UserHabit, type UserProfileData } from '@/lib/user-profile';
+
+type ProfileTab = 'day' | 'activity';
+const TAB_OPTIONS: { value: ProfileTab; label: string }[] = [
+  { value: 'day', label: 'Day' },
+  { value: 'activity', label: 'Activity' },
+];
 
 const PAGE_SIZE = 20;
 
@@ -43,9 +52,14 @@ export function UserProfileView({ targetId, viewerId, onBack }: Props) {
   const [selectedDayCount, setSelectedDayCount] = useState(0);
   const [mutualModalOpen, setMutualModalOpen] = useState(false);
   const [activeComment, setActiveComment] = useState<{ targetId: string; targetKind: FeedKind; ownerId: string } | null>(null);
+  const [tab, setTab] = useState<ProfileTab>('day');
+  const [dayGroups, setDayGroups] = useState<Map<string, DayGroup>>(new Map());
+  const [dayLoading, setDayLoading] = useState(false);
+  const dayWindow = useRef<{ from: string; to: string } | null>(null);
 
   const loadAll = useCallback(async () => {
     setLoading(true);
+    dayWindow.current = null; // force the day-view window to refetch
     try {
       const [p, h] = await Promise.all([
         fetchUserProfile(targetId, viewerId),
@@ -89,13 +103,6 @@ export function UserProfileView({ targetId, viewerId, onBack }: Props) {
     setSelectedDate(date); setSelectedDayCount(count); setSelectedLineageId(null);
     setItems(allItemsRef.current); setReachedEnd(reachedEndAllRef.current);
   }, []);
-  const handleChipSelect = useCallback((lineageId: string | null) => {
-    setSelectedLineageId(lineageId);
-    if (selectedDate) return;
-    const filtered = lineageId ? filterItemsByLineage(allItemsRef.current, habits, lineageId) : allItemsRef.current;
-    setItems(filtered);
-    setReachedEnd(lineageId ? false : reachedEndAllRef.current);
-  }, [habits, selectedDate]);
   const handleToggleLike = useCallback(async (item: FeedItem) => {
     if (!viewerId) return;
     const next = !item.viewer_liked;
@@ -108,9 +115,54 @@ export function UserProfileView({ targetId, viewerId, onBack }: Props) {
     }
   }, [viewerId]);
 
+  // ── Day tab: read-only agenda of the owner's day ──────────────────────────
+  // Only for OTHER users — your own calendar lives on the home tab, so the Me
+  // page skips the day-view and just shows your activity.
+  const isSelf = targetId === viewerId;
+  const showDay = !isSelf && tab === 'day';
+  const anchorIso = selectedDate ?? isoDate(now);
+  const habitMap = useMemo(
+    () => new Map(userHabitsToHabits(habits, targetId).map((h) => [h.id, h])),
+    [habits, targetId],
+  );
+
+  const loadDayWindow = useCallback(
+    async (centerIso: string) => {
+      setDayLoading(true);
+      try {
+        const days = nDayRange(parseIsoLocal(addDaysIso(centerIso, -28)), 42); // [-28, +13]
+        const from = days[0];
+        const to = addDaysIso(days[days.length - 1], 1); // exclusive
+        const { completions, overrides } = await fetchUserDayData(targetId, viewerId, from, to);
+        const full = userHabitsToHabits(habits, targetId);
+        const groups = buildDayGroups(days, full, completions, overrides, now);
+        setDayGroups(new Map(groups.map((g) => [g.date, g])));
+        dayWindow.current = { from, to };
+      } finally {
+        setDayLoading(false);
+      }
+    },
+    [targetId, viewerId, habits, now],
+  );
+
+  useEffect(() => {
+    if (!showDay || habits.length === 0) return;
+    const w = dayWindow.current;
+    if (w && anchorIso >= w.from && anchorIso < w.to) return; // already covered
+    loadDayWindow(anchorIso);
+  }, [showDay, anchorIso, habits, loadDayWindow]);
+
+  const dayGroup = dayGroups.get(anchorIso);
+
+  const handleDayHabitPress = useCallback(
+    (habitId: string) => {
+      router.push({ pathname: '/habit/view', params: { id: habitId, occurrenceDate: anchorIso } });
+    },
+    [router, anchorIso],
+  );
+
   const backHandler = onBack ?? (() => {});
 
-  const visibleHabits = selectedDate ? habitsCompletedOnDate(items, habits, selectedDate) : habits;
   const displayedItems = useMemo(() => {
     const byLineage = selectedLineageId ? filterItemsByLineage(items, habits, selectedLineageId) : items;
     return filterItemsByDate(byLineage, selectedDate);
@@ -144,8 +196,9 @@ export function UserProfileView({ targetId, viewerId, onBack }: Props) {
         <View style={s.center}><ActivityIndicator /></View>
       ) : (
         <FlatList
-          data={displayedItems}
+          data={showDay ? [] : displayedItems}
           keyExtractor={(i) => i.id}
+          contentContainerStyle={s.listContent}
           ListHeaderComponent={
             <View>
               {profile && (
@@ -164,9 +217,20 @@ export function UserProfileView({ targetId, viewerId, onBack }: Props) {
               {selectedDate != null && (
                 <ThemedText style={s.daySummary}>{formatDaySummary(selectedDate, selectedDayCount)}</ThemedText>
               )}
-              <View style={s.chipsWrap}>
-                <UserHabitChips habits={visibleHabits} selectedLineageId={selectedLineageId} onSelect={handleChipSelect} />
-              </View>
+              {!isSelf && habits.length > 0 && (
+                <View style={s.segmentWrap}>
+                  <SegmentedControl options={TAB_OPTIONS} value={tab} onChange={setTab} />
+                </View>
+              )}
+              {showDay && habits.length > 0 && (
+                <View style={s.dayWrap}>
+                  {dayLoading && dayGroups.size === 0 ? (
+                    <View style={s.footer}><ActivityIndicator /></View>
+                  ) : (
+                    <ProfileDayAgenda group={dayGroup} habitMap={habitMap} onHabitPress={handleDayHabitPress} />
+                  )}
+                </View>
+              )}
             </View>
           }
           renderItem={({ item }) =>
@@ -175,9 +239,15 @@ export function UserProfileView({ targetId, viewerId, onBack }: Props) {
               : <FeedCard {...cardProps(item)} onEdit={item.owner_id === viewerId ? () => router.push(`/completion/${item.id}`) : undefined} />
           }
           ItemSeparatorComponent={Sep}
-          ListEmptyComponent={loading ? <View style={s.footer}><ActivityIndicator /></View> : <ThemedText style={s.empty}>No activity yet</ThemedText>}
-          ListFooterComponent={paging ? <View style={s.footer}><ActivityIndicator /></View> : null}
-          onEndReached={loadMore}
+          ListEmptyComponent={
+            showDay
+              ? null
+              : loading
+                ? <View style={s.footer}><ActivityIndicator /></View>
+                : <ThemedText style={s.empty}>No activity yet</ThemedText>
+          }
+          ListFooterComponent={paging && !showDay ? <View style={s.footer}><ActivityIndicator /></View> : null}
+          onEndReached={showDay ? undefined : loadMore}
           onEndReachedThreshold={0.4}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}
         />
@@ -200,11 +270,25 @@ export function UserProfileView({ targetId, viewerId, onBack }: Props) {
 
 function Sep() { return <View style={s.sep} />; }
 
+function parseIsoLocal(iso: string): Date {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+function addDaysIso(iso: string, n: number): string {
+  const d = parseIsoLocal(iso);
+  d.setDate(d.getDate() + n);
+  return isoDate(d);
+}
+
+
 const s = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  listContent: { paddingBottom: 120 },
   muted: { opacity: 0.6, fontSize: 15 },
   daySummary: { paddingHorizontal: 14, paddingBottom: 4, fontSize: 13, opacity: 0.7 },
-  chipsWrap: { paddingBottom: 12 },
+  segmentWrap: { paddingHorizontal: 14, paddingVertical: 8 },
+  dayWrap: { paddingTop: 4, paddingBottom: 12 },
   empty: { textAlign: 'center', opacity: 0.5, paddingTop: 40, fontSize: 15 },
   sep: { height: StyleSheet.hairlineWidth, backgroundColor: 'rgba(127,127,127,0.25)', marginHorizontal: 14 },
   footer: { paddingVertical: 18, alignItems: 'center' },

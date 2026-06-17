@@ -4,8 +4,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, useColorScheme, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { Palette } from '@/constants/colors';
 import { Calendar3DayView } from '@/components/calendar-3day-view';
@@ -14,6 +13,7 @@ import type { ViewMode } from '@/components/calendar-menu-drawer';
 import { CompletionToast } from '@/components/completion-toast';
 import { useDrawer } from '@/components/drawer-provider';
 import { FabSpeedDial } from '@/components/fab-speed-dial';
+import { ScreenHeader } from '@/components/screen-header';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { CalendarMonthView } from '@/components/calendar-month-view';
 import { CalendarScheduleView } from '@/components/calendar-schedule-view';
@@ -503,10 +503,6 @@ export default function CalendarScreen() {
 
   // ─── Render ────────────────────────────────────────────────────────────
 
-  const insets = useSafeAreaInsets();
-  const headerBg =
-    useColorScheme() !== 'light' ? Palette.charcoalElevated : '#FFFFFF';
-
   const isOnToday = isoDate(anchorDate) === isoDate(today);
   const showBack =
     view === 'day' && (previousView === 'month' || previousView === 'week');
@@ -514,11 +510,9 @@ export default function CalendarScreen() {
   return (
     <ThemedView style={styles.root}>
       <View style={styles.content}>
-        {/* Elevated header surface: top bar + date wheel sit on a lighter
-            surface (with a hairline divider) so they read as one navigation
+        {/* Elevated header surface: top bar + date wheel read as one navigation
             band, distinct from the content scrolling on the base background. */}
-        <View
-          style={[styles.header, { paddingTop: insets.top, backgroundColor: headerBg }]}>
+        <ScreenHeader>
           <TabTopBar
             title={headerLabel(view, anchorDate, weekStart)}
             onMenuPress={openDrawer}
@@ -572,7 +566,7 @@ export default function CalendarScreen() {
               </Pressable>
             </View>
           )}
-        </View>
+        </ScreenHeader>
 
         {/* Body */}
         {loading ? (
@@ -707,10 +701,6 @@ function parseIsoLocal(iso: string): Date {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   content: { flex: 1 },
-  header: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(127,127,127,0.25)',
-  },
   todayBtn: { fontSize: 14, color: Palette.lavender, fontWeight: '600' },
   subBar: {
     flexDirection: 'row',

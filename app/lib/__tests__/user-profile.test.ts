@@ -5,9 +5,33 @@ import {
   filterItemsByLineage,
   filterItemsByDate,
   habitsCompletedOnDate,
+  userHabitsToHabits,
   type UserHabit,
 } from '../user-profile';
 import type { FeedItem } from '../feed';
+
+function makeUserHabit(overrides: Partial<UserHabit> = {}): UserHabit {
+  return {
+    id: 'h1',
+    lineage_id: 'L1',
+    title: 'Meditate',
+    description: null,
+    icon: '🧘',
+    color: null,
+    kind: 'scheduled',
+    visibility: 'friends',
+    timezone: 'UTC',
+    dtstart: '2026-06-01T08:00:00Z',
+    rrule: 'FREQ=DAILY',
+    until: null,
+    target_count: null,
+    target_period: null,
+    unit: 'count',
+    target_seconds: null,
+    display_unit: null,
+    ...overrides,
+  };
+}
 
 function makeItem(overrides: Partial<FeedItem> = {}): FeedItem {
   return {
@@ -151,9 +175,9 @@ describe('mergeUserFeedPages', () => {
 
 describe('filterItemsByLineage', () => {
   const habits: UserHabit[] = [
-    { id: 'h1', lineage_id: 'L1', title: 'Meditate', icon: '🧘', color: null, kind: 'scheduled' },
-    { id: 'h2', lineage_id: 'L1', title: 'Meditate v2', icon: '🧘', color: null, kind: 'scheduled' },
-    { id: 'h3', lineage_id: 'L2', title: 'Run', icon: '🏃', color: null, kind: 'flex' },
+    makeUserHabit({ id: 'h1', lineage_id: 'L1', title: 'Meditate' }),
+    makeUserHabit({ id: 'h2', lineage_id: 'L1', title: 'Meditate v2' }),
+    makeUserHabit({ id: 'h3', lineage_id: 'L2', title: 'Run', kind: 'flex' }),
   ];
 
   it('returns all items when lineageId is null', () => {
@@ -236,9 +260,9 @@ describe('friendshipActionLabel', () => {
 
 describe('habitsCompletedOnDate', () => {
   const habits: UserHabit[] = [
-    { id: 'h1', lineage_id: 'l1', title: 'Meditate', icon: '🧘', color: '#aaa', kind: 'scheduled' },
-    { id: 'h2', lineage_id: 'l2', title: 'Run', icon: '🏃', color: '#f00', kind: 'flex' },
-    { id: 'h3', lineage_id: 'l3', title: 'Read', icon: '📖', color: '#00f', kind: 'scheduled' },
+    makeUserHabit({ id: 'h1', lineage_id: 'l1', title: 'Meditate', color: '#aaa' }),
+    makeUserHabit({ id: 'h2', lineage_id: 'l2', title: 'Run', icon: '🏃', color: '#f00', kind: 'flex' }),
+    makeUserHabit({ id: 'h3', lineage_id: 'l3', title: 'Read', icon: '📖', color: '#00f' }),
   ];
 
   it('returns habits with completions on the given date', () => {
@@ -277,5 +301,32 @@ describe('habitsCompletedOnDate', () => {
     ];
     const result = habitsCompletedOnDate(items, habits, '2026-06-01');
     expect(result.map((h) => h.id)).toEqual(['h2']);
+  });
+});
+
+describe('userHabitsToHabits', () => {
+  it('maps visible-habit rows into full Habit objects with the given owner', () => {
+    const result = userHabitsToHabits(
+      [makeUserHabit({ id: 'h1', lineage_id: 'L1', rrule: 'FREQ=WEEKLY' })],
+      'owner-7',
+    );
+    expect(result).toHaveLength(1);
+    const h = result[0];
+    expect(h.id).toBe('h1');
+    expect(h.owner_id).toBe('owner-7');
+    expect(h.rrule).toBe('FREQ=WEEKLY');
+    expect(h.dtstart).toBe('2026-06-01T08:00:00Z');
+    expect(h.sort_index).toBe(0);
+    expect(h.deleted_at).toBeNull();
+  });
+
+  it('preserves flex targets', () => {
+    const [h] = userHabitsToHabits(
+      [makeUserHabit({ kind: 'flex', rrule: null, dtstart: null, target_count: 3, target_period: 'week' })],
+      'u1',
+    );
+    expect(h.kind).toBe('flex');
+    expect(h.target_count).toBe(3);
+    expect(h.target_period).toBe('week');
   });
 });

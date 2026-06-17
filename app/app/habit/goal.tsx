@@ -1,20 +1,23 @@
-// "Goal" detail page (pushed from the habit form's Goal row). Sets the raw
-// target number plus its unit: a simple count ("Times") or a timed duration
-// ("Minutes" / "Hours"). Reads/writes the shared habit draft.
+// "Goal" detail page (pushed from the habit form's Goal row). Sets the target
+// amount plus its unit, grouped iOS-style into Count units (count / steps / reps
+// / … ) and Time units (seconds / minutes / hours). Reads/writes the shared
+// habit draft. Mirrors the grouped-card look of the habit create/edit form.
 
 import { useRouter } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { CardList, FormCard } from '@/components/form-card';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { Palette } from '@/constants/colors';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { useHabitForm } from '@/lib/habit-form';
 import type { TimeDisplayUnit } from '@/lib/habits';
+import { COUNT_UNITS, type CountUnit } from '@/lib/units';
 
-type UnitKey = 'count' | TimeDisplayUnit;
-const UNIT_OPTIONS: { key: UnitKey; label: string }[] = [
-  { key: 'count', label: 'Times' },
+const TIME_UNITS: { key: TimeDisplayUnit; label: string }[] = [
+  { key: 'seconds', label: 'Seconds' },
   { key: 'minutes', label: 'Minutes' },
   { key: 'hours', label: 'Hours' },
 ];
@@ -25,19 +28,22 @@ export default function GoalScreen() {
   const textColor = useThemeColor({}, 'text');
 
   const isTime = draft.unit === 'time';
-  const number = isTime ? draft.targetValue : draft.targetCount;
-  const selectedKey: UnitKey = isTime ? draft.displayUnit : 'count';
+  const amount = isTime ? draft.targetValue : draft.targetCount;
 
-  function setNumber(t: string) {
+  function setAmount(t: string) {
     const n = parseInt(t, 10);
     const val = isNaN(n) ? 0 : n;
     if (isTime) update({ targetValue: val });
     else update({ targetCount: val });
   }
 
-  function selectUnit(key: UnitKey) {
-    if (key === 'count') update({ unit: 'count' });
-    else update({ unit: 'time', displayUnit: key });
+  // Switching unit carries the current amount across so only editing the number
+  // changes it (the count/time targets are stored separately under the hood).
+  function selectCount(key: CountUnit) {
+    update({ unit: 'count', countUnit: key, targetCount: amount });
+  }
+  function selectTime(key: TimeDisplayUnit) {
+    update({ unit: 'time', displayUnit: key, targetValue: amount });
   }
 
   return (
@@ -53,24 +59,53 @@ export default function GoalScreen() {
           </Pressable>
         </View>
 
-        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-          <ThemedText style={styles.label}>Amount</ThemedText>
-          <TextInput
-            value={String(number)}
-            onChangeText={setNumber}
-            keyboardType="number-pad"
-            style={[styles.input, { color: textColor }]}
-            selectTextOnFocus
-            autoFocus
-          />
+        <View style={styles.pinned}>
+          <FormCard title="Amount">
+            <CardList>
+              <View style={styles.cell}>
+                <TextInput
+                  value={String(amount)}
+                  onChangeText={setAmount}
+                  keyboardType="number-pad"
+                  style={[styles.input, { color: textColor }]}
+                  selectTextOnFocus
+                  autoFocus
+                />
+              </View>
+            </CardList>
+          </FormCard>
+        </View>
 
-          <ThemedText style={[styles.label, styles.unitLabel]}>Unit</ThemedText>
-          {UNIT_OPTIONS.map((o) => (
-            <Pressable key={o.key} onPress={() => selectUnit(o.key)} style={styles.optionRow}>
-              <ThemedText style={styles.radio}>{selectedKey === o.key ? '●' : '○'}</ThemedText>
-              <ThemedText style={styles.optionText}>{o.label}</ThemedText>
-            </Pressable>
-          ))}
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+          automaticallyAdjustKeyboardInsets>
+          <FormCard title="Count">
+            <CardList>
+              {COUNT_UNITS.map((o) => (
+                <Pressable key={o.key} style={styles.row} onPress={() => selectCount(o.key)}>
+                  <ThemedText style={styles.rowLabel}>{o.label}</ThemedText>
+                  {!isTime && draft.countUnit === o.key && (
+                    <ThemedText style={styles.check}>✓</ThemedText>
+                  )}
+                </Pressable>
+              ))}
+            </CardList>
+          </FormCard>
+
+          <FormCard title="Time">
+            <CardList>
+              {TIME_UNITS.map((o) => (
+                <Pressable key={o.key} style={styles.row} onPress={() => selectTime(o.key)}>
+                  <ThemedText style={styles.rowLabel}>{o.label}</ThemedText>
+                  {isTime && draft.displayUnit === o.key && (
+                    <ThemedText style={styles.check}>✓</ThemedText>
+                  )}
+                </Pressable>
+              ))}
+            </CardList>
+          </FormCard>
         </ScrollView>
       </SafeAreaView>
     </ThemedView>
@@ -91,28 +126,17 @@ const styles = StyleSheet.create({
   },
   headerButton: { fontSize: 16 },
   done: { fontWeight: '600' },
-  scroll: { padding: 20, gap: 8 },
-  label: {
-    fontSize: 12,
-    opacity: 0.6,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  unitLabel: { marginTop: 16 },
-  input: {
-    fontSize: 17,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(127,127,127,0.3)',
-  },
-  optionRow: {
+  pinned: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 8 },
+  scroll: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 60, gap: 24 },
+  cell: { paddingHorizontal: 16, paddingVertical: 12 },
+  input: { fontSize: 17, padding: 0 },
+  row: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: 12,
-    paddingVertical: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
   },
-  radio: { fontSize: 18, width: 24 },
-  optionText: { fontSize: 16 },
+  rowLabel: { fontSize: 16 },
+  check: { fontSize: 17, fontWeight: '700', color: Palette.primary },
 });
