@@ -19,6 +19,7 @@ import { CalendarMonthView } from '@/components/calendar-month-view';
 import { CalendarScheduleView } from '@/components/calendar-schedule-view';
 import { CalendarWeekView } from '@/components/calendar-week-view';
 import { TabTopBar } from '@/components/tab-top-bar';
+import { RestUntilModal } from '@/components/rest-until-modal';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { WeekStrip } from '@/components/week-strip';
@@ -32,10 +33,10 @@ import {
   markFlexCompleted,
   markScheduledCompleted,
   reorderHabits,
-  skipOccurrence,
+  restHabitDays,
   unmarkCompleted,
   unmarkLastFlexInPeriod,
-  unskipOccurrence,
+  wakeHabit,
   type Habit,
   type HabitOverride,
 } from '@/lib/habits';
@@ -48,6 +49,7 @@ import {
   flexProgressByHabit,
   monthLabel,
   nDayRange,
+  occurrencesInRange,
   weekDatesFrom,
   type AgendaRow,
   type CompletionWithHabit,
@@ -105,6 +107,7 @@ export default function CalendarScreen() {
 
   const [toastVisible, setToastVisible] = useState(false);
   const [toastCompletionId, setToastCompletionId] = useState<string | null>(null);
+  const [restTarget, setRestTarget] = useState<{ habit: Habit; dateIso: string } | null>(null);
   const [activeTimerHabitId, setActiveTimerHabitId] = useState<string | null>(null);
   const [activeTimerDateIso, setActiveTimerDateIso] = useState<string | null>(null);
   const activeTimerRef = useRef<{ entryId: string; startedAt: string } | null>(null);
@@ -345,6 +348,22 @@ export default function CalendarScreen() {
     if (!userId) return;
     if (!canCompleteOn(dateIso, today)) return;
 
+    // A resting habit can still be completed (counts toward the streak) without
+    // ending the rest — toggle the completion, leave the rest overrides intact.
+    if (row.kind === 'rest') {
+      if (row.completed && row.completionId) {
+        await unmarkCompleted(row.completionId);
+      } else if (!row.completed) {
+        const completionId = await markScheduledCompleted(row.habitId, userId, dateIso);
+        if (completionId) {
+          setToastCompletionId(completionId);
+          setToastVisible(true);
+        }
+      }
+      await load();
+      return;
+    }
+
     const habitId = row.kind === 'completion' ? row.habit.id : row.habitId;
     const habit = habits.find((h) => h.id === habitId);
 
@@ -441,19 +460,31 @@ export default function CalendarScreen() {
         await deleteTimeEntries(habit.id, occurrenceDate, periodStart);
       } else if (row.kind === 'completion') {
         await unmarkCompleted(row.id);
-      } else if (row.kind === 'skip') {
-        await unskipOccurrence(row.habitId, dateIso);
       } else if (row.kind === 'flex' && row.count > 0) {
         const habit = habits.find((h) => h.id === row.habitId);
         if (!habit?.target_period) return;
         const periodStart = flexPeriodStartFor(dateIso, habit.target_period);
         await unmarkLastFlexInPeriod(row.habitId, periodStart);
       }
-    } else if (action === 'skip') {
+    } else if (action === 'rest') {
+      // Open the date picker; the modal writes the rest range on confirm.
       if (row.kind === 'scheduled') {
-        await skipOccurrence(row.habitId, dateIso);
+        const habit = habits.find((h) => h.id === row.habitId);
+        if (habit) setRestTarget({ habit, dateIso });
       }
+      return;
+    } else if (action === 'wake') {
+      if (row.kind === 'rest') await wakeHabit(row.habitId, isoDate(today));
     }
+    await load();
+  }
+
+  async function confirmRest(untilIso: string) {
+    if (!userId || !restTarget) return;
+    const { habit, dateIso } = restTarget;
+    const dates = occurrencesInRange(habit, dateIso, untilIso);
+    setRestTarget(null);
+    await restHabitDays(habit.id, dates);
     await load();
   }
 
@@ -464,7 +495,7 @@ export default function CalendarScreen() {
   // the global list) caused rows on other days to jump around.
   async function handleReorderSection(
     dateIso: string,
-    section: 'notCompleted' | 'completed',
+    section: Section,
     newRows: AgendaRow[],
   ) {
     const newSectionIds = newRows.map((r) =>
@@ -650,6 +681,14 @@ export default function CalendarScreen() {
           if (toastCompletionId) router.push(`/completion/${toastCompletionId}`);
         }}
         onDismiss={() => setToastVisible(false)}
+      />
+
+      <RestUntilModal
+        visible={restTarget !== null}
+        habitTitle={restTarget?.habit.title ?? ''}
+        fromIso={restTarget?.dateIso ?? isoDate(today)}
+        onConfirm={confirmRest}
+        onClose={() => setRestTarget(null)}
       />
     </ThemedView>
   );

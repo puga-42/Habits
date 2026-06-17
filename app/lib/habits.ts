@@ -473,31 +473,40 @@ export function occurrenceMidnight(occurrenceDate: string): Date {
   return new Date(y, m - 1, d, 0, 0, 0, 0);
 }
 
-// ─── Swipe-action mutations ───────────────────────────────────────────────
+// ─── Rest (swipe) mutations ───────────────────────────────────────────────
+//
+// "Rest" makes a scheduled habit's due days streak-neutral through a chosen
+// date. Each rested day reuses the per-occurrence neutral override (kind 'skip'
+// is the internal neutral-day marker — kept to avoid a needless enum/RPC
+// migration; the streak's skip_dates already treat it as neutral). A habit is
+// "resting" while it has such an override on/after today.
 
-export async function skipOccurrence(
+export async function restHabitDays(
   habitId: string,
-  occurrenceDate: string,
+  occurrenceDates: string[],
 ): Promise<void> {
+  if (occurrenceDates.length === 0) return;
+  const rows = occurrenceDates.map((occurrence_date) => ({
+    habit_id: habitId,
+    occurrence_date,
+    kind: 'skip' as const,
+    patch: null,
+  }));
   const { error } = await supabase
     .from('habit_overrides')
-    .upsert(
-      { habit_id: habitId, occurrence_date: occurrenceDate, kind: 'skip', patch: null },
-      { onConflict: 'habit_id,occurrence_date' },
-    );
+    .upsert(rows, { onConflict: 'habit_id,occurrence_date' });
   if (error) throw error;
 }
 
-export async function unskipOccurrence(
-  habitId: string,
-  occurrenceDate: string,
-): Promise<void> {
+// End a rest from `fromIso` forward. Past rested days are kept neutral so the
+// streak keeps bridging them; only today-and-later rest days are cleared.
+export async function wakeHabit(habitId: string, fromIso: string): Promise<void> {
   const { error } = await supabase
     .from('habit_overrides')
     .delete()
     .eq('habit_id', habitId)
-    .eq('occurrence_date', occurrenceDate)
-    .eq('kind', 'skip');
+    .eq('kind', 'skip')
+    .gte('occurrence_date', fromIso);
   if (error) throw error;
 }
 

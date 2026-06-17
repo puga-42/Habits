@@ -10,6 +10,7 @@ export default function HabitLayout() {
         <Stack.Screen name="new" />
         <Stack.Screen name="goal" />
         <Stack.Screen name="repeat" />
+        <Stack.Screen name="visibility" />
       </Stack>
     </HabitFormProvider>
   );

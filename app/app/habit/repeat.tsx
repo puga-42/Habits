@@ -5,13 +5,16 @@
 //   - Flex     → a target period (day / week / month).
 // The kind picker is locked on the edit screen (passed via ?lock=1) because
 // changing kind mid-lineage isn't supported. Reads/writes the shared draft.
+// Grouped iOS-style into cards, mirroring the Goal page.
 
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { CardList, FormCard } from '@/components/form-card';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { Palette } from '@/constants/colors';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { useHabitForm } from '@/lib/habit-form';
 import type { FlexPeriod } from '@/lib/habits';
@@ -41,23 +44,28 @@ const PERIOD_OPTIONS: { key: FlexPeriod; label: string }[] = [
 
 const MONTH_DAYS = Array.from({ length: 31 }, (_, i) => i + 1);
 
-function RadioRow({
+function SelectRow({
   selected,
   label,
+  description,
   onPress,
   disabled,
 }: {
   selected: boolean;
   label: string;
+  description?: string;
   onPress: () => void;
   disabled?: boolean;
 }) {
   return (
     <Pressable
       onPress={disabled ? undefined : onPress}
-      style={[styles.optionRow, disabled && styles.disabled]}>
-      <ThemedText style={styles.radio}>{selected ? '●' : '○'}</ThemedText>
-      <ThemedText style={styles.optionText}>{label}</ThemedText>
+      style={[styles.row, disabled && styles.disabled]}>
+      <View style={styles.rowMain}>
+        <ThemedText style={styles.rowLabel}>{label}</ThemedText>
+        {description ? <ThemedText style={styles.rowSub}>{description}</ThemedText> : null}
+      </View>
+      {selected && <ThemedText style={styles.check}>✓</ThemedText>}
     </Pressable>
   );
 }
@@ -109,107 +117,124 @@ export default function RepeatScreen() {
           </Pressable>
         </View>
 
-        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-          <ThemedText style={styles.label}>Type</ThemedText>
-          <RadioRow
-            selected={draft.kind === 'scheduled'}
-            label="Scheduled — on a set schedule"
-            onPress={() => update({ kind: 'scheduled' })}
-            disabled={locked}
-          />
-          <RadioRow
-            selected={draft.kind === 'flex'}
-            label="Flex — a target per period"
-            onPress={() => update({ kind: 'flex' })}
-            disabled={locked}
-          />
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+          automaticallyAdjustKeyboardInsets>
+          <FormCard title="Type">
+            <CardList>
+              <SelectRow
+                selected={draft.kind === 'scheduled'}
+                label="Scheduled"
+                description="On a set schedule"
+                onPress={() => update({ kind: 'scheduled' })}
+                disabled={locked}
+              />
+              <SelectRow
+                selected={draft.kind === 'flex'}
+                label="Flex"
+                description="A target per period"
+                onPress={() => update({ kind: 'flex' })}
+                disabled={locked}
+              />
+            </CardList>
+          </FormCard>
 
           {draft.kind === 'scheduled' ? (
             <>
-              <ThemedText style={[styles.label, styles.section]}>Schedule</ThemedText>
-              {PATTERN_OPTIONS.map((p) => (
-                <RadioRow
-                  key={p.key}
-                  selected={recurrence.pattern === p.key}
-                  label={p.label}
-                  onPress={() => setPattern(p.key)}
-                />
-              ))}
+              <FormCard title="Schedule">
+                <CardList>
+                  {PATTERN_OPTIONS.map((p) => (
+                    <SelectRow
+                      key={p.key}
+                      selected={recurrence.pattern === p.key}
+                      label={p.label}
+                      onPress={() => setPattern(p.key)}
+                    />
+                  ))}
+                </CardList>
+              </FormCard>
 
               {recurrence.pattern === 'weekly' && (
-                <View style={styles.subSection}>
-                  <ThemedText style={styles.label}>Days</ThemedText>
-                  <View style={styles.daysRow}>
-                    {WEEKDAYS.map((d) => {
-                      const selected = recurrence.byDays.includes(d);
-                      return (
-                        <Pressable
-                          key={d}
-                          onPress={() => toggleDay(d)}
-                          style={[styles.dayChip, selected && styles.chipSelected]}>
-                          <ThemedText style={[styles.chipText, selected && styles.chipTextSelected]}>
-                            {WEEKDAY_LABELS[d]}
-                          </ThemedText>
-                        </Pressable>
-                      );
-                    })}
+                <FormCard title="Days">
+                  <View style={styles.cell}>
+                    <View style={styles.daysRow}>
+                      {WEEKDAYS.map((d) => {
+                        const selected = recurrence.byDays.includes(d);
+                        return (
+                          <Pressable
+                            key={d}
+                            onPress={() => toggleDay(d)}
+                            style={[styles.dayChip, selected && styles.chipSelected]}>
+                            <ThemedText style={[styles.chipText, selected && styles.chipTextSelected]}>
+                              {WEEKDAY_LABELS[d]}
+                            </ThemedText>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
                   </View>
-                </View>
+                </FormCard>
               )}
 
               {recurrence.pattern === 'monthlyDays' && (
-                <View style={styles.subSection}>
-                  <ThemedText style={styles.label}>Days of month</ThemedText>
-                  <View style={styles.monthGrid}>
-                    {MONTH_DAYS.map((d) => {
-                      const selected = (recurrence.byMonthDays ?? []).includes(d);
-                      return (
-                        <Pressable
-                          key={d}
-                          onPress={() => toggleMonthDay(d)}
-                          style={[styles.monthChip, selected && styles.chipSelected]}>
-                          <ThemedText style={[styles.chipText, selected && styles.chipTextSelected]}>
-                            {d}
-                          </ThemedText>
-                        </Pressable>
-                      );
-                    })}
+                <FormCard title="Days of month">
+                  <View style={styles.cell}>
+                    <View style={styles.monthGrid}>
+                      {MONTH_DAYS.map((d) => {
+                        const selected = (recurrence.byMonthDays ?? []).includes(d);
+                        return (
+                          <Pressable
+                            key={d}
+                            onPress={() => toggleMonthDay(d)}
+                            style={[styles.monthChip, selected && styles.chipSelected]}>
+                            <ThemedText style={[styles.chipText, selected && styles.chipTextSelected]}>
+                              {d}
+                            </ThemedText>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
                   </View>
-                </View>
+                </FormCard>
               )}
 
               {recurrence.pattern === 'interval' && (
-                <View style={styles.subSection}>
-                  <ThemedText style={styles.label}>Every N days</ThemedText>
-                  <TextInput
-                    value={String(recurrence.interval)}
-                    onChangeText={(t) => {
-                      const n = parseInt(t, 10);
-                      update({ recurrence: { ...recurrence, interval: isNaN(n) || n < 1 ? 1 : n } });
-                    }}
-                    keyboardType="number-pad"
-                    style={[styles.input, { color: textColor }]}
-                  />
-                </View>
+                <FormCard title="Every N days">
+                  <View style={styles.cell}>
+                    <View style={styles.intervalRow}>
+                      <TextInput
+                        value={String(recurrence.interval)}
+                        onChangeText={(t) => {
+                          const n = parseInt(t, 10);
+                          update({ recurrence: { ...recurrence, interval: isNaN(n) || n < 1 ? 1 : n } });
+                        }}
+                        keyboardType="number-pad"
+                        style={[styles.input, { color: textColor }]}
+                        selectTextOnFocus
+                      />
+                      <ThemedText style={styles.intervalSuffix}>days</ThemedText>
+                    </View>
+                  </View>
+                </FormCard>
               )}
 
-              <View style={styles.previewBox}>
-                <ThemedText style={styles.label}>Preview</ThemedText>
-                <ThemedText style={styles.previewText}>{describeRrule(recurrence)}</ThemedText>
-              </View>
+              <ThemedText style={styles.footer}>{describeRrule(recurrence)}</ThemedText>
             </>
           ) : (
-            <>
-              <ThemedText style={[styles.label, styles.section]}>Period</ThemedText>
-              {PERIOD_OPTIONS.map((p) => (
-                <RadioRow
-                  key={p.key}
-                  selected={draft.targetPeriod === p.key}
-                  label={p.label}
-                  onPress={() => update({ targetPeriod: p.key })}
-                />
-              ))}
-            </>
+            <FormCard title="Period">
+              <CardList>
+                {PERIOD_OPTIONS.map((p) => (
+                  <SelectRow
+                    key={p.key}
+                    selected={draft.targetPeriod === p.key}
+                    label={p.label}
+                    onPress={() => update({ targetPeriod: p.key })}
+                  />
+                ))}
+              </CardList>
+            </FormCard>
           )}
         </ScrollView>
       </SafeAreaView>
@@ -231,27 +256,28 @@ const styles = StyleSheet.create({
   },
   headerButton: { fontSize: 16 },
   done: { fontWeight: '600' },
-  scroll: { padding: 20, gap: 8, paddingBottom: 60 },
-  label: {
-    fontSize: 12,
-    opacity: 0.6,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+  scroll: { padding: 20, paddingBottom: 60, gap: 24 },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
   },
-  section: { marginTop: 20 },
-  optionRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
+  rowMain: { flex: 1 },
+  rowLabel: { fontSize: 16 },
+  rowSub: { fontSize: 13, opacity: 0.55, marginTop: 2 },
+  check: { fontSize: 17, fontWeight: '700', color: Palette.primary },
   disabled: { opacity: 0.4 },
-  radio: { fontSize: 18, width: 24 },
-  optionText: { fontSize: 16 },
-  subSection: { gap: 8, marginTop: 8 },
+  cell: { paddingHorizontal: 16, paddingVertical: 12 },
   daysRow: { flexDirection: 'row', gap: 8, justifyContent: 'space-between' },
   monthGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   dayChip: {
-    width: 40,
-    height: 40,
+    width: 38,
+    height: 38,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 20,
+    borderRadius: 19,
     borderWidth: 1,
     borderColor: 'rgba(127,127,127,0.3)',
   },
@@ -265,25 +291,18 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(127,127,127,0.3)',
   },
   chipSelected: {
-    backgroundColor: 'rgba(127,127,127,0.3)',
-    borderColor: 'rgba(127,127,127,0.6)',
+    backgroundColor: 'rgba(9,237,226,0.18)',
+    borderColor: Palette.primary,
   },
   chipText: { fontSize: 14 },
-  chipTextSelected: { fontWeight: '600' },
-  input: {
-    fontSize: 17,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(127,127,127,0.3)',
+  chipTextSelected: { fontWeight: '700', color: Palette.primaryDark },
+  intervalRow: { flexDirection: 'row', alignItems: 'baseline', gap: 8 },
+  input: { fontSize: 17, padding: 0, minWidth: 40 },
+  intervalSuffix: { fontSize: 16, opacity: 0.6 },
+  footer: {
+    fontSize: 13,
+    opacity: 0.55,
+    paddingHorizontal: 16,
+    marginTop: -12,
   },
-  previewBox: {
-    gap: 4,
-    marginTop: 24,
-    padding: 16,
-    borderRadius: 8,
-    backgroundColor: 'rgba(127,127,127,0.1)',
-  },
-  previewText: { fontSize: 16 },
 });
