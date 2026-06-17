@@ -127,3 +127,17 @@ export async function endRestForHabit(habitId: string, fromIso: string): Promise
   // cascade, plus any legacy untagged skips).
   await wakeHabit(habitId, fromIso);
 }
+
+// Update the rest's note (the "why I'm resting" text shared by its feed post and
+// day-view banner). Empty/whitespace clears it.
+export async function updateRestNote(
+  restId: string,
+  note: string | null,
+): Promise<void> {
+  const trimmed = note?.trim() || null;
+  const { error } = await supabase
+    .from('habit_rests')
+    .update({ note: trimmed })
+    .eq('id', restId);
+  if (error) throw error;
+}
