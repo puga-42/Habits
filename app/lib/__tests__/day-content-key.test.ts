@@ -24,8 +24,15 @@ function completion(habitId: string, completionId: string): AgendaRow {
   };
 }
 
-function skip(habitId: string): AgendaRow {
-  return { kind: 'skip', habitId, habit: habit(habitId), time: null };
+function rest(habitId: string): AgendaRow {
+  return {
+    kind: 'rest',
+    habitId,
+    habit: habit(habitId),
+    time: null,
+    completed: false,
+    completionId: null,
+  };
 }
 
 function flex(habitId: string): AgendaRow {
@@ -59,10 +66,10 @@ describe('dayItemKey', () => {
     expect(scheduledKey).toBe(completionKey);
   });
 
-  it('returns same key for scheduled and skip of same habit', () => {
+  it('returns same key for scheduled and rest of same habit in the same section', () => {
     const scheduledKey = dayItemKey(rowItem(scheduled('h1')));
-    const skipKey = dayItemKey(rowItem(skip('h1')));
-    expect(scheduledKey).toBe(skipKey);
+    const restKey = dayItemKey(rowItem(rest('h1')));
+    expect(scheduledKey).toBe(restKey);
   });
 
   it('returns same key for flex and completion of same habit', () => {
@@ -77,9 +84,12 @@ describe('dayItemKey', () => {
     expect(key1).not.toBe(key2);
   });
 
-  it('key does not change across sections', () => {
+  it('key is section-scoped, so it differs across sections', () => {
+    // The resting feature made keys section-prefixed so a habit can appear in
+    // more than one section (e.g. a rest row that is also completable) with a
+    // distinct list identity. Moving between sections is a remount, by design.
     const inProgress = dayItemKey(rowItem(scheduled('h1'), 'notCompleted'));
     const completed = dayItemKey(rowItem(scheduled('h1'), 'completed'));
-    expect(inProgress).toBe(completed);
+    expect(inProgress).not.toBe(completed);
   });
 });

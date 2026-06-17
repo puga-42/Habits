@@ -329,7 +329,7 @@ describe('buildDayGroups (past)', () => {
     }
   });
 
-  it('inserts a skip row for skip overrides on a past day', () => {
+  it('inserts a rest row for skip overrides on a past day', () => {
     const overrides: HabitOverride[] = [
       {
         id: 'o1',
@@ -347,7 +347,7 @@ describe('buildDayGroups (past)', () => {
       overrides,
       MAY_14,
     );
-    expect(groups[0].rows[0].kind).toBe('skip');
+    expect(groups[0].rows[0].kind).toBe('rest');
   });
 
   it('shows scheduled rows for past days with no activity', () => {
@@ -373,7 +373,7 @@ describe('buildDayGroups (past)', () => {
     ).toEqual(['c-early', 'c-late']);
   });
 
-  it('omits skip rows whose habit is unknown', () => {
+  it('omits rest rows whose habit is unknown', () => {
     const overrides: HabitOverride[] = [
       {
         id: 'o1',
@@ -408,7 +408,7 @@ describe('buildDayGroups (today + future)', () => {
     expect(groups[0].rows[0].kind).toBe('completion');
   });
 
-  it('shows a skip row (not scheduled) when skip override exists for today', () => {
+  it('shows a rest row (not scheduled) when skip override exists for today', () => {
     const override: HabitOverride = {
       id: 'o1',
       habit_id: meditate.id,
@@ -419,7 +419,7 @@ describe('buildDayGroups (today + future)', () => {
     };
     const groups = buildDayGroups([todayIso], [meditate], [], [override], TODAY);
     expect(groups[0].rows).toHaveLength(1);
-    expect(groups[0].rows[0].kind).toBe('skip');
+    expect(groups[0].rows[0].kind).toBe('rest');
   });
 
   it('shows a scheduled row on a future day', () => {
@@ -627,8 +627,15 @@ describe('completionCountByDate', () => {
       isFlex: false,
     };
   }
-  function skipRow(): AgendaRow {
-    return { kind: 'skip', habitId: 'h', habit: fakeAgendaHabit, time: null };
+  function restRow(): AgendaRow {
+    return {
+      kind: 'rest',
+      habitId: 'h',
+      habit: fakeAgendaHabit,
+      time: null,
+      completed: false,
+      completionId: null,
+    };
   }
   function scheduledRow(): AgendaRow {
     return { kind: 'scheduled', habitId: 'h', habit: fakeAgendaHabit, time: null };
@@ -641,9 +648,9 @@ describe('completionCountByDate', () => {
     expect(completionCountByDate([]).size).toBe(0);
   });
 
-  it('counts only completion rows, ignoring skip and scheduled', () => {
+  it('counts only completion rows, ignoring rest and scheduled', () => {
     const map = completionCountByDate([
-      group('2026-05-13', [completionRow('c1'), skipRow(), scheduledRow()]),
+      group('2026-05-13', [completionRow('c1'), restRow(), scheduledRow()]),
     ]);
     expect(map.get('2026-05-13')).toBe(1);
   });
@@ -656,7 +663,7 @@ describe('completionCountByDate', () => {
   });
 
   it('omits days with zero completions from the map', () => {
-    const map = completionCountByDate([group('2026-05-13', [skipRow()])]);
+    const map = completionCountByDate([group('2026-05-13', [restRow()])]);
     expect(map.has('2026-05-13')).toBe(false);
   });
 
@@ -1008,12 +1015,14 @@ describe('partitionRows', () => {
       time: null,
     };
   }
-  function skip(habitId: string): AgendaRow {
+  function rest(habitId: string): AgendaRow {
     return {
-      kind: 'skip',
+      kind: 'rest',
       habitId,
       habit: { id: habitId, title: habitId, description: null, icon: null, color: null, unit: 'count' as const },
       time: null,
+      completed: false,
+      completionId: null,
     };
   }
 
@@ -1029,10 +1038,11 @@ describe('partitionRows', () => {
     expect(out.completed).toEqual([]);
   });
 
-  it('puts skip rows in the completed bucket', () => {
-    const out = partitionRows([skip('h1')], habitMap);
-    expect(out.completed).toHaveLength(1);
+  it('puts rest rows in the resting bucket', () => {
+    const out = partitionRows([rest('h1')], habitMap);
+    expect(out.resting).toHaveLength(1);
     expect(out.notCompleted).toEqual([]);
+    expect(out.completed).toEqual([]);
   });
 
   it("sorts each bucket by the habit's sort_index ASC", () => {
@@ -1059,9 +1069,9 @@ describe('partitionRows', () => {
     ]);
   });
 
-  it('returns both empty for no rows', () => {
+  it('returns all empty for no rows', () => {
     const out = partitionRows([], habitMap);
-    expect(out).toEqual({ notCompleted: [], completed: [] });
+    expect(out).toEqual({ notCompleted: [], completed: [], resting: [] });
   });
 });
 
@@ -1113,9 +1123,9 @@ describe('densityBucket', () => {
 describe('swipeActionsForRow', () => {
   const habit = { id: 'h1', title: 'H', description: null, icon: null, color: null, unit: 'count' as const };
 
-  it('returns [skip] for a scheduled (open) row', () => {
+  it('returns [rest] for a scheduled (open) row', () => {
     const row: AgendaRow = { kind: 'scheduled', habitId: 'h1', habit, time: null };
-    expect(swipeActionsForRow(row)).toEqual(['skip']);
+    expect(swipeActionsForRow(row)).toEqual(['rest']);
   });
 
   it('returns [reset] for a completed scheduled row', () => {
@@ -1128,9 +1138,12 @@ describe('swipeActionsForRow', () => {
     expect(swipeActionsForRow(row)).toEqual(['reset']);
   });
 
-  it('returns [reset] for a skipped row', () => {
-    const row: AgendaRow = { kind: 'skip', habitId: 'h1', habit, time: null };
-    expect(swipeActionsForRow(row)).toEqual(['reset']);
+  it('returns [wake] for a resting row', () => {
+    const row: AgendaRow = {
+      kind: 'rest', habitId: 'h1', habit, time: null,
+      completed: false, completionId: null,
+    };
+    expect(swipeActionsForRow(row)).toEqual(['wake']);
   });
 
   it('returns [reset] for a flex row with count > 0', () => {
@@ -1157,22 +1170,22 @@ describe('swipeActionsForRow', () => {
     expect(swipeActionsForRow(row)).toEqual([]);
   });
 
-  it('returns [reset, skip] for a scheduled time-based row with progress', () => {
+  it('returns [reset, rest] for a scheduled time-based row with progress', () => {
     const timeHabit = { ...habit, unit: 'time' as const };
     const row: AgendaRow = { kind: 'scheduled', habitId: 'h1', habit: timeHabit, time: null };
-    expect(swipeActionsForRow(row, { timeProgress: 0.5 })).toEqual(['reset', 'skip']);
+    expect(swipeActionsForRow(row, { timeProgress: 0.5 })).toEqual(['reset', 'rest']);
   });
 
-  it('returns [skip] for a scheduled time-based row with no progress', () => {
+  it('returns [rest] for a scheduled time-based row with no progress', () => {
     const timeHabit = { ...habit, unit: 'time' as const };
     const row: AgendaRow = { kind: 'scheduled', habitId: 'h1', habit: timeHabit, time: null };
-    expect(swipeActionsForRow(row, { timeProgress: 0 })).toEqual(['skip']);
+    expect(swipeActionsForRow(row, { timeProgress: 0 })).toEqual(['rest']);
   });
 
-  it('returns [skip] for a scheduled time-based row without opts', () => {
+  it('returns [rest] for a scheduled time-based row without opts', () => {
     const timeHabit = { ...habit, unit: 'time' as const };
     const row: AgendaRow = { kind: 'scheduled', habitId: 'h1', habit: timeHabit, time: null };
-    expect(swipeActionsForRow(row)).toEqual(['skip']);
+    expect(swipeActionsForRow(row)).toEqual(['rest']);
   });
 });
 

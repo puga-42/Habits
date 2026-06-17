@@ -152,7 +152,7 @@ function CompactRow({
   dateIso: string;
   onPress: (row: AgendaRowT, dateIso: string) => void;
 }) {
-  const isSkip = row.kind === 'skip';
+  const isRest = row.kind === 'rest';
   const isCompletion = row.kind === 'completion';
   return (
     <Pressable
@@ -163,7 +163,7 @@ function CompactRow({
       style={[
         styles.compactRow,
         row.habit.color ? { borderLeftColor: row.habit.color } : null,
-        (isCompletion || isSkip) && styles.compactRowMuted,
+        (isCompletion || isRest) && styles.compactRowMuted,
       ]}>
       {row.habit.icon ? (
         <ThemedText style={styles.icon}>{row.habit.icon}</ThemedText>
