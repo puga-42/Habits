@@ -171,6 +171,10 @@ export function describeRepeat(draft: HabitDraft): string {
   return describeRrule(draft.recurrence);
 }
 
+export function describeVisibility(v: Visibility): string {
+  return v === 'public' ? 'Public' : v === 'friends' ? 'Friends' : 'Private';
+}
+
 type Ctx = {
   draft: HabitDraft;
   update: (patch: Partial<HabitDraft>) => void;

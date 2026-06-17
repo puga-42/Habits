@@ -14,22 +14,8 @@ import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import { CardList, FormCard } from '@/components/form-card';
 import { HabitIdentityFields } from '@/components/habit-identity-fields';
 import { ThemedText } from '@/components/themed-text';
-import { Palette } from '@/constants/colors';
-import { describeGoal, describeRepeat, useHabitForm } from '@/lib/habit-form';
+import { describeGoal, describeRepeat, describeVisibility, useHabitForm } from '@/lib/habit-form';
 import { clampEndDate, defaultEndDate } from '@/lib/habit-ends';
-import type { Visibility } from '@/lib/habits';
-
-const VISIBILITY_OPTIONS: Visibility[] = ['public', 'friends', 'private'];
-const VISIBILITY_TITLES: Record<Visibility, string> = {
-  public: 'Public',
-  friends: 'Friends',
-  private: 'Private',
-};
-const VISIBILITY_DESCS: Record<Visibility, string> = {
-  public: 'Anyone can see',
-  friends: 'Only your friends',
-  private: 'Only you',
-};
 
 type Props = {
   lockKind?: boolean;
@@ -74,18 +60,10 @@ export function HabitFormFields({ lockKind = false, onDelete }: Props) {
             />
           )}
 
-          {VISIBILITY_OPTIONS.map((v) => (
-            <Pressable
-              key={v}
-              onPress={() => update({ visibility: v })}
-              style={styles.row}>
-              <View style={styles.visMain}>
-                <ThemedText style={styles.rowLabel}>{VISIBILITY_TITLES[v]}</ThemedText>
-                <ThemedText style={styles.visSub}>{VISIBILITY_DESCS[v]}</ThemedText>
-              </View>
-              {draft.visibility === v && <ThemedText style={styles.check}>✓</ThemedText>}
-            </Pressable>
-          ))}
+          <Row label="Visibility" onPress={() => router.push('/habit/visibility')}>
+            <ThemedText style={styles.rowValue}>{describeVisibility(draft.visibility)}</ThemedText>
+            <ThemedText style={styles.chevron}>›</ThemedText>
+          </Row>
         </CardList>
       </FormCard>
 
@@ -223,9 +201,6 @@ const styles = StyleSheet.create({
   rowValue: { fontSize: 16, opacity: 0.65 },
   clear: { fontSize: 14, opacity: 0.55 },
   chevron: { fontSize: 22, opacity: 0.4 },
-  visMain: { flex: 1 },
-  visSub: { fontSize: 13, opacity: 0.55, marginTop: 2 },
-  check: { fontSize: 17, fontWeight: '700', color: Palette.primary },
   deleteButton: {
     marginTop: 8,
     paddingVertical: 14,

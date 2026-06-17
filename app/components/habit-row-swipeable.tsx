@@ -150,12 +150,14 @@ export function HabitRowSwipeable({
 
 const CHIP_COLORS: Record<SwipeAction, { bg: string; text: string }> = {
   reset: { bg: Palette.lavenderMuted, text: Palette.lavender },
-  skip: { bg: Palette.blushMuted, text: Palette.blush },
+  rest: { bg: Palette.lavenderMuted, text: Palette.lavender },
+  wake: { bg: Palette.blushMuted, text: Palette.blush },
 };
 
 const CHIP_LABELS: Record<SwipeAction, string> = {
   reset: 'Reset',
-  skip: 'Skip',
+  rest: 'Rest',
+  wake: 'Wake',
 };
 
 function ActionChips({

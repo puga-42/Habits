@@ -76,7 +76,7 @@ export function AgendaRow({
   hideTrailing,
   streak = 0,
 }: Props) {
-  const isSkip = row.kind === 'skip';
+  const isRest = row.kind === 'rest';
   const isCompletion = row.kind === 'completion';
   const isFlex = row.kind === 'flex';
   const isFlexCompletion = isCompletion && row.isFlex;
@@ -93,7 +93,7 @@ export function AgendaRow({
 
   const isTimeHabit = row.habit.unit === 'time';
   const trailingActionable =
-    (row.kind === 'scheduled' || isFlex || isTimeHabit) && !!onTrailingPress;
+    (row.kind === 'scheduled' || isFlex || isTimeHabit || isRest) && !!onTrailingPress;
 
   const handleTrailingPress = trailingActionable
     ? () => {
@@ -102,7 +102,7 @@ export function AgendaRow({
       }
     : undefined;
 
-  const titleStyleKey = isCompletion ? 'done' : isSkip ? 'skip' : 'active';
+  const titleStyleKey = isCompletion ? 'done' : isRest ? 'rest' : 'active';
   const titleTransition = useContentTransition(titleStyleKey);
   const trailingKey = hideTrailing ? 'hidden' : row.kind;
 
@@ -117,7 +117,7 @@ export function AgendaRow({
         compact && !isTight && styles.pillCompact,
         isTight && styles.pillTight,
         pressed && (onLongPress || onPress) && styles.pillPressed,
-        isSkip && styles.pillSkipped,
+        isRest && styles.pillResting,
         hideTrailing && styles.pillMuted,
       ]}>
       <View
@@ -140,7 +140,6 @@ export function AgendaRow({
               styles.title,
               isTight && styles.titleTight,
               isCompletion && !isFlexCompletion && styles.titleCompleted,
-              isSkip && styles.titleSkipped,
             ]}
             numberOfLines={1}>
             {row.habit.title}
@@ -151,9 +150,7 @@ export function AgendaRow({
             {flexSubtitle}
           </ThemedText>
         ) : !compact && row.habit.description ? (
-          <ThemedText
-            style={[styles.description, isSkip && styles.descriptionSkipped]}
-            numberOfLines={1}>
+          <ThemedText style={styles.description} numberOfLines={1}>
             {row.habit.description}
           </ThemedText>
         ) : null}
@@ -179,12 +176,18 @@ export function AgendaRow({
                 pressed && trailingActionable && styles.trailingPressed,
                 !trailingActionable && styles.trailingInert,
               ]}>
-              {isTimeHabit && timerStatus ? (
+              {isTimeHabit && timerStatus && !isRest ? (
                 <TimeTrailingIcon status={timerStatus} color={habitColor} fraction={timeProgress} />
               ) : isFlex ? (
                 <FlexRing count={row.count} target={row.target} color={habitColor} />
               ) : isFlexCompletion && flexProgress ? (
                 <FlexRing count={flexProgress.count} target={flexProgress.target} color={habitColor} />
+              ) : isRest ? (
+                row.completed ? (
+                  <ThemedText style={[styles.markerCheck, { color: habitColor }]}>✓</ThemedText>
+                ) : (
+                  <View style={styles.incompleteCircle} />
+                )
               ) : (
                 <Marker kind={row.kind} color={habitColor} />
               )}
@@ -198,13 +201,14 @@ export function AgendaRow({
 
 function trailingA11yLabel(row: AgendaRowT): string {
   if (row.kind === 'completion') return 'Completed';
-  if (row.kind === 'skip') return 'Skipped';
+  if (row.kind === 'rest') return row.completed ? 'Completed (resting)' : `Complete ${row.habit.title}`;
   return `Complete ${row.habit.title}`;
 }
 
 function trailingA11yHint(row: AgendaRowT): string | undefined {
   if (row.kind === 'scheduled') return 'Marks this habit complete';
   if (row.kind === 'flex') return 'Adds one completion';
+  if (row.kind === 'rest') return 'Marks complete; stays resting';
   return undefined;
 }
 
@@ -222,9 +226,6 @@ function Marker({
 }) {
   if (kind === 'completion') {
     return <ThemedText style={[styles.markerCheck, { color }]}>✓</ThemedText>;
-  }
-  if (kind === 'skip') {
-    return <ThemedText style={styles.markerDim}>—</ThemedText>;
   }
   // scheduled — an empty ring whose outer diameter and stroke match the timer's
   // circular progress ring (and play/pause button), so the trailing control is
@@ -307,7 +308,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   pillPressed: { opacity: 0.6 },
-  pillSkipped: { opacity: 0.5 },
+  pillResting: { opacity: 0.85 },
   pillMuted: { opacity: 0.5 },
   leading: {
     alignItems: 'center',
@@ -318,9 +319,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 16, fontWeight: '600' },
   titleTight: { fontSize: 13 },
   titleCompleted: { opacity: 0.7 },
-  titleSkipped: { textDecorationLine: 'line-through' },
   description: { fontSize: 13, opacity: 0.55, marginTop: 2 },
-  descriptionSkipped: { textDecorationLine: 'line-through' },
   trailing: {
     // Width matches the largest trailing control (the timer / incomplete ring),
     // so its right edge sits at the pill's horizontal padding — the same gap the
@@ -332,7 +331,6 @@ const styles = StyleSheet.create({
   },
   trailingPressed: { opacity: 0.6 },
   trailingInert: { opacity: 0.5 },
-  markerDim: { fontSize: TRAILING_ICON_SIZE, opacity: 0.5 },
   incompleteCircle: {
     width: RING_SIZE,
     height: RING_SIZE,

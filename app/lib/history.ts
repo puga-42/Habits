@@ -62,11 +62,15 @@ export type AgendaRow =
       habit: AgendaHabit;
       time: Date | null;
     }
+  // A resting habit's due day. Streak-neutral, but still completable — completing
+  // it sets `completed` without ending the rest. Grouped into the Resting section.
   | {
-      kind: 'skip';
+      kind: 'rest';
       habitId: string;
       habit: AgendaHabit;
       time: Date | null;
+      completed: boolean;
+      completionId: string | null;
     }
   // A flex habit's persistent "log it" row. Always tappable, even after the
   // period target is met — the app intentionally lets users record beyond the
@@ -88,7 +92,7 @@ export type DayGroup = {
 
 // ─── Swipe-action helpers ─────────────────────────────────────────────────
 
-export type SwipeAction = 'reset' | 'skip';
+export type SwipeAction = 'reset' | 'rest' | 'wake';
 
 export function swipeActionsForRow(
   row: AgendaRow,
@@ -100,13 +104,13 @@ export function swipeActionsForRow(
       if (row.habit.unit === 'time' && (opts?.timeProgress ?? 0) > 0) {
         actions.push('reset');
       }
-      actions.push('skip');
+      actions.push('rest');
       return actions;
     }
     case 'completion':
       return ['reset'];
-    case 'skip':
-      return ['reset'];
+    case 'rest':
+      return ['wake'];
     case 'flex':
       return row.count > 0 ? ['reset'] : [];
   }
@@ -275,7 +279,7 @@ export function buildDayGroups(
         const matchedCompletions = dayCompletions.filter(
           (c) => c.habit_id === habit.id && c.occurrence_date === dayIso,
         );
-        const matchedSkip = dayOverrides.find(
+        const matchedRest = dayOverrides.find(
           (o) => o.habit_id === habit.id && o.kind === 'skip',
         );
         const editOverride = dayOverrides.find(
@@ -284,7 +288,24 @@ export function buildDayGroups(
             (o.kind === 'edit' || o.kind === 'reschedule'),
         );
 
-        if (matchedCompletions.length > 0) {
+        if (matchedRest) {
+          // Resting takes precedence: one rest row, completed if logged today.
+          // The completion (if any) still counts in the streak, but renders here
+          // rather than as a separate completion row, so it stays in Resting.
+          if (!handledOverrideIds.has(matchedRest.id)) {
+            const completion = matchedCompletions[0];
+            rows.push({
+              kind: 'rest',
+              habitId: habit.id,
+              habit: agendaHabitFor(habit),
+              time: occTime,
+              completed: !!completion,
+              completionId: completion?.id ?? null,
+            });
+            handledOverrideIds.add(matchedRest.id);
+            for (const c of matchedCompletions) handledCompletionIds.add(c.id);
+          }
+        } else if (matchedCompletions.length > 0) {
           for (const c of matchedCompletions) {
             if (handledCompletionIds.has(c.id)) continue;
             const patch: OccurrencePatch = editOverride?.patch ?? {};
@@ -303,16 +324,6 @@ export function buildDayGroups(
               isFlex: c.habits.kind === 'flex',
             });
             handledCompletionIds.add(c.id);
-          }
-        } else if (matchedSkip) {
-          if (!handledOverrideIds.has(matchedSkip.id)) {
-            rows.push({
-              kind: 'skip',
-              habitId: habit.id,
-              habit: agendaHabitFor(habit),
-              time: occTime,
-            });
-            handledOverrideIds.add(matchedSkip.id);
           }
         } else {
           const patch: OccurrencePatch = editOverride?.patch ?? {};
@@ -341,6 +352,8 @@ export function buildDayGroups(
     for (const c of dayCompletions) {
       if (c.habits.kind === 'flex') continue;
       if (handledCompletionIds.has(c.id)) continue;
+      // A rested habit's completion is shown by its rest row, not separately.
+      if (dayOverrides.some((o) => o.habit_id === c.habit_id && o.kind === 'skip')) continue;
       const editOverride = dayOverrides.find(
         (o) =>
           o.habit_id === c.habit_id &&
@@ -364,17 +377,22 @@ export function buildDayGroups(
       handledCompletionIds.add(c.id);
     }
 
-    // Any skip overrides on this day not yet rendered.
+    // Any rest (neutral) overrides on this day not yet rendered.
     for (const o of dayOverrides) {
       if (o.kind !== 'skip') continue;
       if (handledOverrideIds.has(o.id)) continue;
       const h = habitMap.get(o.habit_id);
       if (!h) continue;
+      const completion = dayCompletions.find(
+        (c) => c.habit_id === o.habit_id && c.occurrence_date === dayIso,
+      );
       rows.push({
-        kind: 'skip',
+        kind: 'rest',
         habitId: h.id,
         habit: agendaHabitFor(h),
-        time: skipRowTime(h, dayIso),
+        time: restRowTime(h, dayIso),
+        completed: !!completion,
+        completionId: completion?.id ?? null,
       });
       handledOverrideIds.add(o.id);
     }
@@ -414,11 +432,24 @@ function parseIsoToLocalMidnight(iso: string): Date {
   return new Date(y, m - 1, d, 0, 0, 0, 0);
 }
 
-function skipRowTime(habit: Habit, occurrenceDate: string): Date | null {
+function restRowTime(habit: Habit, occurrenceDate: string): Date | null {
   if (!habit.dtstart) return null;
   const [y, m, d] = occurrenceDate.split('-').map((n) => parseInt(n, 10));
   const dt = new Date(habit.dtstart);
   return new Date(y, m - 1, d, dt.getHours(), dt.getMinutes(), 0, 0);
+}
+
+// A scheduled habit's due dates (ISO) in [fromIso, toIso] inclusive — used to
+// rest every due day through a chosen until-date. Reuses RRULE expansion.
+export function occurrencesInRange(
+  habit: Habit,
+  fromIso: string,
+  toIso: string,
+): string[] {
+  const from = parseIsoToLocalMidnight(fromIso);
+  const to = parseIsoToLocalMidnight(toIso);
+  to.setHours(23, 59, 59, 999);
+  return expandHabit(habit, from, to).map((d) => isoDate(d));
 }
 
 function applyTimePatch(occ: Date, hhmm: string): Date {
@@ -517,17 +548,20 @@ export function densityBucket(count: number): 0 | 1 | 2 | 3 | 4 {
 
 // ─── Section partition ─────────────────────────────────────────────────────
 
-// Split a day's rows into "not completed" vs "completed" buckets, sorted by
-// each row's habit's sort_index. Skip rows count as completed (the user has
-// explicitly acted on them).
+// Split a day's rows into "not completed", "completed", and "resting" buckets,
+// sorted by each row's habit's sort_index. Resting rows live in their own
+// section (even when completed); completion rows count as completed.
 export function partitionRows(
   rows: AgendaRow[],
   habitMap: Map<string, Habit>,
-): { notCompleted: AgendaRow[]; completed: AgendaRow[] } {
+): { notCompleted: AgendaRow[]; completed: AgendaRow[]; resting: AgendaRow[] } {
   const notCompleted: AgendaRow[] = [];
   const completed: AgendaRow[] = [];
+  const resting: AgendaRow[] = [];
   for (const row of rows) {
-    if (row.kind === 'completion' || row.kind === 'skip') {
+    if (row.kind === 'rest') {
+      resting.push(row);
+    } else if (row.kind === 'completion') {
       completed.push(row);
     } else {
       notCompleted.push(row);
@@ -541,7 +575,8 @@ export function partitionRows(
   };
   notCompleted.sort((a, b) => sortKey(a) - sortKey(b));
   completed.sort((a, b) => sortKey(a) - sortKey(b));
-  return { notCompleted, completed };
+  resting.sort((a, b) => sortKey(a) - sortKey(b));
+  return { notCompleted, completed, resting };
 }
 
 // ─── Range helpers for calendar views ──────────────────────────────────────
