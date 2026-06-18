@@ -27,17 +27,14 @@ import {
   blockUser,
   feedItemSortKey,
   fetchFeedPage,
-  likeActivity,
-  likeCompletion,
   mergeFeedPages,
   muteHabit,
   reportContent,
   subscribeToFeed,
-  unlikeActivity,
-  unlikeCompletion,
   type FeedItem,
   type FeedKind,
 } from "@/lib/feed";
+import { socialFnsFor } from "@/lib/feed-dispatch";
 
 const PAGE_SIZE = 20;
 
@@ -77,55 +74,55 @@ export default function FeedScreen() {
     useCallback(() => {
       if (!viewerId) return;
       loadFirstPage();
+      // A new post arrived: jump to it if we're at the top, else show the pill.
+      const newItemArrived = () => {
+        if (isAtTopRef.current) loadFirstPage();
+        else setPendingNew((n) => n + 1);
+      };
+      // Like/comment updates are keyed by the feed item's id, which is unique
+      // across kinds — so completion and rest events share the same logic.
+      const bumpLike = (id: string, event: "INSERT" | "DELETE") =>
+        setItems((prev) =>
+          prev.map((i) =>
+            i.id === id
+              ? applyLikeToggle(i, event === "INSERT" ? true : i.viewer_liked)
+              : i,
+          ),
+        );
+      const bumpComment = (id: string, event: "INSERT" | "UPDATE" | "DELETE") =>
+        setItems((prev) =>
+          prev.map((i) =>
+            i.id === id
+              ? {
+                  ...i,
+                  comment_count:
+                    event === "INSERT"
+                      ? i.comment_count + 1
+                      : event === "DELETE"
+                        ? Math.max(0, i.comment_count - 1)
+                        : i.comment_count,
+                }
+              : i,
+          ),
+        );
       const unsub = subscribeToFeed({
         onCompletion: (event, id) => {
-          if (event === "INSERT") {
-            if (isAtTopRef.current) {
-              loadFirstPage();
-            } else {
-              setPendingNew((n) => n + 1);
-            }
-          } else if (event === "DELETE") {
+          if (event === "INSERT") newItemArrived();
+          else if (event === "DELETE")
             setItems((prev) => prev.filter((i) => i.id !== id));
-          }
         },
         onActivity: (event) => {
-          if (event === "INSERT") {
-            if (isAtTopRef.current) {
-              loadFirstPage();
-            } else {
-              setPendingNew((n) => n + 1);
-            }
-          }
+          if (event === "INSERT") newItemArrived();
         },
-        onLike: (event, completionId) => {
-          setItems((prev) =>
-            prev.map((i) =>
-              i.id === completionId
-                ? applyLikeToggle(i, event === "INSERT" ? true : i.viewer_liked)
-                : i,
-            ),
-          );
-          // The above keeps viewer_liked sticky; refetch the page for count
-          // accuracy on the next pull-to-refresh.
+        onRest: (event, id) => {
+          if (event === "INSERT") newItemArrived();
+          else if (event === "DELETE")
+            setItems((prev) => prev.filter((i) => i.id !== id));
         },
-        onComment: (event, completionId) => {
-          setItems((prev) =>
-            prev.map((i) =>
-              i.id === completionId
-                ? {
-                    ...i,
-                    comment_count:
-                      event === "INSERT"
-                        ? i.comment_count + 1
-                        : event === "DELETE"
-                          ? Math.max(0, i.comment_count - 1)
-                          : i.comment_count,
-                  }
-                : i,
-            ),
-          );
-        },
+        onLike: (event, completionId) => bumpLike(completionId, event),
+        onComment: (event, completionId) => bumpComment(completionId, event),
+        onRestLike: (event, restId) => bumpLike(restId, event),
+        onRestComment: (event, restId) => bumpComment(restId, event),
         onCommentLike: () => {
           // Card-level state doesn't include comment-like aggregates.
         },
@@ -167,10 +164,7 @@ export default function FeedScreen() {
         prev.map((i) => (i.id === item.id ? applyLikeToggle(i, next) : i)),
       );
       try {
-        const like =
-          item.feed_kind === "completion" ? likeCompletion : likeActivity;
-        const unlike =
-          item.feed_kind === "completion" ? unlikeCompletion : unlikeActivity;
+        const { like, unlike } = socialFnsFor(item.feed_kind);
         if (next) await like(item.id, viewerId);
         else await unlike(item.id, viewerId);
       } catch {
@@ -188,8 +182,7 @@ export default function FeedScreen() {
   const openComments = useCallback((item: FeedItem) => {
     setActiveCommentTarget({
       targetId: item.id,
-      targetKind:
-        item.feed_kind === "habit_created" ? "habit_created" : "completion",
+      targetKind: item.feed_kind,
       ownerId: item.owner_id,
     });
   }, []);
@@ -205,6 +198,13 @@ export default function FeedScreen() {
         router.push({
           pathname: "/habit/view",
           params: { id: item.habit_id, activityId: item.id },
+        });
+        return;
+      }
+      if (item.feed_kind === "rest") {
+        router.push({
+          pathname: "/habit/view",
+          params: { id: item.habit_id },
         });
         return;
       }

@@ -93,7 +93,9 @@ export const FeedCard = memo(function FeedCard({
       <View style={styles.body}>
         <View style={styles.bodyMain}>
           <View style={styles.habitLine}>
-            <ThemedText style={styles.habitVerb}>completed </ThemedText>
+            <ThemedText style={styles.habitVerb}>
+              {item.feed_kind === 'rest' ? 'is resting ' : 'completed '}
+            </ThemedText>
             <ThemedText style={styles.habitTitle}>{item.habit_title}</ThemedText>
             {item.habit_icon ? (
               <ThemedText style={styles.habitIcon}> {item.habit_icon}</ThemedText>
@@ -130,7 +132,7 @@ export const FeedCard = memo(function FeedCard({
       <View style={styles.actionWrap}>
         <FeedActionBar
           targetId={item.id}
-          targetKind="completion"
+          targetKind={item.feed_kind}
           likeCount={item.like_count}
           commentCount={item.comment_count}
           viewerLiked={item.viewer_liked}

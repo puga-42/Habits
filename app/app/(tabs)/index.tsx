@@ -33,10 +33,8 @@ import {
   markFlexCompleted,
   markScheduledCompleted,
   reorderHabits,
-  restHabitDays,
   unmarkCompleted,
   unmarkLastFlexInPeriod,
-  wakeHabit,
   type Habit,
   type HabitOverride,
 } from '@/lib/habits';
@@ -49,7 +47,6 @@ import {
   flexProgressByHabit,
   monthLabel,
   nDayRange,
-  occurrencesInRange,
   weekDatesFrom,
   type AgendaRow,
   type CompletionWithHabit,
@@ -61,6 +58,8 @@ import {
   streaksByHabit,
   type LineageStats,
 } from '@/lib/habit-stats';
+import { type Section } from '@/lib/day-item-key';
+import { createRest, endRestForHabit } from '@/lib/rests';
 import { fetchProfile, type Profile } from '@/lib/profile';
 import {
   checkAndAutoComplete,
@@ -474,7 +473,7 @@ export default function CalendarScreen() {
       }
       return;
     } else if (action === 'wake') {
-      if (row.kind === 'rest') await wakeHabit(row.habitId, isoDate(today));
+      if (row.kind === 'rest') await endRestForHabit(row.habitId, isoDate(today));
     }
     await load();
   }
@@ -482,9 +481,8 @@ export default function CalendarScreen() {
   async function confirmRest(untilIso: string) {
     if (!userId || !restTarget) return;
     const { habit, dateIso } = restTarget;
-    const dates = occurrencesInRange(habit, dateIso, untilIso);
     setRestTarget(null);
-    await restHabitDays(habit.id, dates);
+    await createRest(habit, userId, dateIso, untilIso);
     await load();
   }
 

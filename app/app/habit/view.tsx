@@ -18,6 +18,7 @@ import {
 import { FeedAvatar } from "@/components/feed-avatar";
 import { FeedCardStats } from "@/components/feed-card-stats";
 import { HabitCompletionChart } from "@/components/habit-completion-chart";
+import { HabitRestPanel } from "@/components/habit-rest-panel";
 import { OverviewSocial } from "@/components/overview-social";
 import { StopwatchPanel } from "@/components/stopwatch-panel";
 import { ThemedText } from "@/components/themed-text";
@@ -160,6 +161,15 @@ export default function HabitViewScreen() {
               </ThemedText>
             ) : null}
           </View>
+
+          {session?.user.id ? (
+            <HabitRestPanel
+              habitId={habit.id}
+              userId={session.user.id}
+              isOwner={isOwner}
+              dateIso={occurrenceDate ?? isoDate(new Date())}
+            />
+          ) : null}
 
           {isOwner &&
             (habit.unit === "time" && session?.user.id ? (

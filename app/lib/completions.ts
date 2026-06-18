@@ -3,6 +3,23 @@ import { File as ExpoFile } from 'expo-file-system';
 
 import { supabase } from './supabase';
 import type { Visibility } from './habits';
+import { attachmentKindForMime, storagePathFor } from './attachments';
+import type { AttachmentDetail } from './attachments';
+
+// The attachment validation, limits, mime, and path helpers now live in the
+// shared `attachments` module (reused by rest attachments). Re-exported here so
+// existing importers of '@/lib/completions' keep working unchanged.
+export {
+  ALLOWED_PHOTO_MIMES,
+  ALLOWED_VIDEO_MIMES,
+  MAX_PHOTO_BYTES,
+  MAX_VIDEO_BYTES,
+  MAX_VIDEO_SECONDS,
+  MAX_ATTACHMENTS,
+  validateAttachment,
+  computeSortOrders,
+} from './attachments';
+export type { AttachmentDetail, ValidationError } from './attachments';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -23,95 +40,6 @@ export type CompletionDetail = {
   };
   attachments: AttachmentDetail[];
 };
-
-export type AttachmentDetail = {
-  id: string;
-  kind: 'photo' | 'video';
-  storage_path: string;
-  mime_type: string;
-  byte_size: number;
-  width: number | null;
-  height: number | null;
-  duration_seconds: number | null;
-  sort_order: number;
-  signed_url?: string;
-};
-
-// ─── Constants ──────────────────────────────────────────────────────────────
-
-export const ALLOWED_PHOTO_MIMES = [
-  'image/jpeg',
-  'image/png',
-  'image/heic',
-  'image/heif',
-];
-
-export const ALLOWED_VIDEO_MIMES = ['video/mp4', 'video/quicktime'];
-
-export const MAX_PHOTO_BYTES = 10 * 1024 * 1024; // 10 MB
-export const MAX_VIDEO_BYTES = 50 * 1024 * 1024; // 50 MB
-export const MAX_VIDEO_SECONDS = 30;
-export const MAX_ATTACHMENTS = 10;
-
-// ─── Validation (pure) ──────────────────────────────────────────────────────
-
-export type ValidationError =
-  | { kind: 'too_large'; maxMb: number; actualMb: number }
-  | { kind: 'too_long'; maxSeconds: number; actualSeconds: number }
-  | { kind: 'cap_reached'; max: number }
-  | { kind: 'unsupported_type'; mime: string };
-
-export function validateAttachment(
-  file: { mimeType: string; byteSize: number; durationSeconds?: number },
-  existingCount: number,
-): ValidationError | null {
-  if (existingCount >= MAX_ATTACHMENTS) {
-    return { kind: 'cap_reached', max: MAX_ATTACHMENTS };
-  }
-
-  const isPhoto = ALLOWED_PHOTO_MIMES.includes(file.mimeType);
-  const isVideo = ALLOWED_VIDEO_MIMES.includes(file.mimeType);
-
-  if (!isPhoto && !isVideo) {
-    return { kind: 'unsupported_type', mime: file.mimeType };
-  }
-
-  if (isPhoto && file.byteSize > MAX_PHOTO_BYTES) {
-    return {
-      kind: 'too_large',
-      maxMb: MAX_PHOTO_BYTES / (1024 * 1024),
-      actualMb: file.byteSize / (1024 * 1024),
-    };
-  }
-
-  if (isVideo) {
-    if (file.byteSize > MAX_VIDEO_BYTES) {
-      return {
-        kind: 'too_large',
-        maxMb: MAX_VIDEO_BYTES / (1024 * 1024),
-        actualMb: file.byteSize / (1024 * 1024),
-      };
-    }
-    if (
-      file.durationSeconds != null &&
-      file.durationSeconds > MAX_VIDEO_SECONDS
-    ) {
-      return {
-        kind: 'too_long',
-        maxSeconds: MAX_VIDEO_SECONDS,
-        actualSeconds: file.durationSeconds,
-      };
-    }
-  }
-
-  return null;
-}
-
-// ─── Reorder (pure) ─────────────────────────────────────────────────────────
-
-export function computeSortOrders(orderedIds: string[]): { id: string; sort_order: number }[] {
-  return orderedIds.map((id, i) => ({ id, sort_order: i }));
-}
 
 // ─── Queries ────────────────────────────────────────────────────────────────
 
@@ -195,9 +123,8 @@ export async function uploadAttachment(
     duration?: number;
   },
 ): Promise<AttachmentDetail> {
-  const ext = extensionForMime(file.mimeType);
   const uuid = Crypto.randomUUID();
-  const storagePath = `${ownerId}/${completionId}/${uuid}.${ext}`;
+  const storagePath = storagePathFor(ownerId, completionId, uuid, file.mimeType);
 
   const expoFile = new ExpoFile(file.uri);
   if (!expoFile.exists) throw new Error('File not found');
@@ -217,16 +144,12 @@ export async function uploadAttachment(
     .limit(1);
   const nextOrder = (maxRow?.[0]?.sort_order ?? -1) + 1;
 
-  const kind: 'photo' | 'video' = ALLOWED_VIDEO_MIMES.includes(file.mimeType)
-    ? 'video'
-    : 'photo';
-
   const { data, error: insertErr } = await supabase
     .from('completion_attachments')
     .insert({
       completion_id: completionId,
       owner_id: ownerId,
-      kind,
+      kind: attachmentKindForMime(file.mimeType),
       storage_path: storagePath,
       mime_type: file.mimeType,
       byte_size: byteSize,
@@ -269,26 +192,5 @@ export async function reorderAttachments(orderedIds: string[]): Promise<void> {
   const results = await Promise.all(updates);
   for (const r of results) {
     if (r.error) throw r.error;
-  }
-}
-
-// ─── Helpers ────────────────────────────────────────────────────────────────
-
-function extensionForMime(mime: string): string {
-  switch (mime) {
-    case 'image/jpeg':
-      return 'jpg';
-    case 'image/png':
-      return 'png';
-    case 'image/heic':
-      return 'heic';
-    case 'image/heif':
-      return 'heif';
-    case 'video/mp4':
-      return 'mp4';
-    case 'video/quicktime':
-      return 'mov';
-    default:
-      return 'bin';
   }
 }

@@ -29,20 +29,11 @@ import { Palette } from '@/constants/colors';
 import { useAuth } from '@/lib/auth';
 import {
   applyCommentLikeToggle,
-  deleteActivityComment,
-  deleteComment,
-  fetchActivityComments,
-  fetchComments,
-  likeActivityComment,
-  likeComment,
-  postActivityComment,
-  postComment,
   subscribeToFeed,
-  unlikeActivityComment,
-  unlikeComment,
   type Comment,
   type FeedKind,
 } from '@/lib/feed';
+import { commentFnsFor } from '@/lib/feed-dispatch';
 
 type Props = {
   visible: boolean;
@@ -91,11 +82,13 @@ export function FeedCommentsSheet({
     }).start();
   }, [visible, translateY]);
 
-  const fetchFn = targetKind === 'completion' ? fetchComments : fetchActivityComments;
-  const postFn = targetKind === 'completion' ? postComment : postActivityComment;
-  const deleteFn = targetKind === 'completion' ? deleteComment : deleteActivityComment;
-  const likeFn = targetKind === 'completion' ? likeComment : likeActivityComment;
-  const unlikeFn = targetKind === 'completion' ? unlikeComment : unlikeActivityComment;
+  const {
+    fetch: fetchFn,
+    post: postFn,
+    remove: deleteFn,
+    like: likeFn,
+    unlike: unlikeFn,
+  } = commentFnsFor(targetKind);
 
   useEffect(() => {
     if (!visible || !targetId) return;
@@ -114,23 +107,31 @@ export function FeedCommentsSheet({
   }, [visible, targetId, fetchFn]);
 
   useEffect(() => {
-    if (!visible || !targetId || !viewerId || targetKind !== 'completion') return;
+    if (!visible || !targetId || !viewerId) return;
+    if (targetKind !== 'completion' && targetKind !== 'rest') return;
+    const onCommentChange = (
+      event: 'INSERT' | 'UPDATE' | 'DELETE',
+      parentId: string,
+      commentId: string,
+    ) => {
+      if (parentId !== targetId) return;
+      if (event === 'DELETE') {
+        setComments((prev) => prev.filter((c) => c.id !== commentId));
+      } else {
+        fetchFn(targetId).then(setComments);
+      }
+    };
+    const refetch = () => fetchFn(targetId).then(setComments);
+    const isRest = targetKind === 'rest';
     const unsub = subscribeToFeed(
       {
         onCompletion: () => {},
         onActivity: () => {},
         onLike: () => {},
-        onComment: (event, eventCompletionId, commentId) => {
-          if (eventCompletionId !== targetId) return;
-          if (event === 'DELETE') {
-            setComments((prev) => prev.filter((c) => c.id !== commentId));
-          } else {
-            fetchFn(targetId).then(setComments);
-          }
-        },
-        onCommentLike: () => {
-          fetchFn(targetId).then(setComments);
-        },
+        onComment: isRest ? () => {} : onCommentChange,
+        onCommentLike: isRest ? () => {} : refetch,
+        onRestComment: isRest ? onCommentChange : undefined,
+        onRestCommentLike: isRest ? refetch : undefined,
       },
       `comments-${targetId}`,
     );
