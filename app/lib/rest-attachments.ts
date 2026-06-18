@@ -93,3 +93,13 @@ export async function deleteRestAttachment(attachmentId: string): Promise<void> 
 
   await supabase.storage.from(BUCKET).remove([data.storage_path]);
 }
+
+export async function reorderRestAttachments(orderedIds: string[]): Promise<void> {
+  const updates = orderedIds.map((id, idx) =>
+    supabase.from('rest_attachments').update({ sort_order: idx }).eq('id', id),
+  );
+  const results = await Promise.all(updates);
+  for (const r of results) {
+    if (r.error) throw r.error;
+  }
+}

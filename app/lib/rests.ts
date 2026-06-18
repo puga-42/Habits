@@ -141,3 +141,32 @@ export async function updateRestNote(
     .eq('id', restId);
   if (error) throw error;
 }
+
+// ─── Habit overview rest panel ──────────────────────────────────────────────
+
+export type ActiveRest = {
+  id: string;
+  habit_id: string;
+  note: string | null;
+  start_date: string;
+  end_date: string;
+};
+
+// The active rest for a single habit whose period covers `iso`, or null. Drives
+// the resting panel on the habit overview page. RLS (can_view_rest) scopes this
+// to rests the viewer may see, so it works for the owner and for friends.
+export async function fetchActiveRestForHabit(
+  habitId: string,
+  iso: string,
+): Promise<ActiveRest | null> {
+  const { data, error } = await supabase
+    .from('habit_rests')
+    .select('id, habit_id, note, start_date, end_date')
+    .eq('habit_id', habitId)
+    .lte('start_date', iso)
+    .gte('end_date', iso)
+    .order('start_date', { ascending: true })
+    .limit(1);
+  if (error) throw error;
+  return (data?.[0] ?? null) as ActiveRest | null;
+}
