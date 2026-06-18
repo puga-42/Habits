@@ -1,16 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import {
-  fetchActivitySocial,
-  fetchCompletionSocial,
-  likeActivity,
-  likeCompletion,
-  toggleSocialLike,
-  unlikeActivity,
-  unlikeCompletion,
-  type FeedKind,
-  type SocialCounts,
-} from '@/lib/feed';
+import { toggleSocialLike, type FeedKind, type SocialCounts } from '@/lib/feed';
+import { socialFnsFor } from '@/lib/feed-dispatch';
 
 const EMPTY_SOCIAL: SocialCounts = {
   like_count: 0,
@@ -41,7 +32,7 @@ export function useSocialTarget(
   useEffect(() => {
     if (!id || !kind || !userId || byId.has(id)) return;
     let cancelled = false;
-    const fetch = kind === 'completion' ? fetchCompletionSocial : fetchActivitySocial;
+    const fetch = socialFnsFor(kind).fetch;
     fetch(id, userId)
       .then((s) => {
         if (!cancelled) setById((prev) => new Map(prev).set(id, s));
@@ -60,8 +51,7 @@ export function useSocialTarget(
     const next = !current.viewer_liked;
     setById((prev) => new Map(prev).set(id, toggleSocialLike(current, next)));
     try {
-      const like = kind === 'completion' ? likeCompletion : likeActivity;
-      const unlike = kind === 'completion' ? unlikeCompletion : unlikeActivity;
+      const { like, unlike } = socialFnsFor(kind);
       if (next) await like(id, userId);
       else await unlike(id, userId);
     } catch {

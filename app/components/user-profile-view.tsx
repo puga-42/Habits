@@ -13,7 +13,8 @@ import { ProfileDayAgenda } from '@/components/profile-day-agenda';
 import { SegmentedControl } from '@/components/segmented-control';
 import { ThemedText } from '@/components/themed-text';
 import { UserHero } from '@/components/user-hero';
-import { applyLikeToggle, blockUser, likeActivity, likeCompletion, muteHabit, reportContent, unlikeActivity, unlikeCompletion, type FeedItem, type FeedKind } from '@/lib/feed';
+import { applyLikeToggle, blockUser, muteHabit, reportContent, type FeedItem, type FeedKind } from '@/lib/feed';
+import { socialFnsFor } from '@/lib/feed-dispatch';
 import type { FriendProfile } from '@/lib/friends';
 import { isoDate } from '@/lib/habits';
 import { buildDayGroups, nDayRange, type DayGroup } from '@/lib/history';
@@ -108,8 +109,9 @@ export function UserProfileView({ targetId, viewerId, onBack }: Props) {
     const next = !item.viewer_liked;
     setItems((p) => p.map((i) => (i.id === item.id ? applyLikeToggle(i, next) : i)));
     try {
-      if (next) await (item.feed_kind === 'completion' ? likeCompletion : likeActivity)(item.id, viewerId);
-      else await (item.feed_kind === 'completion' ? unlikeCompletion : unlikeActivity)(item.id, viewerId);
+      const { like, unlike } = socialFnsFor(item.feed_kind);
+      if (next) await like(item.id, viewerId);
+      else await unlike(item.id, viewerId);
     } catch {
       setItems((p) => p.map((i) => (i.id === item.id ? applyLikeToggle(i, !next) : i)));
     }

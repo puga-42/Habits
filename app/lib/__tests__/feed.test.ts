@@ -272,6 +272,15 @@ describe('feedItemSortKey', () => {
     const item = makeActivityItem({ created_at: '2026-05-14T09:00:00Z' });
     expect(feedItemSortKey(item)).toBe('2026-05-14T09:00:00Z');
   });
+
+  it('returns created_at for rest items (no completed_at)', () => {
+    const item = makeItem({
+      feed_kind: 'rest',
+      completed_at: null,
+      created_at: '2026-05-14T08:00:00Z',
+    });
+    expect(feedItemSortKey(item)).toBe('2026-05-14T08:00:00Z');
+  });
 });
 
 describe('mergeFeedPages (mixed kinds)', () => {
@@ -318,6 +327,10 @@ describe('parseLikerKind', () => {
     expect(parseLikerKind('activity')).toBe('activity');
   });
 
+  it('returns "rest" for "rest"', () => {
+    expect(parseLikerKind('rest')).toBe('rest');
+  });
+
   it('defaults to "completion" for unknown strings', () => {
     expect(parseLikerKind('garbage')).toBe('completion');
     expect(parseLikerKind('')).toBe('completion');
@@ -359,6 +372,19 @@ describe('feedItemStreak', () => {
 
   it('is 0 for activity (habit_created) items regardless of history', () => {
     const item = makeActivityItem({
+      habit_kind: 'scheduled',
+      habit_rrule: 'FREQ=DAILY',
+      habit_dtstart: '2026-06-01T08:00:00Z',
+      completion_history: ['2026-06-12', '2026-06-11'],
+    });
+    expect(feedItemStreak(item)).toBe(0);
+  });
+
+  it('is 0 for rest items regardless of history', () => {
+    const item = makeItem({
+      feed_kind: 'rest',
+      completed_at: null,
+      occurrence_date: null,
       habit_kind: 'scheduled',
       habit_rrule: 'FREQ=DAILY',
       habit_dtstart: '2026-06-01T08:00:00Z',
