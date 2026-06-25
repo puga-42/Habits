@@ -99,6 +99,7 @@ function TabLayoutInner() {
         available={[...AVAILABLE_VIEWS]}
         onPickView={setView}
         onOpenSettings={() => router.push('/settings')}
+        onOpenGroups={() => router.push('/groups')}
         onClose={closeDrawer}
       />
     </>

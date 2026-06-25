@@ -1,0 +1,233 @@
+import { buildDayItems, UNGROUPED } from '../day-items';
+import type { GroupMembership, HabitGroup } from '../groups';
+import type { Habit } from '../habits';
+import type { AgendaRow } from '../history';
+
+// ─── Fixtures ────────────────────────────────────────────────────────────────
+
+function habit(id: string, sort_index: number, lineage_id = id): Habit {
+  return {
+    id,
+    lineage_id,
+    owner_id: 'u1',
+    kind: 'scheduled',
+    title: id,
+    description: null,
+    color: null,
+    icon: null,
+    visibility: 'private',
+    timezone: 'UTC',
+    dtstart: '2026-06-01T07:00:00Z',
+    rrule: 'FREQ=DAILY',
+    until: null,
+    target_count: null,
+    target_period: null,
+    unit: 'count',
+    count_unit: null,
+    target_seconds: null,
+    display_unit: null,
+    sort_index,
+    created_at: '2026-06-01T00:00:00Z',
+    updated_at: '2026-06-01T00:00:00Z',
+    deleted_at: null,
+  };
+}
+
+function scheduledRow(habitId: string): AgendaRow {
+  return {
+    kind: 'scheduled',
+    habitId,
+    habit: {
+      id: habitId,
+      title: habitId,
+      description: null,
+      icon: null,
+      color: null,
+      unit: 'count',
+    },
+    time: null,
+  };
+}
+
+function completionRow(habitId: string, id = `c-${habitId}`): AgendaRow {
+  return {
+    kind: 'completion',
+    id,
+    habit: {
+      id: habitId,
+      title: habitId,
+      description: null,
+      icon: null,
+      color: null,
+      unit: 'count',
+    },
+    time: new Date('2026-06-25T08:00:00Z'),
+    isFlex: false,
+  };
+}
+
+function group(id: string, sort_index: number, collapsed = false): HabitGroup {
+  return {
+    id,
+    owner_id: 'u1',
+    name: id,
+    color: null,
+    icon: null,
+    sort_index,
+    collapsed,
+    created_at: '2026-06-01T00:00:00Z',
+    updated_at: '2026-06-01T00:00:00Z',
+    deleted_at: null,
+  };
+}
+
+function member(lineage_id: string, group_id: string): GroupMembership {
+  return {
+    id: `${group_id}-${lineage_id}`,
+    group_id,
+    lineage_id,
+    owner_id: 'u1',
+    effective_from: '2026-06-01',
+    effective_until: null,
+    created_at: '2026-06-01T00:00:00Z',
+  };
+}
+
+const ISO = '2026-06-25';
+
+function build(
+  rows: AgendaRow[],
+  habits: Habit[],
+  groups: HabitGroup[],
+  members: GroupMembership[],
+  restingExpanded = new Set<string>(),
+) {
+  const habitMap = new Map(habits.map((h) => [h.id, h]));
+  return buildDayItems({
+    rows,
+    habitMap,
+    groups,
+    memberships: members,
+    dateIso: ISO,
+    restingExpanded,
+  });
+}
+
+describe('buildDayItems — grouping', () => {
+  it('emits one group-header per non-empty group, in sort_index order, with its rows nested', () => {
+    const habits = [habit('A', 1), habit('B', 2)];
+    const rows = [scheduledRow('A'), scheduledRow('B')];
+    const groups = [group('G2', 2), group('G1', 1)];
+    const members = [member('A', 'G1'), member('B', 'G2')];
+
+    const items = build(rows, habits, groups, members);
+
+    expect(items[0]).toMatchObject({ kind: 'group-header', groupId: 'G1' });
+    expect(items[1]).toMatchObject({ kind: 'row', groupId: 'G1', section: 'notCompleted' });
+    expect((items[1] as any).row.habitId).toBe('A');
+    expect(items[2]).toMatchObject({ kind: 'group-header', groupId: 'G2' });
+    expect(items[3]).toMatchObject({ kind: 'row', groupId: 'G2', section: 'notCompleted' });
+    expect((items[3] as any).row.habitId).toBe('B');
+  });
+
+  it('a collapsed group emits only its header, no rows', () => {
+    const habits = [habit('A', 1)];
+    const rows = [scheduledRow('A')];
+    const groups = [group('G1', 1, /* collapsed */ true)];
+    const members = [member('A', 'G1')];
+
+    const items = build(rows, habits, groups, members);
+
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({ kind: 'group-header', groupId: 'G1', collapsed: true });
+  });
+
+  it('skips a group that has no rows for the day', () => {
+    const habits = [habit('A', 1)];
+    const rows = [scheduledRow('A')];
+    const groups = [group('G1', 1), group('G2', 2)];
+    const members = [member('A', 'G1')]; // G2 has no member rows today
+
+    const items = build(rows, habits, groups, members);
+
+    expect(items.some((i) => i.kind === 'group-header' && i.groupId === 'G2')).toBe(false);
+    expect(items.some((i) => i.kind === 'group-header' && i.groupId === 'G1')).toBe(true);
+  });
+
+  it('renders ungrouped rows after all group cards, with no group-header', () => {
+    const habits = [habit('A', 1), habit('U', 2)];
+    const rows = [scheduledRow('A'), scheduledRow('U')];
+    const groups = [group('G1', 1)];
+    const members = [member('A', 'G1')]; // U has no membership
+
+    const items = build(rows, habits, groups, members);
+
+    const lastGroupHeaderIdx = items.findIndex((i) => i.kind === 'group-header');
+    const ungroupedRowIdx = items.findIndex(
+      (i) => i.kind === 'row' && (i as any).row.habitId === 'U',
+    );
+    // ungrouped row comes after the (only) group header, and is tagged UNGROUPED.
+    expect(ungroupedRowIdx).toBeGreaterThan(lastGroupHeaderIdx);
+    expect(items[ungroupedRowIdx]).toMatchObject({ groupId: UNGROUPED });
+  });
+
+  it('a habit removed-going-forward (window closed before the day) is ungrouped that day', () => {
+    const habits = [habit('A', 1)];
+    const rows = [scheduledRow('A')];
+    const groups = [group('G1', 1)];
+    const closed: GroupMembership = {
+      ...member('A', 'G1'),
+      effective_until: '2026-06-20', // closed before ISO 06-25
+    };
+
+    const items = build(rows, habits, groups, [closed]);
+
+    // No group card (G1 has no rows this day); A renders ungrouped.
+    expect(items.some((i) => i.kind === 'group-header')).toBe(false);
+    expect(items[0]).toMatchObject({ kind: 'row', groupId: UNGROUPED });
+  });
+});
+
+describe('buildDayItems — sections within a group', () => {
+  it('orders not-completed then completed rows inside the card, with NO Completed divider', () => {
+    const habits = [habit('A', 1), habit('B', 2)];
+    const rows = [scheduledRow('A'), completionRow('B')];
+    const groups = [group('G1', 1)];
+    const members = [member('A', 'G1'), member('B', 'G1')];
+
+    const items = build(rows, habits, groups, members);
+
+    expect(items[0]).toMatchObject({ kind: 'group-header', groupId: 'G1' });
+    expect(items[1]).toMatchObject({ kind: 'row', section: 'notCompleted' });
+    // No completed-header inside a group card — the completed row drops straight
+    // to the bottom of the list.
+    expect(items[2]).toMatchObject({ kind: 'row', section: 'completed' });
+    expect(items.some((i) => i.kind === 'completed-header')).toBe(false);
+  });
+
+  it('a group with everything completed shows just the rows — no "all done" line', () => {
+    const habits = [habit('A', 1)];
+    const rows = [completionRow('A')];
+    const groups = [group('G1', 1)];
+    const members = [member('A', 'G1')];
+
+    const items = build(rows, habits, groups, members);
+
+    expect(items[0]).toMatchObject({ kind: 'group-header', groupId: 'G1' });
+    expect(items[1]).toMatchObject({ kind: 'row', section: 'completed' });
+    expect(items.some((i) => i.kind === 'all-done')).toBe(false);
+  });
+
+  it('the ungrouped pile keeps the legacy Completed divider', () => {
+    const habits = [habit('A', 1), habit('U', 2)];
+    // A is grouped (forces a card so the ungrouped pile is a real bucket); U is
+    // ungrouped and completed.
+    const rows = [scheduledRow('A'), completionRow('U')];
+    const groups = [group('G1', 1)];
+    const members = [member('A', 'G1')];
+
+    const items = build(rows, habits, groups, members);
+
+    expect(items.some((i) => i.kind === 'completed-header' && i.groupId === UNGROUPED)).toBe(true);
+  });
+});

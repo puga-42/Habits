@@ -14,6 +14,7 @@ import {
 
 import { ColorPickerModal } from '@/components/color-picker-modal';
 import { CardList, FormCard } from '@/components/form-card';
+import { GroupPickerRow } from '@/components/group-picker-row';
 import { HabitPillPreview } from '@/components/habit-pill-preview';
 import { ThemedText } from '@/components/themed-text';
 import { Palette } from '@/constants/colors';
@@ -109,6 +110,8 @@ export function HabitIdentityFields() {
             <ThemedText style={styles.chevron}>›</ThemedText>
           </View>
         </Pressable>
+
+        <GroupPickerRow />
       </CardList>
 
       <ColorPickerModal

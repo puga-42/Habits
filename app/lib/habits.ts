@@ -175,15 +175,20 @@ export type HabitInsert = {
   adopted_from_user_id?: string;
 };
 
+// Returns the new habit's id. For a root habit the lineage trigger sets
+// lineage_id = id, so callers can use the returned id as the lineage_id (e.g.
+// to attach group membership). Generated client-side so it's known up front.
 export async function createHabit(
   ownerId: string,
   input: HabitInsert,
-): Promise<void> {
+): Promise<string> {
   const sortIndex = await nextSortIndex(ownerId);
+  const id = Crypto.randomUUID();
   const { error } = await supabase
     .from('habits')
-    .insert({ owner_id: ownerId, sort_index: sortIndex, ...input });
+    .insert({ id, owner_id: ownerId, sort_index: sortIndex, ...input });
   if (error) throw error;
+  return id;
 }
 
 // Pure: next sort_index given the current list of existing indexes.

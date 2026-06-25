@@ -58,6 +58,14 @@ import {
   streaksByHabit,
   type LineageStats,
 } from '@/lib/habit-stats';
+import {
+  fetchGroups,
+  fetchMemberships,
+  type GroupMembership,
+  type HabitGroup,
+} from '@/lib/groups';
+import { setGroupCollapsed } from '@/lib/group-mutations';
+import { computeGroupStreak } from '@/lib/group-streak';
 import { type Section } from '@/lib/day-item-key';
 import { createRest, endRestForHabit } from '@/lib/rests';
 import { fetchProfile, type Profile } from '@/lib/profile';
@@ -97,6 +105,14 @@ export default function CalendarScreen() {
   const [habits, setHabits] = useState<Habit[]>([]);
   const [completions, setCompletions] = useState<CompletionWithHabit[]>([]);
   const [overrides, setOverrides] = useState<HabitOverride[]>([]);
+  // Groups + their time-scoped memberships drive the day-view's collapsible
+  // cards. `collapsedOverride` holds optimistic toggles layered over each
+  // group's persisted `collapsed`; buildDayItems falls back to the stored flag.
+  const [groups, setGroups] = useState<HabitGroup[]>([]);
+  const [memberships, setMemberships] = useState<GroupMembership[]>([]);
+  const [collapsedOverride, setCollapsedOverride] = useState<Map<string, boolean>>(
+    new Map(),
+  );
   // Per-day completion counts for the week strip's colored circles. Fetched over
   // a fixed today±STRIP_HALF_WINDOW window (the strip is always centered on
   // today), so it stays correct no matter where the day-view anchor jumps.
@@ -163,7 +179,7 @@ export default function CalendarScreen() {
 
   const load = useCallback(async () => {
     if (!userId) return;
-    const [habitsRes, rangeRes, profileRes, statsRes, stripCountsRes] =
+    const [habitsRes, rangeRes, profileRes, statsRes, stripCountsRes, groupsRes, membersRes] =
       await Promise.all([
         fetchHabits(userId),
         fetchRange(userId, dataRange.from, dataRange.to),
@@ -172,12 +188,16 @@ export default function CalendarScreen() {
         fetchCompletionCountsByDate(userId, stripRange.from, stripRange.to).catch(
           () => new Map<string, number>(),
         ),
+        fetchGroups(userId).catch(() => [] as HabitGroup[]),
+        fetchMemberships(userId).catch(() => [] as GroupMembership[]),
       ]);
     setHabits(habitsRes);
     setCompletions(rangeRes.completions);
     setOverrides(rangeRes.overrides);
     setStatsByLineage(statsRes);
     setStripCountByIso(stripCountsRes);
+    setGroups(groupsRes);
+    setMemberships(membersRes);
     if (profileRes) setProfile(profileRes);
     scheduleExtendingRef.current = false;
 
@@ -304,6 +324,24 @@ export default function CalendarScreen() {
     for (const g of dayGroups) m.set(g.date, g);
     return m;
   }, [dayGroups]);
+
+  // Current group-level streak per group ("any active member completed", daily).
+  // Built from the same lineage-wide completion history the per-habit streaks
+  // use, so the two never disagree. Memoized so it recomputes only on data change.
+  const groupStreakByGroupId = useMemo(() => {
+    const completionDaysByLineage = new Map<string, Set<string>>();
+    for (const [lineageId, stats] of statsByLineage) {
+      completionDaysByLineage.set(lineageId, new Set(stats.completion_history));
+    }
+    const out = new Map<string, number>();
+    for (const g of groups) {
+      out.set(
+        g.id,
+        computeGroupStreak({ groupId: g.id, memberships, completionDaysByLineage }, today),
+      );
+    }
+    return out;
+  }, [groups, memberships, statsByLineage, today]);
 
   // ─── Handlers ──────────────────────────────────────────────────────────
 
@@ -493,6 +531,20 @@ export default function CalendarScreen() {
     await load();
   }
 
+  // Collapse/expand a group card. Optimistic (instant) with a persisted write so
+  // the state survives restarts and syncs across devices; a failed write refetches.
+  function handleToggleGroup(groupId: string, collapsed: boolean) {
+    setCollapsedOverride((prev) => {
+      const next = new Map(prev);
+      next.set(groupId, collapsed);
+      return next;
+    });
+    setGroupCollapsed(groupId, collapsed).catch((err) => {
+      console.warn('Persisting group collapse failed, refetching', err);
+      load();
+    });
+  }
+
   async function confirmRest(untilIso: string) {
     if (!userId || !restTarget) return;
     const { habit, dateIso } = restTarget;
@@ -623,6 +675,10 @@ export default function CalendarScreen() {
             today={today}
             habits={habits}
             dayGroups={dayGroups}
+            groups={groups}
+            memberships={memberships}
+            collapsedById={collapsedOverride}
+            streakByGroupId={groupStreakByGroupId}
             flexProgressByHabitId={flexProgressByHabitId}
             timeProgressByHabitId={timeProgressByHabitId}
             streakByHabitId={streakByHabitId}
@@ -630,6 +686,7 @@ export default function CalendarScreen() {
             onRowPress={handleTrailingPress}
             onPillPress={handlePillPress}
             onSwipeAction={handleSwipeAction}
+            onToggleGroup={handleToggleGroup}
             onReorderSection={handleReorderSection}
           />
         ) : view === '3day' ? (
@@ -677,6 +734,12 @@ export default function CalendarScreen() {
               label: 'New habit',
               icon: <IconSymbol name="plus.circle" size={20} color={Palette.primary} />,
               onPress: () => router.push('/habit/new'),
+            },
+            {
+              key: 'new-group',
+              label: 'New group',
+              icon: <IconSymbol name="folder.badge.plus" size={20} color={Palette.lavender} />,
+              onPress: () => router.push('/groups'),
             },
             {
               key: 'feedback',

@@ -8,8 +8,9 @@ import { HabitPillPreview } from '@/components/habit-pill-preview';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useAuth } from '@/lib/auth';
+import { addHabitToGroup } from '@/lib/group-mutations';
 import { draftToInsert, useHabitForm } from '@/lib/habit-form';
-import { createHabit } from '@/lib/habits';
+import { createHabit, isoDate } from '@/lib/habits';
 import { syncWidgetData } from '@/lib/widget-sync';
 
 export default function NewHabitScreen() {
@@ -32,7 +33,12 @@ export default function NewHabitScreen() {
 
     setSaving(true);
     try {
-      await createHabit(session.user.id, draftToInsert(draft));
+      // A new root habit's lineage_id equals its id (set by the lineage trigger),
+      // so the returned id is the lineage to attach group membership to.
+      const newId = await createHabit(session.user.id, draftToInsert(draft));
+      if (draft.groupId) {
+        await addHabitToGroup(session.user.id, newId, draft.groupId, isoDate(new Date()));
+      }
       syncWidgetData(session.user.id);
       reset();
       router.back();

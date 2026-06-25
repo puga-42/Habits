@@ -22,6 +22,7 @@ type Props = {
   available: ViewMode[];
   onPickView: (v: ViewMode) => void;
   onOpenSettings: () => void;
+  onOpenGroups: () => void;
   onClose: () => void;
 };
 
@@ -42,6 +43,7 @@ export function CalendarMenuDrawer({
   available,
   onPickView,
   onOpenSettings,
+  onOpenGroups,
   onClose,
 }: Props) {
   const insets = useSafeAreaInsets();
@@ -106,6 +108,15 @@ export function CalendarMenuDrawer({
                 </Section>
 
                 <Section title="More">
+                  <Pressable
+                    onPress={() => {
+                      onOpenGroups();
+                      onClose();
+                    }}
+                    style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}>
+                    <View style={styles.bullet} />
+                    <ThemedText style={styles.rowText}>Manage groups</ThemedText>
+                  </Pressable>
                   <Pressable
                     onPress={() => {
                       onOpenSettings();

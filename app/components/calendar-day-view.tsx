@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { DayContent } from '@/components/day-content';
 import type { Section } from '@/lib/day-item-key';
+import type { GroupMembership, HabitGroup } from '@/lib/groups';
 import { isoDate, type Habit } from '@/lib/habits';
 import { isDayFuture, type AgendaRow as AgendaRowT, type DayGroup, type SwipeAction } from '@/lib/history';
 
@@ -11,6 +12,10 @@ type Props = {
   today: Date;
   habits: Habit[];
   dayGroups: DayGroup[];
+  groups: HabitGroup[];
+  memberships: GroupMembership[];
+  collapsedById: Map<string, boolean>;
+  streakByGroupId?: Map<string, number>;
   flexProgressByHabitId: Map<string, { count: number; target: number }>;
   timeProgressByHabitId: Map<string, number>;
   streakByHabitId: Map<string, number>;
@@ -18,6 +23,7 @@ type Props = {
   onRowPress: (row: AgendaRowT, dateIso: string) => void;
   onPillPress?: (row: AgendaRowT, dateIso: string) => void;
   onSwipeAction: (row: AgendaRowT, dateIso: string, action: SwipeAction) => void;
+  onToggleGroup: (groupId: string, collapsed: boolean) => void;
   onReorderSection: (dateIso: string, section: Section, newRows: AgendaRowT[]) => void;
 };
 
@@ -26,6 +32,10 @@ export function CalendarDayView({
   today,
   habits,
   dayGroups,
+  groups,
+  memberships,
+  collapsedById,
+  streakByGroupId,
   flexProgressByHabitId,
   timeProgressByHabitId,
   streakByHabitId,
@@ -33,6 +43,7 @@ export function CalendarDayView({
   onRowPress,
   onPillPress,
   onSwipeAction,
+  onToggleGroup,
   onReorderSection,
 }: Props) {
   const anchorIso = isoDate(anchorDate);
@@ -57,6 +68,10 @@ export function CalendarDayView({
         date={anchorDate}
         group={groupByIso.get(anchorIso)}
         habitMap={habitMap}
+        groups={groups}
+        memberships={memberships}
+        collapsedById={collapsedById}
+        streakByGroupId={streakByGroupId}
         flexProgressByHabitId={flexProgressByHabitId}
         timeProgressByHabitId={timeProgressByHabitId}
         streakByHabitId={streakByHabitId}
@@ -65,6 +80,7 @@ export function CalendarDayView({
         onRowPress={onRowPress}
         onPillPress={onPillPress}
         onSwipeAction={onSwipeAction}
+        onToggleGroup={onToggleGroup}
         onReorderSection={onReorderSection}
       />
     </View>

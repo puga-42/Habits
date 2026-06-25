@@ -15,6 +15,15 @@ import { HabitPillPreview } from '@/components/habit-pill-preview';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useAuth } from '@/lib/auth';
+import {
+  addHabitToGroup,
+  removeHabitFromGroupFuture,
+} from '@/lib/group-mutations';
+import {
+  activeGroupIdFor,
+  fetchMemberships,
+  planGroupChange,
+} from '@/lib/groups';
 import { draftToInsert, useHabitForm } from '@/lib/habit-form';
 import {
   applyEditAll,
@@ -24,6 +33,7 @@ import {
   deleteHabitAll,
   deleteHabitFuture,
   fetchHabit,
+  isoDate,
   type Habit,
   occurrenceMidnight,
 } from '@/lib/habits';
@@ -39,19 +49,31 @@ export default function EditHabitScreen() {
     id: string;
     occurrenceDate?: string;
   }>();
-  const { draft, seedFromHabit, reset } = useHabitForm();
+  const { draft, update, seedFromHabit, reset } = useHabitForm();
 
   const [habit, setHabit] = useState<Habit | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  // The group the habit is in on load, so save can reconcile against the picker.
+  const [initialGroupId, setInitialGroupId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
     fetchHabit(id)
-      .then((h) => {
+      .then(async (h) => {
         setHabit(h);
         seedFromHabit(h);
+        // Seed the group picker from the active membership (kept off the habit
+        // row — see habit_group_members). Best-effort: failure leaves it ungrouped.
+        try {
+          const members = await fetchMemberships(h.owner_id);
+          const gid = activeGroupIdFor(members, h.lineage_id, isoDate(new Date()));
+          setInitialGroupId(gid);
+          update({ groupId: gid });
+        } catch {
+          // ignore — picker stays on "None"
+        }
       })
       .catch((err) => {
         Alert.alert('Could not load habit', err instanceof Error ? err.message : String(err));
@@ -59,6 +81,19 @@ export default function EditHabitScreen() {
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  // Apply the group picker change (membership is lineage-level, independent of
+  // the this/future/all occurrence scope).
+  async function reconcileGroup() {
+    if (!habit || !session?.user.id) return;
+    const change = planGroupChange(initialGroupId, draft.groupId);
+    const todayIso = isoDate(new Date());
+    if (change.kind === 'add') {
+      await addHabitToGroup(session.user.id, habit.lineage_id, change.groupId, todayIso);
+    } else if (change.kind === 'remove') {
+      await removeHabitFromGroupFuture(habit.lineage_id, change.groupId, todayIso);
+    }
+  }
 
   function onCancel() {
     reset();
@@ -85,9 +120,15 @@ export default function EditHabitScreen() {
       } else {
         if (!occurrenceDate) throw new Error('"This occurrence only" needs an occurrence date.');
         const patch = buildPatch(habit, draft);
-        if (Object.keys(patch).length === 0) { router.back(); return; }
+        if (Object.keys(patch).length === 0) {
+          // No field changes, but the group may still have changed.
+          await reconcileGroup();
+          router.back();
+          return;
+        }
         await applyEditThis(habit.id, occurrenceDate, patch);
       }
+      await reconcileGroup();
       syncWidgetData(session.user.id);
       reset();
       router.back();

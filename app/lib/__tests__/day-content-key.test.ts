@@ -47,17 +47,31 @@ function flex(habitId: string): AgendaRow {
   };
 }
 
-function rowItem(row: AgendaRow, section: 'notCompleted' | 'completed' = 'notCompleted'): DayItem {
-  return { kind: 'row', row, section };
+function rowItem(
+  row: AgendaRow,
+  section: 'notCompleted' | 'completed' = 'notCompleted',
+  groupId = '__ungrouped',
+): DayItem {
+  return { kind: 'row', row, section, groupId };
 }
 
 describe('dayItemKey', () => {
-  it('returns stable key for completed-header', () => {
-    expect(dayItemKey({ kind: 'completed-header' })).toBe('__ch');
+  it('returns group-scoped key for completed-header', () => {
+    expect(dayItemKey({ kind: 'completed-header', groupId: '__ungrouped' })).toBe(
+      '__ch-__ungrouped',
+    );
   });
 
-  it('returns stable key for all-done', () => {
-    expect(dayItemKey({ kind: 'all-done' })).toBe('__ad');
+  it('returns group-scoped key for all-done', () => {
+    expect(dayItemKey({ kind: 'all-done', groupId: '__ungrouped' })).toBe(
+      '__ad-__ungrouped',
+    );
+  });
+
+  it('the same habit in different group cards gets distinct keys', () => {
+    const inG1 = dayItemKey(rowItem(scheduled('h1'), 'notCompleted', 'G1'));
+    const inG2 = dayItemKey(rowItem(scheduled('h1'), 'notCompleted', 'G2'));
+    expect(inG1).not.toBe(inG2);
   });
 
   it('returns same key for scheduled and completion of same habit', () => {

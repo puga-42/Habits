@@ -36,6 +36,10 @@ export type HabitDraft = {
   icon: string;
   visibility: Visibility;
   adoptedFromUserId: string | null;
+  // Active group (membership lives in habit_group_members, not on the habit row).
+  // null = ungrouped. On edit, seeded by the screen from the active membership;
+  // reconciled to a membership write on save (see planGroupChange).
+  groupId: string | null;
 };
 
 function defaultDraft(): HabitDraft {
@@ -56,6 +60,7 @@ function defaultDraft(): HabitDraft {
     icon: '',
     visibility: 'private',
     adoptedFromUserId: null,
+    groupId: null,
   };
 }
 
@@ -85,6 +90,7 @@ export function habitToDraft(habit: Habit): HabitDraft {
       icon: habit.icon ?? '',
       visibility: habit.visibility,
       adoptedFromUserId: null,
+      groupId: null,
     };
   }
   return {
@@ -101,6 +107,7 @@ export function habitToDraft(habit: Habit): HabitDraft {
     icon: habit.icon ?? '✨',
     visibility: habit.visibility,
     adoptedFromUserId: null,
+    groupId: null,
   };
 }
 

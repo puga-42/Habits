@@ -6,14 +6,16 @@ import DraggableFlatList, {
 import Animated, { FadeOut, LinearTransition } from 'react-native-reanimated';
 
 import { AnimatedHabitRow } from '@/components/animated-habit-row';
+import { GroupCardHeader } from '@/components/group-card-header';
 import { HabitRowSwipeable } from '@/components/habit-row-swipeable';
 import type { TimerStatus } from '@/components/time-trailing-icon';
 import { ThemedText } from '@/components/themed-text';
 import { diffDayHabits } from '@/lib/day-diff';
+import { buildDayItems, UNGROUPED } from '@/lib/day-items';
 import { dayItemKey, type DayItem, type Section } from '@/lib/day-item-key';
+import type { GroupMembership, HabitGroup } from '@/lib/groups';
 import { isoDate, type Habit } from '@/lib/habits';
 import {
-  partitionRows,
   type AgendaRow as AgendaRowT,
   type DayGroup,
   type SwipeAction,
@@ -25,6 +27,10 @@ type Props = {
   date: Date;
   group: DayGroup | undefined;
   habitMap: Map<string, Habit>;
+  groups: HabitGroup[];
+  memberships: GroupMembership[];
+  collapsedById: Map<string, boolean>;
+  streakByGroupId?: Map<string, number>;
   flexProgressByHabitId: Map<string, { count: number; target: number }>;
   timeProgressByHabitId: Map<string, number>;
   streakByHabitId: Map<string, number>;
@@ -33,6 +39,7 @@ type Props = {
   onRowPress: (row: AgendaRowT, dateIso: string) => void;
   onPillPress?: (row: AgendaRowT, dateIso: string) => void;
   onSwipeAction: (row: AgendaRowT, dateIso: string, action: SwipeAction) => void;
+  onToggleGroup: (groupId: string, collapsed: boolean) => void;
   onReorderSection: (
     dateIso: string,
     section: Section,
@@ -44,6 +51,10 @@ export function DayContent({
   date,
   group,
   habitMap,
+  groups,
+  memberships,
+  collapsedById,
+  streakByGroupId,
   flexProgressByHabitId,
   timeProgressByHabitId,
   streakByHabitId,
@@ -52,42 +63,37 @@ export function DayContent({
   onRowPress,
   onPillPress,
   onSwipeAction,
+  onToggleGroup,
   onReorderSection,
 }: Props) {
   const iso = isoDate(date);
   const rows = group?.rows ?? [];
-  const { notCompleted, completed, resting } = useMemo(
-    () => partitionRows(rows, habitMap),
-    [rows, habitMap],
+
+  // Per-section (group-scoped) Resting expand state, keyed by group id / UNGROUPED.
+  const [restingExpanded, setRestingExpanded] = useState<Set<string>>(new Set());
+  const toggleResting = useCallback((key: string) => {
+    setRestingExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
+
+  const data = useMemo<DayItem[]>(
+    () =>
+      buildDayItems({
+        rows,
+        habitMap,
+        groups,
+        memberships,
+        dateIso: iso,
+        restingExpanded,
+        collapsedById,
+        streakByGroupId,
+      }),
+    [rows, habitMap, groups, memberships, iso, restingExpanded, collapsedById, streakByGroupId],
   );
-
-  const [restingExpanded, setRestingExpanded] = useState(false);
-
-  const data = useMemo<DayItem[]>(() => {
-    const out: DayItem[] = [];
-    if (notCompleted.length > 0) {
-      for (const row of notCompleted) {
-        out.push({ kind: 'row', row, section: 'notCompleted' });
-      }
-    } else if (completed.length > 0) {
-      out.push({ kind: 'all-done' });
-    }
-    if (completed.length > 0) {
-      out.push({ kind: 'completed-header' });
-      for (const row of completed) {
-        out.push({ kind: 'row', row, section: 'completed' });
-      }
-    }
-    if (resting.length > 0) {
-      out.push({ kind: 'resting-header' });
-      if (restingExpanded) {
-        for (const row of resting) {
-          out.push({ kind: 'row', row, section: 'resting' });
-        }
-      }
-    }
-    return out;
-  }, [notCompleted, completed, resting, restingExpanded]);
 
   const [generation, setGeneration] = useState(0);
 
@@ -126,6 +132,27 @@ export function DayContent({
   const keyExtractor = (item: DayItem): string => dayItemKey(item);
 
   const renderItem = ({ item, drag, isActive }: RenderItemParams<DayItem>) => {
+    if (item.kind === 'group-header') {
+      return (
+        <Animated.View>
+          <GroupCardHeader
+            name={item.name}
+            collapsed={item.collapsed}
+            color={item.color}
+            streak={item.streak}
+            onToggle={() => onToggleGroup(item.groupId, !item.collapsed)}
+          />
+        </Animated.View>
+      );
+    }
+    if (item.kind === 'ungrouped-header') {
+      // Subtle divider marking the start of the ungrouped habits below the cards.
+      return (
+        <Animated.View style={styles.ungroupedHeader}>
+          <View style={styles.rule} />
+        </Animated.View>
+      );
+    }
     if (item.kind === 'all-done') {
       return (
         <Animated.View>
@@ -143,18 +170,17 @@ export function DayContent({
       );
     }
     if (item.kind === 'resting-header') {
+      const expanded = restingExpanded.has(item.groupId);
       return (
         <Pressable
-          onPress={() => setRestingExpanded((v) => !v)}
+          onPress={() => toggleResting(item.groupId)}
           style={styles.sectionHeader}
           accessibilityRole="button"
-          accessibilityLabel={restingExpanded ? 'Collapse resting' : 'Expand resting'}>
+          accessibilityLabel={expanded ? 'Collapse resting' : 'Expand resting'}>
           <View style={styles.rule} />
           <ThemedText style={styles.sectionLabel}>Resting</ThemedText>
           <ThemedText style={styles.zzz}>zᶻᶻ</ThemedText>
-          <ThemedText style={styles.restChevron}>
-            {restingExpanded ? '▾' : '▸'}
-          </ThemedText>
+          <ThemedText style={styles.restChevron}>{expanded ? '▾' : '▸'}</ThemedText>
           <View style={styles.rule} />
         </Pressable>
       );
@@ -210,29 +236,32 @@ export function DayContent({
       setGeneration((g) => g + 1);
       return;
     }
-    // Determine which section the row landed in by walking the headers above it.
+    // Determine which group + section the row landed in by walking the headers
+    // above it. A group-header / ungrouped-header opens a new group (section
+    // resets to not-completed); completed/resting headers switch the section.
+    let landedGroup = UNGROUPED;
     let landedSection: Section = 'notCompleted';
     for (let i = 0; i < to; i++) {
       const it = newData[i];
-      if (it.kind === 'completed-header') landedSection = 'completed';
+      if (it.kind === 'group-header') {
+        landedGroup = it.groupId;
+        landedSection = 'notCompleted';
+      } else if (it.kind === 'ungrouped-header') {
+        landedGroup = UNGROUPED;
+        landedSection = 'notCompleted';
+      } else if (it.kind === 'completed-header') landedSection = 'completed';
       else if (it.kind === 'resting-header') landedSection = 'resting';
     }
-    if (landedSection !== moved.section) {
+    // Reject drops that cross a group or section boundary — reorder is in-place.
+    if (landedGroup !== moved.groupId || landedSection !== moved.section) {
       setGeneration((g) => g + 1);
       return;
     }
+    // Collect the new order of this group+section's rows (their groupId/section
+    // fields are unchanged by the drag, so filtering by them is correct).
     const sectionRows: AgendaRowT[] = [];
-    let currentSection: Section = 'notCompleted';
     for (const it of newData) {
-      if (it.kind === 'completed-header') {
-        currentSection = 'completed';
-        continue;
-      }
-      if (it.kind === 'resting-header') {
-        currentSection = 'resting';
-        continue;
-      }
-      if (it.kind === 'row' && currentSection === moved.section) {
+      if (it.kind === 'row' && it.groupId === moved.groupId && it.section === moved.section) {
         sectionRows.push(it.row);
       }
     }
@@ -293,4 +322,5 @@ const styles = StyleSheet.create({
   },
   zzz: { fontSize: 12, opacity: 0.5, fontStyle: 'italic' },
   restChevron: { fontSize: 12, opacity: 0.55 },
+  ungroupedHeader: { paddingTop: 18, paddingBottom: 4 },
 });
