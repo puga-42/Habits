@@ -1,13 +1,15 @@
-// Bottom-sheet color picker: a true HSV wheel (intuitive free-form selection)
-// plus a brightness slider and the curated palette swatches (the existing
-// quick selection). Updates `onChange` live so the habit preview updates
-// underneath. Pure color math lives in `lib/color-wheel.ts`.
+// Full-page color picker: a true HSV wheel (intuitive free-form selection) plus
+// a brightness slider and the curated palette swatches. The caller's live
+// `preview` sits at the top, above the wheel, so the user sees their pill change
+// as they drag — no need to keep the form behind visible. Updates `onChange`
+// live. Pure color math lives in `lib/color-wheel.ts`; slider in
+// `brightness-slider`.
 
-import { useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import { Modal, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 
+import { BrightnessSlider } from '@/components/brightness-slider';
 import { ColorWheel } from '@/components/color-wheel';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -16,19 +18,21 @@ import { hexToHsv, hsvToHex, type Hsv } from '@/lib/color-wheel';
 
 const PRESETS = Palette.habitColors;
 const WHEEL = 240;
-const SLIDER_H = 28;
 
 type Props = {
   visible: boolean;
   value: string;
   onChange: (hex: string) => void;
   onClose: () => void;
+  // Rendered at the top of the page, above the wheel — typically a live preview
+  // of whatever the color applies to, so the user sees it change as they drag.
+  preview?: ReactNode;
 };
 
-export function ColorPickerModal({ visible, value, onChange, onClose }: Props) {
+export function ColorPickerModal({ visible, value, onChange, onClose, preview }: Props) {
   const [hsv, setHsv] = useState<Hsv>(() => hexToHsv(value));
 
-  // Re-seed from the incoming color each time the sheet opens.
+  // Re-seed from the incoming color each time the page opens.
   useEffect(() => {
     if (visible) setHsv(hexToHsv(value));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -45,7 +49,7 @@ export function ColorPickerModal({ visible, value, onChange, onClose }: Props) {
     <Modal
       visible={visible}
       animationType="slide"
-      presentationStyle="pageSheet"
+      presentationStyle="fullScreen"
       onRequestClose={onClose}>
       <ThemedView style={styles.root}>
         <SafeAreaView edges={['top']} style={styles.content}>
@@ -55,6 +59,8 @@ export function ColorPickerModal({ visible, value, onChange, onClose }: Props) {
               <ThemedText style={styles.done}>Done</ThemedText>
             </Pressable>
           </View>
+
+          {preview}
 
           <View style={styles.wheelArea}>
             <ColorWheel
@@ -89,39 +95,6 @@ export function ColorPickerModal({ visible, value, onChange, onClose }: Props) {
   );
 }
 
-function BrightnessSlider({ hsv, onChange }: { hsv: Hsv; onChange: (v: number) => void }) {
-  const [width, setWidth] = useState(0);
-
-  function handle(locationX: number) {
-    if (width <= 0) return;
-    onChange(Math.max(0, Math.min(1, locationX / width)));
-  }
-
-  const full = hsvToHex(hsv.h, hsv.s, 1);
-  const thumbLeft = Math.max(0, Math.min(width - 24, hsv.v * width - 12));
-
-  return (
-    <View
-      style={styles.slider}
-      onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
-      onStartShouldSetResponder={() => true}
-      onMoveShouldSetResponder={() => true}
-      onResponderGrant={(e) => handle(e.nativeEvent.locationX)}
-      onResponderMove={(e) => handle(e.nativeEvent.locationX)}>
-      <Svg width={width || 1} height={SLIDER_H}>
-        <Defs>
-          <LinearGradient id="bright" x1="0" y1="0" x2="1" y2="0">
-            <Stop offset="0" stopColor="#000" />
-            <Stop offset="1" stopColor={full} />
-          </LinearGradient>
-        </Defs>
-        <Rect width={width || 1} height={SLIDER_H} rx={SLIDER_H / 2} fill="url(#bright)" />
-      </Svg>
-      <View pointerEvents="none" style={[styles.sliderThumb, { left: thumbLeft }]} />
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   root: { flex: 1 },
   content: { flex: 1 },
@@ -136,26 +109,6 @@ const styles = StyleSheet.create({
   },
   done: { fontSize: 16, fontWeight: '600' },
   wheelArea: { alignItems: 'center', paddingTop: 28 },
-  slider: {
-    height: SLIDER_H,
-    marginHorizontal: 24,
-    marginTop: 28,
-    justifyContent: 'center',
-  },
-  sliderThumb: {
-    position: 'absolute',
-    top: 2,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 3,
-    borderColor: '#fff',
-    backgroundColor: 'transparent',
-    shadowColor: '#000',
-    shadowOpacity: 0.3,
-    shadowRadius: 2,
-    shadowOffset: { width: 0, height: 1 },
-  },
   presets: {
     flexDirection: 'row',
     flexWrap: 'wrap',

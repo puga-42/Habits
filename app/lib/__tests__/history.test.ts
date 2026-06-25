@@ -741,6 +741,18 @@ describe('countCompletionsByDate', () => {
     expect(map.get('2026-05-12')).toBe(1);
     expect(map.get('2026-05-13')).toBe(2);
   });
+
+  it('tallies minimal rows without a habits join (count-only query path)', () => {
+    // fetchCompletionCountsByDate selects only the two date columns, so the
+    // tally must work on rows lacking habit/id/owner fields.
+    const map = countCompletionsByDate([
+      { occurrence_date: '2026-05-13', completed_at: '2026-05-13T10:00:00Z' },
+      { occurrence_date: '2026-05-13', completed_at: '2026-05-13T11:00:00Z' },
+      { occurrence_date: null, completed_at: new Date(2026, 4, 14, 9).toISOString() },
+    ]);
+    expect(map.get('2026-05-13')).toBe(2);
+    expect(map.get('2026-05-14')).toBe(1);
+  });
 });
 
 // ─── flexProgressByHabit ───────────────────────────────────────────────────

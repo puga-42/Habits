@@ -22,7 +22,7 @@ import { TabTopBar } from '@/components/tab-top-bar';
 import { RestUntilModal } from '@/components/rest-until-modal';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { WeekStrip } from '@/components/week-strip';
+import { HALF_WINDOW as STRIP_HALF_WINDOW, WeekStrip } from '@/components/week-strip';
 import { useAuth } from '@/lib/auth';
 import { setNavHabit } from '@/lib/habit-nav-cache';
 import {
@@ -41,7 +41,7 @@ import {
 import {
   buildDayGroups,
   buildMonthGrid,
-  countCompletionsByDate,
+  fetchCompletionCountsByDate,
   fetchRange,
   flexPeriodStartFor,
   flexProgressByHabit,
@@ -97,6 +97,10 @@ export default function CalendarScreen() {
   const [habits, setHabits] = useState<Habit[]>([]);
   const [completions, setCompletions] = useState<CompletionWithHabit[]>([]);
   const [overrides, setOverrides] = useState<HabitOverride[]>([]);
+  // Per-day completion counts for the week strip's colored circles. Fetched over
+  // a fixed today±STRIP_HALF_WINDOW window (the strip is always centered on
+  // today), so it stays correct no matter where the day-view anchor jumps.
+  const [stripCountByIso, setStripCountByIso] = useState<Map<string, number>>(new Map());
   // Lineage-wide completion/skip history per lineage, used only to derive the
   // 🔥 streak badge on day-view pills. Empty on fetch failure → badges hidden.
   const [statsByLineage, setStatsByLineage] = useState<Map<string, LineageStats>>(new Map());
@@ -135,26 +139,45 @@ export default function CalendarScreen() {
     } else if (view === '3day') {
       latest.setDate(latest.getDate() + 3);
     } else {
-      earliest.setDate(earliest.getDate() - 7);
-      latest.setDate(latest.getDate() + 7);
+      // Day view shows the WeekStrip (±14 days). Fetch the same window so every
+      // visible day has completion data to color its circle — otherwise days
+      // outside the fetch range render gray until a refetch repopulates them.
+      earliest.setDate(earliest.getDate() - 14);
+      latest.setDate(latest.getDate() + 14);
     }
     return { from: isoDate(earliest), to: isoDate(latest) };
   }, [view, anchorDate, anchorYear, anchorMonth, today, scheduleWindow]);
+
+  // Fixed window for the week strip's colored circles: today ± the strip's
+  // half-window (the strip is always centered on today). Kept separate from
+  // dataRange so the circles never depend on the anchor-relative agenda fetch.
+  const stripRange = useMemo(() => {
+    const from = new Date(today);
+    from.setDate(from.getDate() - STRIP_HALF_WINDOW);
+    const to = new Date(today);
+    to.setDate(to.getDate() + STRIP_HALF_WINDOW + 1); // exclusive upper bound
+    return { from: isoDate(from), to: isoDate(to) };
+  }, [today]);
 
   const anchorIso = isoDate(anchorDate);
 
   const load = useCallback(async () => {
     if (!userId) return;
-    const [habitsRes, rangeRes, profileRes, statsRes] = await Promise.all([
-      fetchHabits(userId),
-      fetchRange(userId, dataRange.from, dataRange.to),
-      fetchProfile(userId).catch(() => null),
-      fetchMyHabitsStats(userId).catch(() => new Map<string, LineageStats>()),
-    ]);
+    const [habitsRes, rangeRes, profileRes, statsRes, stripCountsRes] =
+      await Promise.all([
+        fetchHabits(userId),
+        fetchRange(userId, dataRange.from, dataRange.to),
+        fetchProfile(userId).catch(() => null),
+        fetchMyHabitsStats(userId).catch(() => new Map<string, LineageStats>()),
+        fetchCompletionCountsByDate(userId, stripRange.from, stripRange.to).catch(
+          () => new Map<string, number>(),
+        ),
+      ]);
     setHabits(habitsRes);
     setCompletions(rangeRes.completions);
     setOverrides(rangeRes.overrides);
     setStatsByLineage(statsRes);
+    setStripCountByIso(stripCountsRes);
     if (profileRes) setProfile(profileRes);
     scheduleExtendingRef.current = false;
 
@@ -167,7 +190,7 @@ export default function CalendarScreen() {
       }),
     );
     setTimeBaseByHabitId(new Map(baseTotals));
-  }, [userId, dataRange.from, dataRange.to, anchorIso]);
+  }, [userId, dataRange.from, dataRange.to, stripRange.from, stripRange.to, anchorIso]);
 
   useFocusEffect(
     useCallback(() => {
@@ -259,14 +282,6 @@ export default function CalendarScreen() {
         today,
       ),
     [daysInRange, habits, completions, overrides, today],
-  );
-
-  // Day-by-day completion counts across the fetched window, used to fill the
-  // week-strip cells. Computed directly from completions so we don't need to
-  // build DayGroups for the 21-day strip range separately.
-  const completionCountByIso = useMemo(
-    () => countCompletionsByDate(completions),
-    [completions],
   );
 
   // Per-flex-habit progress through the current period (day/week/month). Drives
@@ -572,7 +587,7 @@ export default function CalendarScreen() {
               anchorDate={anchorDate}
               weekStart={weekStart}
               today={today}
-              countByDate={completionCountByIso}
+              countByDate={stripCountByIso}
               onSelect={setAnchorDate}
             />
           )}

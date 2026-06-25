@@ -18,7 +18,10 @@ const TODAY_ACCENT = Palette.lavender;
 const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const DENSITY_ALPHA = [0, 0.12, 0.26, 0.45, 0.68] as const;
 
-const HALF_WINDOW = 90;
+// Exported so the screen can fetch completion counts for exactly this window —
+// the strip is always centered on `today`, so its color data must cover the
+// same fixed ±HALF_WINDOW days regardless of the selected anchor.
+export const HALF_WINDOW = 14;
 const CELL_BUBBLE = 30;
 const OVAL_HEIGHT = 66;
 const OVAL_WIDTH = 40;
@@ -74,7 +77,23 @@ export function WeekStrip({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Scroll offset that places the initial cell in the centre of the viewport.
+  // Using contentOffset (rather than initialScrollIndex, which left-aligns) means
+  // the current day is centred on first paint with no post-layout jump.
+  const initialOffset = useMemo(
+    () => Math.max(0, cellWidth * initialIndex - (screenWidth - cellWidth) / 2),
+    [cellWidth, screenWidth, initialIndex],
+  );
+
+  // Re-centre on anchor changes, but skip the first run: contentOffset already
+  // centres the initial day, and a mount-time scrollToIndex would fire before
+  // the list is laid out (viewPosition needs the measured width) and snap left.
+  const didMountRef = useRef(false);
   useEffect(() => {
+    if (!didMountRef.current) {
+      didMountRef.current = true;
+      return;
+    }
     const idx = dates.indexOf(anchorIso);
     if (idx >= 0) {
       listRef.current?.scrollToIndex({
@@ -172,7 +191,7 @@ export function WeekStrip({
         keyExtractor={keyExtractor}
         renderItem={renderItem}
         getItemLayout={getItemLayout}
-        initialScrollIndex={initialIndex}
+        contentOffset={{ x: initialOffset, y: 0 }}
         onScrollToIndexFailed={handleScrollFailed}
         windowSize={5}
       />

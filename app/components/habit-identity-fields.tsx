@@ -14,6 +14,7 @@ import {
 
 import { ColorPickerModal } from '@/components/color-picker-modal';
 import { CardList, FormCard } from '@/components/form-card';
+import { HabitPillPreview } from '@/components/habit-pill-preview';
 import { ThemedText } from '@/components/themed-text';
 import { Palette } from '@/constants/colors';
 import { useThemeColor } from '@/hooks/use-theme-color';
@@ -115,6 +116,7 @@ export function HabitIdentityFields() {
         value={color}
         onChange={(hex) => update({ color: hex })}
         onClose={() => setColorOpen(false)}
+        preview={<HabitPillPreview />}
       />
     </FormCard>
   );

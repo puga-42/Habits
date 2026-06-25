@@ -14,7 +14,13 @@
       "appleTeamId": "4TR73V342N",
       "usesAppleSignIn": true,
       "entitlements": {
-        "com.apple.security.application-groups": ["group.com.joshbernd.habits"]
+        "com.apple.security.application-groups": [
+          "group.com.joshbernd.habits",
+          "group.com.joshbernd.habits"
+        ]
+      },
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -53,6 +59,30 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "build": {
+          "experimental": {
+            "ios": {
+              "appExtensions": [
+                {
+                  "bundleIdentifier": "com.joshbernd.habits.widget",
+                  "targetName": "HabitsWidget",
+                  "entitlements": {
+                    "com.apple.security.application-groups": [
+                      "group.com.joshbernd.habits"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "projectId": "b127b5e2-22fc-4da8-a42b-6b79a22bce19"
+      }
+    },
+    "owner": "jbernd"
   }
 }

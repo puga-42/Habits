@@ -527,7 +527,7 @@ export function flexPeriodStartFor(dayIso: string, period: FlexPeriod): string {
 // completions bucket by their occurrence_date; flex completions (no
 // occurrence_date) bucket by the local date of completed_at.
 export function countCompletionsByDate(
-  completions: CompletionWithHabit[],
+  completions: readonly DateBucketable[],
 ): Map<string, number> {
   const out = new Map<string, number>();
   for (const c of completions) {
@@ -535,6 +535,32 @@ export function countCompletionsByDate(
     out.set(date, (out.get(date) ?? 0) + 1);
   }
   return out;
+}
+
+// The only fields countCompletionsByDate needs. Letting it accept this minimal
+// shape lets the lightweight count query below reuse the same tested tally
+// without selecting (or joining) full completion rows.
+type DateBucketable = { occurrence_date: string | null; completed_at: string };
+
+// Count-only variant of fetchRange for the day-view week strip. The strip is
+// always built around `today` (a fixed ±N-day window) independent of the
+// anchor, so its colored circles must NOT depend on the anchor-relative agenda
+// fetch — otherwise days outside that window render gray until a refetch moves
+// the window over them. Selects just the two date columns, no habits join.
+export async function fetchCompletionCountsByDate(
+  userId: string,
+  fromIso: string,
+  toIso: string,
+): Promise<Map<string, number>> {
+  const { data, error } = await supabase
+    .from('habit_completions')
+    .select('occurrence_date, completed_at')
+    .eq('owner_id', userId)
+    .or(
+      `and(occurrence_date.gte.${fromIso},occurrence_date.lt.${toIso}),and(occurrence_date.is.null,completed_at.gte.${fromIso},completed_at.lt.${toIso})`,
+    );
+  if (error) throw error;
+  return countCompletionsByDate((data ?? []) as DateBucketable[]);
 }
 
 // 5-level bucket scale matching the GitHub contributions graph: 0, 1, 2, 3, 4+.
