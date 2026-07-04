@@ -1,5 +1,14 @@
 # Feedback Pipeline — Implementation Plan
 
+> **Status (2026-07): NOT DEPLOYED.** The `dispatch-feedback` function exists but
+> nothing triggers it — there is no webhook or trigger on the `feedback` table in
+> the live DB. Also, the "Webhook config → Database → Webhooks" steps below are
+> superseded: the project now wires functions with version-controlled **pg_net
+> SQL triggers** (see `supabase/migrations/20260609000000_adopt_habit.sql`), not
+> Dashboard webhooks. Before enabling, address the prompt-injection risk in
+> `CODE_REVIEW.md` (SEC-3) and add the `x-webhook-secret` header. Treat the
+> sections below as design intent, not current reality.
+
 Automated pipeline: user feedback lands in `public.feedback` → Edge Function
 triages and creates a GitHub issue → Claude Code routine (Pro plan) picks up
 new issues, implements, and opens a PR for review.

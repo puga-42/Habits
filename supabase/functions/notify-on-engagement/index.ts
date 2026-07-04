@@ -1,15 +1,25 @@
 // Edge Function: push notifications for engagement events (likes & comments).
 //
-// Triggered by DB webhooks on 6 tables (INSERT only):
+// WIRING: pg_net SQL triggers (NOT Dashboard webhooks), defined in
+// supabase/migrations/20260609000000_adopt_habit.sql via
+// invoke_notify_on_engagement(). Seven INSERT triggers, one per table:
 //   completion_likes, completion_comments, comment_likes,
-//   activity_likes, activity_comments, activity_comment_likes
+//   activity_likes, activity_comments, activity_comment_likes, habit_activity
+// The trigger reads supabase_url / service_role_key / webhook_secret from Vault
+// and POSTs { type, table, record, schema } with an x-webhook-secret header
+// (verified by _shared/verify-webhook.ts).
 //
 // For comments: sends push immediately.
-// For likes: queues into pending_like_notifications for batched delivery.
-// Always inserts into notifications table for the in-app list.
+// For likes: queues into pending_like_notifications for BATCHED delivery by the
+//   flush-like-notifications function — so likes only ever reach a device if
+//   that function is actually scheduled (see its header).
+// The in-app notifications-list rows are written by separate DB triggers
+// (create_engagement_notification), not by this function.
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+import { verifyWebhookSecret } from "../_shared/verify-webhook.ts";
 
 type Kind =
   | "completion_like"
@@ -47,6 +57,9 @@ const LIKE_KINDS: Kind[] = [
 ];
 
 serve(async (req) => {
+  const denied = verifyWebhookSecret(req);
+  if (denied) return denied;
+
   const payload = await req.json();
   if (payload.type !== "INSERT") {
     return json({ skipped: true });

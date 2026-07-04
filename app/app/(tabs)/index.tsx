@@ -4,7 +4,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, AppState, Pressable, StyleSheet, View } from 'react-native';
 
 import { Palette } from '@/constants/colors';
 import { Calendar3DayView } from '@/components/calendar-3day-view';
@@ -73,10 +73,9 @@ import {
   checkAndAutoComplete,
   dateParamsForHabitOn,
   deleteTimeEntries,
-  fetchTimeEntries,
-  sumDurationSeconds,
   startTimeEntry,
   stopTimeEntry,
+  sumTimeBasesForHabits,
 } from '@/lib/time-entries';
 import { syncWidgetData } from '@/lib/widget-sync';
 
@@ -89,7 +88,15 @@ export default function CalendarScreen() {
   const userId = session?.user.id;
 
   const { view, setView, openDrawer } = useDrawer();
-  const today = useMemo(() => new Date(), []);
+  // `today` is the real current day, the reference for canCompleteOn, streak
+  // math, and today-highlighting. Tab screens stay mounted for the app's
+  // lifetime, so it must be refreshed when the day rolls over (on focus and on
+  // returning to the foreground) — otherwise, after midnight, "today" silently
+  // rejects completing the actual current day.
+  const [today, setToday] = useState(() => new Date());
+  const refreshToday = useCallback(() => {
+    setToday((prev) => (isoDate(prev) === isoDate(new Date()) ? prev : new Date()));
+  }, []);
   const [previousView, setPreviousView] = useState<ViewMode | null>(null);
   const [anchorDate, setAnchorDate] = useState(today);
 
@@ -180,48 +187,72 @@ export default function CalendarScreen() {
 
   const anchorIso = isoDate(anchorDate);
 
-  const load = useCallback(async () => {
+  // Anchor-independent data that only a real edit changes (adding/reordering a
+  // habit, editing the profile, group membership). Fetched on focus — NOT on
+  // every day-step or completion toggle, which is what made stepping through
+  // days re-request all of this needlessly.
+  const loadStatic = useCallback(async () => {
     if (!userId) return;
-    const [habitsRes, rangeRes, profileRes, statsRes, stripCountsRes, groupsRes, membersRes] =
-      await Promise.all([
-        fetchHabits(userId),
-        fetchRange(userId, dataRange.from, dataRange.to),
-        fetchProfile(userId).catch(() => null),
-        fetchMyHabitsStats().catch(() => new Map<string, LineageStats>()),
-        fetchCompletionCountsByDate(userId, stripRange.from, stripRange.to).catch(
-          () => new Map<string, number>(),
-        ),
-        fetchGroups(userId).catch(() => [] as HabitGroup[]),
-        fetchMemberships(userId).catch(() => [] as GroupMembership[]),
-      ]);
+    const [habitsRes, profileRes, groupsRes, membersRes] = await Promise.all([
+      fetchHabits(userId),
+      fetchProfile(userId).catch(() => null),
+      fetchGroups(userId).catch(() => [] as HabitGroup[]),
+      fetchMemberships(userId).catch(() => [] as GroupMembership[]),
+    ]);
     setHabits(habitsRes);
+    setGroups(groupsRes);
+    setMemberships(membersRes);
+    if (profileRes) setProfile(profileRes);
+  }, [userId]);
+
+  // The agenda window plus the progress data a completion changes (streaks,
+  // strip counts, time totals). Re-runs on day-step (window/anchor change) and
+  // after mutations, but leaves the static data above untouched.
+  const loadDynamic = useCallback(async () => {
+    if (!userId) return;
+    const [rangeRes, statsRes, stripCountsRes] = await Promise.all([
+      fetchRange(userId, dataRange.from, dataRange.to),
+      fetchMyHabitsStats().catch(() => new Map<string, LineageStats>()),
+      fetchCompletionCountsByDate(userId, stripRange.from, stripRange.to).catch(
+        () => new Map<string, number>(),
+      ),
+    ]);
     setCompletions(rangeRes.completions);
     setOverrides(rangeRes.overrides);
     setStatsByLineage(statsRes);
     setStripCountByIso(stripCountsRes);
-    setGroups(groupsRes);
-    setMemberships(membersRes);
-    if (profileRes) setProfile(profileRes);
     scheduleExtendingRef.current = false;
 
-    const timeHabits = habitsRes.filter((h) => h.unit === 'time' && h.target_seconds);
-    const baseTotals = await Promise.all(
-      timeHabits.map(async (h) => {
-        const { occurrenceDate, periodStart } = dateParamsForHabitOn(h, anchorIso);
-        const te = await fetchTimeEntries(h.id, occurrenceDate, periodStart);
-        return [h.id, sumDurationSeconds(te)] as const;
-      }),
-    );
-    setTimeBaseByHabitId(new Map(baseTotals));
-  }, [userId, dataRange.from, dataRange.to, stripRange.from, stripRange.to, anchorIso]);
+    const timeHabits = habits.filter((h) => h.unit === 'time' && h.target_seconds);
+    setTimeBaseByHabitId(await sumTimeBasesForHabits(timeHabits, anchorIso));
+  }, [userId, dataRange.from, dataRange.to, stripRange.from, stripRange.to, anchorIso, habits]);
 
   useFocusEffect(
     useCallback(() => {
       if (!userId) return;
-      load().finally(() => setLoading(false));
-      syncWidgetData(userId);
-    }, [userId, load]),
+      refreshToday();
+      loadStatic();
+    }, [userId, loadStatic, refreshToday]),
   );
+
+  // Separate effect so a day-step (which only changes loadDynamic's deps)
+  // refetches the window without re-running the static fetch above.
+  useFocusEffect(
+    useCallback(() => {
+      if (!userId) return;
+      loadDynamic().finally(() => setLoading(false));
+      syncWidgetData(userId);
+    }, [userId, loadDynamic]),
+  );
+
+  // Refresh the current day when the app returns to the foreground, so a
+  // session left open across midnight corrects itself without a tab switch.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') refreshToday();
+    });
+    return () => sub.remove();
+  }, [refreshToday]);
 
   useEffect(() => {
     async function restoreTimer() {
@@ -420,7 +451,7 @@ export default function CalendarScreen() {
             setToastVisible(true);
           }
         }
-        await load();
+        await loadDynamic();
         return;
       }
 
@@ -446,7 +477,7 @@ export default function CalendarScreen() {
         setToastCompletionId(completionId);
         setToastVisible(true);
       }
-      await load();
+      await loadDynamic();
     } finally {
       trailingInFlightRef.current.delete(guardKey);
     }
@@ -469,7 +500,7 @@ export default function CalendarScreen() {
       setActiveTimerHabitId(null);
       setActiveTimerDateIso(null);
       await checkAndAutoComplete(habit.id, userId, habit, occurrenceDate, periodStart);
-      await load();
+      await loadDynamic();
     } else {
       if (activeTimerHabitId && activeTimerRef.current) {
         const prevHabit = habits.find((h) => h.id === activeTimerHabitId);
@@ -543,7 +574,7 @@ export default function CalendarScreen() {
     } else if (action === 'wake') {
       if (row.kind === 'rest') await endRestForHabit(row.habitId, isoDate(today));
     }
-    await load();
+    await loadDynamic();
   }
 
   // Collapse/expand a group card. Optimistic (instant) with a persisted write so
@@ -556,7 +587,7 @@ export default function CalendarScreen() {
     });
     setGroupCollapsed(groupId, collapsed).catch((err) => {
       console.warn('Persisting group collapse failed, refetching', err);
-      load();
+      loadStatic();
     });
   }
 
@@ -565,7 +596,7 @@ export default function CalendarScreen() {
     const { habit, dateIso } = restTarget;
     setRestTarget(null);
     await createRest(habit, userId, dateIso, untilIso);
-    await load();
+    await loadDynamic();
   }
 
   // Reorder happens within a section on a specific day. We only renumber the
@@ -588,7 +619,7 @@ export default function CalendarScreen() {
     const globalOrder = updatedHabits.map((h) => h.id);
     reorderHabits(globalOrder).catch((err) => {
       console.warn('Reorder failed, refetching', err);
-      load();
+      loadStatic();
     });
   }
 
