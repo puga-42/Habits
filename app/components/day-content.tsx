@@ -136,6 +136,7 @@ export function DayContent({
       return (
         <Animated.View>
           <GroupCardHeader
+            groupId={item.groupId}
             name={item.name}
             collapsed={item.collapsed}
             color={item.color}

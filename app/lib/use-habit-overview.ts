@@ -162,7 +162,7 @@ export function useHabitOverview(
     async (h: Habit) => {
       if (!userId) return;
       try {
-        setStats(await fetchHabitStats(h.owner_id, userId, h.lineage_id));
+        setStats(await fetchHabitStats(h.owner_id, h.lineage_id));
       } catch {
         /* non-fatal */
       }
@@ -213,7 +213,11 @@ export function useHabitOverview(
       if (habit.kind === "scheduled") {
         await markScheduledCompleted(habit.id, userId, dateIso);
       } else {
-        await markFlexCompleted(habit.id, userId);
+        await markFlexCompleted(
+          habit.id,
+          userId,
+          currentPeriodStart(dateIso, habit.target_period ?? "week"),
+        );
       }
       await loadCompletions(habit);
       loadStats(habit);

@@ -25,14 +25,12 @@ export type HeatmapGrid = {
 
 export async function fetchActivityHeatmap(
   targetId: string,
-  viewerId: string,
   from: string,
   to: string,
   habitLineageId?: string,
 ): Promise<DayActivity[]> {
   const { data, error } = await supabase.rpc('get_user_activity_heatmap', {
     p_target_id: targetId,
-    p_viewer_id: viewerId,
     p_from_date: from,
     p_to_date: to,
     p_habit_lineage_id: habitLineageId ?? null,

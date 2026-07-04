@@ -42,12 +42,10 @@ function segmentsFor(
 // caller can simply hide the badges rather than error.
 export async function fetchHabitStats(
   targetId: string,
-  viewerId: string,
   lineageId: string,
 ): Promise<HabitStats | null> {
   const { data, error } = await supabase.rpc("fetch_habit_stats", {
     p_target_id: targetId,
-    p_viewer_id: viewerId,
     p_lineage_id: lineageId,
   });
   if (error) throw error;
@@ -121,12 +119,8 @@ export function streaksByHabit(
 // checked), this is always the user's own habits, so the RPC skips visibility
 // and returns a row per lineage. Returns an empty map on failure so the caller
 // simply hides the streak badges rather than erroring.
-export async function fetchMyHabitsStats(
-  viewerId: string,
-): Promise<Map<string, LineageStats>> {
-  const { data, error } = await supabase.rpc("fetch_my_habits_stats", {
-    p_viewer_id: viewerId,
-  });
+export async function fetchMyHabitsStats(): Promise<Map<string, LineageStats>> {
+  const { data, error } = await supabase.rpc("fetch_my_habits_stats");
   if (error) throw error;
   const rows = (data ?? []) as Array<{
     lineage_id: string;

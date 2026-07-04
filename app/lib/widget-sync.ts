@@ -5,12 +5,11 @@ import {
   fetchTodayCompletions,
   fetchTodayOverrides,
   isoDate,
-  weekStart,
   type Completion,
   type Habit,
   type HabitOverride,
 } from './habits';
-import { expandHabit } from './history';
+import { expandHabit, flexPeriodStartFor } from './history';
 import { writeWidgetData, reloadWidget } from './widget-sync-bridge';
 
 export type WidgetHabitEntry = {
@@ -71,10 +70,11 @@ export function buildWidgetPayload(
     }
   }
 
-  const periodStart = isoDate(weekStart(today));
   for (const h of habits) {
     if (h.kind !== 'flex') continue;
     if (h.target_count == null || h.target_period == null) continue;
+    // Bucket by this habit's own period (day/week/month), not this week.
+    const periodStart = flexPeriodStartFor(todayIso, h.target_period);
     const count = completions.filter(
       (c) => c.habit_id === h.id && c.period_start === periodStart,
     ).length;

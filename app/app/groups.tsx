@@ -160,6 +160,7 @@ export default function GroupsScreen() {
                 }}
                 onCommitEdit={() => onSaveRename(g.id)}
                 onDelete={() => onDelete(g)}
+                onOpen={() => router.push(`/group/${g.id}`)}
               />
             ))}
           </ScrollView>

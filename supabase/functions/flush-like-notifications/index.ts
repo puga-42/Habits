@@ -1,17 +1,28 @@
-// Edge Function: flush batched like notifications.
+// Edge Function: flush batched like notifications + prune old notifications.
 //
-// Triggered by Supabase CRON (every 1 minute).
-// Groups pending likes older than 15 min by (user_id, kind, target_id),
-// composes a single push per group, sends via Expo, then deletes flushed rows.
+// Intended to run on a ~1-minute schedule: groups pending likes older than
+// 15 min by (user_id, kind, target_id), sends one Expo push per group, deletes
+// the flushed rows, and cleans up notifications older than 90 days.
 //
-// Also cleans up notifications older than 90 days.
-//
-// Configure in Supabase Dashboard → Edge Functions → Schedules:
-//   Schedule: */1 * * * *  (every minute)
-//   Function: flush-like-notifications
+// ⚠️ NOT CURRENTLY SCHEDULED. pg_cron is not enabled on this project (the
+// cron.job relation does not exist) and nothing else invokes this function
+// (verified 2026-07). Consequences while unscheduled:
+//   - notify-on-engagement queues every LIKE into pending_like_notifications
+//     expecting this job to deliver it — so batched like pushes are NEVER sent
+//     and that table grows unbounded (only comment pushes, which send inline,
+//     work).
+//   - the 90-day notifications cleanup never runs.
+// To enable: `create extension pg_cron;` then schedule a call that sends the
+// x-webhook-secret header this function now requires, e.g.
+//   select cron.schedule('flush-likes', '* * * * *',
+//     $$ select net.http_post(url := ..., headers := jsonb_build_object(
+//          'x-webhook-secret', (select decrypted_secret from vault.decrypted_secrets
+//                               where name = 'webhook_secret'))) $$);
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+import { verifyWebhookSecret } from "../_shared/verify-webhook.ts";
 
 const BATCH_WINDOW_MINUTES = 15;
 const RETENTION_DAYS = 90;
@@ -35,7 +46,10 @@ interface Group {
   rowIds: string[];
 }
 
-serve(async () => {
+serve(async (req) => {
+  const denied = verifyWebhookSecret(req);
+  if (denied) return denied;
+
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,

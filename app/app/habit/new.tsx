@@ -7,6 +7,7 @@ import { HabitFormFields } from '@/components/habit-form-fields';
 import { HabitPillPreview } from '@/components/habit-pill-preview';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { resyncHabitAlerts } from '@/lib/alert-scheduler';
 import { useAuth } from '@/lib/auth';
 import { addHabitToGroup } from '@/lib/group-mutations';
 import { draftToInsert, useHabitForm } from '@/lib/habit-form';
@@ -40,6 +41,7 @@ export default function NewHabitScreen() {
         await addHabitToGroup(session.user.id, newId, draft.groupId, isoDate(new Date()));
       }
       syncWidgetData(session.user.id);
+      resyncHabitAlerts(session.user.id);
       reset();
       router.back();
     } catch (err) {

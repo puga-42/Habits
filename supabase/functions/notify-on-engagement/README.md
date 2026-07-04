@@ -3,20 +3,25 @@
 Edge Function that sends Expo push notifications when someone engages with a
 user's content on the feed.
 
-## Triggers (DB webhooks → this function)
+## Triggers (pg_net SQL triggers → this function)
 
-Configured in Supabase Studio under **Database → Webhooks**. One webhook per
-table. All POST to `https://<project>.functions.supabase.co/notify-on-engagement`
-with `Authorization: Bearer <service_role_key>`.
+**Not** Dashboard webhooks. The wiring lives in
+`supabase/migrations/20260609000000_adopt_habit.sql`: one `after insert` trigger
+per table, all running `invoke_notify_on_engagement()`, which POSTs to this
+function via `pg_net`. The trigger reads `supabase_url` / `service_role_key` /
+`webhook_secret` from Vault and sends `Authorization: Bearer <service_role_key>`
+plus the `x-webhook-secret` header this function requires (see
+`_shared/verify-webhook.ts`).
 
-| Webhook | Table | Events | Kind |
+| Trigger | Table | Events | Kind |
 | --- | --- | --- | --- |
-| `like_on_completion` | `completion_likes` | INSERT | `completion_like` |
-| `comment_on_completion` | `completion_comments` | INSERT | `completion_comment` |
-| `like_on_comment` | `comment_likes` | INSERT | `comment_like` |
-| `like_on_activity` | `activity_likes` | INSERT | `activity_like` |
-| `comment_on_activity` | `activity_comments` | INSERT | `activity_comment` |
-| `like_on_activity_comment` | `activity_comment_likes` | INSERT | `activity_comment_like` |
+| `webhook_completion_likes` | `completion_likes` | INSERT | `completion_like` |
+| `webhook_completion_comments` | `completion_comments` | INSERT | `completion_comment` |
+| `webhook_comment_likes` | `comment_likes` | INSERT | `comment_like` |
+| `webhook_activity_likes` | `activity_likes` | INSERT | `activity_like` |
+| `webhook_activity_comments` | `activity_comments` | INSERT | `activity_comment` |
+| `webhook_activity_comment_likes` | `activity_comment_likes` | INSERT | `activity_comment_like` |
+| `webhook_habit_activity` | `habit_activity` | INSERT | `habit_adopted` |
 
 ## Behavior
 
@@ -24,8 +29,10 @@ with `Authorization: Bearer <service_role_key>`.
 2. Always inserts into the `notifications` table (in-app list).
 3. Checks recipient's `notify_likes` / `notify_comments` preference.
 4. **Comments** → sends push immediately via Expo push API.
-5. **Likes** → inserts into `pending_like_notifications` for batched delivery
-   (flushed by the `flush-like-notifications` cron function every 15 min).
+5. **Likes** → inserts into `pending_like_notifications` for batched delivery by
+   the `flush-like-notifications` function. ⚠️ That flush job is **not currently
+   scheduled** (pg_cron is disabled), so queued like pushes are not delivered
+   until it is — see that function's header.
 
 ## Recipient resolution
 

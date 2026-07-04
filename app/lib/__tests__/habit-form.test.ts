@@ -21,6 +21,7 @@ const scheduledHabit: Habit = {
   count_unit: null,
   target_seconds: null,
   display_unit: null,
+  alert_times: null,
   sort_index: 0,
   created_at: '2026-01-01T00:00:00Z',
   updated_at: '2026-01-01T00:00:00Z',
@@ -92,6 +93,31 @@ describe('draftToInsert', () => {
     draft.adoptedFromUserId = 'user-xyz';
     const insert = draftToInsert(draft);
     expect(insert.adopted_from_user_id).toBe('user-xyz');
+  });
+});
+
+describe('alert times round-trip', () => {
+  it('seeds alertTimes from the habit row, [] when null', () => {
+    expect(habitToDraft({ ...scheduledHabit, alert_times: ['07:30'] }).alertTimes)
+      .toEqual(['07:30']);
+    expect(habitToDraft(scheduledHabit).alertTimes).toEqual([]);
+  });
+
+  it('emits normalized alert_times in the scheduled insert', () => {
+    const draft = habitToDraft(scheduledHabit);
+    draft.alertTimes = ['21:00', 'bogus', '08:00', '08:00'];
+    expect(draftToInsert(draft).alert_times).toEqual(['08:00', '21:00']);
+  });
+
+  it('emits alert_times in the flex insert', () => {
+    const flexHabit: Habit = {
+      ...scheduledHabit,
+      kind: 'flex',
+      target_count: 3,
+      target_period: 'week',
+      alert_times: ['12:00'],
+    };
+    expect(draftToInsert(habitToDraft(flexHabit)).alert_times).toEqual(['12:00']);
   });
 });
 

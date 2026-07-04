@@ -1,18 +1,28 @@
 // Edge Function: push notifications for friend request events.
 //
-// Triggered by DB webhooks on the friend_requests table:
-//   - INSERT (status=pending) → notify to_user
-//   - UPDATE (pending→accepted) → notify from_user (original sender)
+// Handles friend_requests:
+//   - INSERT (status=pending)    → notify to_user
+//   - UPDATE (pending→accepted)  → notify from_user (original sender)
 //
-// Configure in Supabase Studio → Database → Webhooks:
-//   friend_request_created  │ friend_requests │ INSERT │ POST → this function
-//   friend_request_updated  │ friend_requests │ UPDATE │ POST → this function
-// Both with Authorization: Bearer <service_role_key>.
+// ⚠️ NOT CURRENTLY WIRED. Nothing invokes this function: there is no pg_net
+// trigger on friend_requests and no Dashboard webhook (verified against the
+// live DB, 2026-07). Friend-request and acceptance pushes therefore never
+// fire. The project moved from Dashboard webhooks to version-controlled pg_net
+// triggers (see 20260609000000_adopt_habit.sql) but this function was never
+// migrated. To enable, add INSERT + UPDATE pg_net triggers on friend_requests
+// mirroring invoke_notify_on_engagement — reading supabase_url /
+// service_role_key / webhook_secret from Vault and sending the
+// x-webhook-secret header this function now requires.
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+import { verifyWebhookSecret } from "../_shared/verify-webhook.ts";
+
 serve(async (req) => {
+  const denied = verifyWebhookSecret(req);
+  if (denied) return denied;
+
   const payload = await req.json();
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,

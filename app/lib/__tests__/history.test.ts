@@ -6,6 +6,7 @@ import {
   countCompletionsByDate,
   densityBucket,
   expandHabit,
+  flexPeriodStartFor,
   flexProgressByHabit,
   isDayFuture,
   monthLabel,
@@ -234,10 +235,12 @@ describe('expandHabit', () => {
   });
 
   it('expands a daily habit across a date range', () => {
-    const from = new Date(Date.UTC(2026, 4, 13, 0, 0, 0));
-    const to = new Date(Date.UTC(2026, 4, 15, 23, 59, 59));
+    const from = new Date(2026, 4, 13);
+    const to = new Date(2026, 4, 15, 23, 59, 59);
     const dates = expandHabit(meditate, from, to);
-    expect(dates.length).toBe(3); // May 13, 14, 15
+    expect(dates.map((d) => isoDate(d))).toEqual([
+      '2026-05-13', '2026-05-14', '2026-05-15',
+    ]);
   });
 
   it('respects the until cap on the habit', () => {
@@ -245,10 +248,27 @@ describe('expandHabit', () => {
       ...meditate,
       until: '2026-05-14T23:59:59Z',
     };
-    const from = new Date(Date.UTC(2026, 4, 13, 0, 0, 0));
-    const to = new Date(Date.UTC(2026, 4, 20, 23, 59, 59));
+    const from = new Date(2026, 4, 13);
+    const to = new Date(2026, 4, 20, 23, 59, 59);
     const dates = expandHabit(capped, from, to);
-    expect(dates.length).toBe(2); // May 13 and 14 only
+    expect(dates.map((d) => isoDate(d))).toEqual(['2026-05-13', '2026-05-14']);
+  });
+});
+
+// ─── flexPeriodStartFor ────────────────────────────────────────────────────
+
+describe('flexPeriodStartFor', () => {
+  // Wed 2026-07-08. Monday-first week → Mon 2026-07-06. Month → 2026-07-01.
+  it('returns the same day for a day-period habit', () => {
+    expect(flexPeriodStartFor('2026-07-08', 'day')).toBe('2026-07-08');
+  });
+
+  it('returns the Monday of the week for a week-period habit', () => {
+    expect(flexPeriodStartFor('2026-07-08', 'week')).toBe('2026-07-06');
+  });
+
+  it('returns the first of the month for a month-period habit', () => {
+    expect(flexPeriodStartFor('2026-07-08', 'month')).toBe('2026-07-01');
   });
 });
 

@@ -2,9 +2,8 @@
 // Pure functions are TDD'd; see __tests__/history.test.ts.
 // No streaks, no completion rates, ever (see CONTEXT.md).
 
-import { rrulestr } from 'rrule';
-
 import { supabase } from './supabase';
+import { expandOccurrenceDates } from './rrule-window';
 import {
   isoDate,
   weekStart,
@@ -176,33 +175,22 @@ export function agendaDatesForMonth(year: number, month: number): string[] {
 
 // ─── RRULE expansion ──────────────────────────────────────────────────────
 
-// Format a Date as RFC 5545 UTC date-time (YYYYMMDDTHHMMSSZ) for RRULE UNTIL.
-function formatRruleUntil(d: Date): string {
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return (
-    d.getUTCFullYear() +
-    pad(d.getUTCMonth() + 1) +
-    pad(d.getUTCDate()) +
-    'T' +
-    pad(d.getUTCHours()) +
-    pad(d.getUTCMinutes()) +
-    pad(d.getUTCSeconds()) +
-    'Z'
-  );
-}
-
-// Expand a scheduled habit's RRULE within [from, to] (inclusive). Respects
-// the habit's `until` column. Returns empty for flex habits and for malformed
-// rules.
+// Expand a scheduled habit's RRULE within [from, to] (inclusive). Respects the
+// habit's `until` column. Returns empty for flex habits and malformed rules.
+// Occurrences are resolved in the habit's own timezone (see rrule-window.ts) so
+// weekly/monthly rules land on the intended calendar day in every zone, then
+// returned as local-midnight Dates — every caller keys off isoDate(occ).
 export function expandHabit(habit: Habit, from: Date, to: Date): Date[] {
   if (habit.kind !== 'scheduled' || !habit.rrule || !habit.dtstart) return [];
-  let ruleStr = habit.rrule;
-  if (habit.until) {
-    ruleStr += `;UNTIL=${formatRruleUntil(new Date(habit.until))}`;
-  }
   try {
-    const rule = rrulestr(ruleStr, { dtstart: new Date(habit.dtstart) });
-    return rule.between(from, to, true);
+    return expandOccurrenceDates(
+      habit.dtstart,
+      habit.rrule,
+      habit.until,
+      habit.timezone,
+      isoDate(from),
+      isoDate(to),
+    ).map((iso) => parseIsoToLocalMidnight(iso));
   } catch (err) {
     console.warn('RRULE parse failed for habit', habit.id, err);
     return [];

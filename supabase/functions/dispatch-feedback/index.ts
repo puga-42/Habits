@@ -1,14 +1,20 @@
 // Edge Function: triage user feedback and create a GitHub issue.
+// Design: FEEDBACK_PIPELINE_PLAN.md. Calls the Claude API to classify feedback,
+// then creates a labeled GitHub issue that a Claude Code routine implements.
 //
-// Triggered by a DB webhook on the feedback table (INSERT).
-// Calls Claude API to classify feedback, then creates a labeled GitHub issue.
-// The Claude Code scheduled routine picks up issues labeled "automated" for implementation.
+// ⚠️ NOT CURRENTLY WIRED. Nothing invokes this on feedback INSERT: no pg_net
+// trigger on feedback and no Dashboard webhook (verified against the live DB,
+// 2026-07), so the feedback→issue pipeline is dormant. The project moved from
+// Dashboard webhooks to pg_net triggers (20260609000000_adopt_habit.sql) but
+// this function was never migrated.
 //
-// Configure in Supabase Studio → Database → Webhooks:
-//   feedback_inserted │ feedback │ INSERT │ POST → this function
-//   Authorization: Bearer <service_role_key>
+// ⚠️ SECURITY BEFORE ENABLING: this pipes anonymous user text into an LLM
+// prompt and into auto-"automated"-labeled GitHub issues that an agent may act
+// on. Address the prompt-injection hardening (CODE_REVIEW.md SEC-3) first. To
+// enable, add an INSERT pg_net trigger on feedback mirroring
+// invoke_notify_on_engagement, sending the x-webhook-secret header.
 //
-// Required secrets (set via `supabase secrets set`):
+// Required secrets (supabase secrets set):
 //   ANTHROPIC_API_KEY — for Claude triage calls
 //   GITHUB_TOKEN     — fine-grained PAT with Issues (read/write) on puga-42/Habits
 //   GITHUB_OWNER     — "puga-42"
@@ -16,6 +22,8 @@
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+import { verifyWebhookSecret } from "../_shared/verify-webhook.ts";
 
 const GITHUB_API = "https://api.github.com";
 const CLAUDE_API = "https://api.anthropic.com/v1/messages";
@@ -35,6 +43,9 @@ interface TriageResult {
 }
 
 serve(async (req) => {
+  const denied = verifyWebhookSecret(req);
+  if (denied) return denied;
+
   const payload = await req.json();
   if (payload.type !== "INSERT") {
     return new Response(JSON.stringify({ skipped: true }), { status: 200 });

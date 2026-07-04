@@ -59,6 +59,58 @@ export async function fetchTimeEntries(
   return (data ?? []) as TimeEntry[];
 }
 
+// Total logged seconds per time-habit for a given day, in ONE query instead of
+// one per habit. Scheduled habits bucket by occurrence_date == dateIso; flex
+// habits by their period start. Returns a map keyed by habit id (habits with no
+// entries map to 0).
+export async function sumTimeBasesForHabits(
+  habits: Habit[],
+  dateIso: string,
+): Promise<Map<string, number>> {
+  const bases = new Map<string, number>();
+  if (habits.length === 0) return bases;
+
+  const params = new Map(
+    habits.map((h) => [h.id, dateParamsForHabitOn(h, dateIso)] as const),
+  );
+  const periodStarts = [
+    ...new Set(
+      [...params.values()]
+        .map((p) => p.periodStart)
+        .filter((p): p is string => p != null),
+    ),
+  ];
+
+  const filters = [`occurrence_date.eq.${dateIso}`];
+  if (periodStarts.length > 0) {
+    filters.push(`period_start.in.(${periodStarts.join(',')})`);
+  }
+
+  const { data, error } = await supabase
+    .from('time_entries')
+    .select('*')
+    .in(
+      'habit_id',
+      habits.map((h) => h.id),
+    )
+    .or(filters.join(','));
+  if (error) throw error;
+  const rows = (data ?? []) as TimeEntry[];
+
+  for (const h of habits) {
+    const { occurrenceDate, periodStart } = params.get(h.id)!;
+    const matching = rows.filter(
+      (r) =>
+        r.habit_id === h.id &&
+        (occurrenceDate != null
+          ? r.occurrence_date === occurrenceDate
+          : r.period_start === periodStart),
+    );
+    bases.set(h.id, sumDurationSeconds(matching));
+  }
+  return bases;
+}
+
 // ─── Mutations ────────────────────────────────────────────────────────────────
 
 export async function startTimeEntry(
@@ -136,6 +188,25 @@ export function dateParamsForHabitOn(
   };
 }
 
+// Whether a completion already exists for a habit's occurrence (scheduled) or
+// period (flex). Used to keep auto-complete idempotent.
+async function completionExists(
+  habitId: string,
+  key: { occurrenceDate: string } | { periodStart: string },
+): Promise<boolean> {
+  let query = supabase
+    .from('habit_completions')
+    .select('id')
+    .eq('habit_id', habitId);
+  query =
+    'occurrenceDate' in key
+      ? query.eq('occurrence_date', key.occurrenceDate)
+      : query.eq('period_start', key.periodStart);
+  const { data, error } = await query.limit(1).maybeSingle();
+  if (error) throw error;
+  return data != null;
+}
+
 export async function checkAndAutoComplete(
   habitId: string,
   ownerId: string,
@@ -150,10 +221,16 @@ export async function checkAndAutoComplete(
 
   if (total < habit.target_seconds) return false;
 
+  // Auto-complete fires on every timer stop once the target is met. Only create
+  // a completion if one doesn't already exist for this occurrence/period —
+  // otherwise a second session (or a flex habit, which has no DB uniqueness)
+  // would pile up duplicate completions.
   if (habit.kind === 'scheduled' && occurrenceDate) {
+    if (await completionExists(habitId, { occurrenceDate })) return false;
     await markScheduledCompleted(habitId, ownerId, occurrenceDate);
-  } else if (habit.kind === 'flex') {
-    await markFlexCompleted(habitId, ownerId);
+  } else if (habit.kind === 'flex' && periodStart) {
+    if (await completionExists(habitId, { periodStart })) return false;
+    await markFlexCompleted(habitId, ownerId, periodStart);
   }
   return true;
 }

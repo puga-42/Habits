@@ -14,6 +14,7 @@ import { HabitFormFields } from '@/components/habit-form-fields';
 import { HabitPillPreview } from '@/components/habit-pill-preview';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { resyncHabitAlerts } from '@/lib/alert-scheduler';
 import { useAuth } from '@/lib/auth';
 import {
   addHabitToGroup,
@@ -37,6 +38,7 @@ import {
   type Habit,
   occurrenceMidnight,
 } from '@/lib/habits';
+import { checkStartDateMove } from '@/lib/start-date';
 import { syncWidgetData } from '@/lib/widget-sync';
 
 type EditScope = 'this' | 'future' | 'all';
@@ -105,6 +107,17 @@ export default function EditHabitScreen() {
     setSaving(true);
     try {
       if (scope === 'all' || habit.kind === 'flex') {
+        // A start date can't move forward past days already completed — those
+        // occurrences would vanish while their completions remain. Backward
+        // moves always pass (see lib/start-date.ts).
+        const blocked = await checkStartDateMove(habit, draft.startsOn);
+        if (blocked) {
+          Alert.alert(
+            "Can't move the start date",
+            `This habit has completions from ${occurrenceMidnight(blocked).toLocaleDateString()}, before the new start date. The start date can only move to a day with no completions after it — moving it further into the past is always fine.`,
+          );
+          return;
+        }
         const update = draftToInsert(draft);
         await applyEditAll(habit.id, update);
       } else if (scope === 'future') {
@@ -130,6 +143,7 @@ export default function EditHabitScreen() {
       }
       await reconcileGroup();
       syncWidgetData(session.user.id);
+      resyncHabitAlerts(session.user.id);
       reset();
       router.back();
     } catch (err) {
@@ -173,7 +187,10 @@ export default function EditHabitScreen() {
     try {
       if (scope === 'all') await deleteHabitAll(habit.id);
       else await deleteHabitFuture(habit);
-      if (session?.user.id) syncWidgetData(session.user.id);
+      if (session?.user.id) {
+        syncWidgetData(session.user.id);
+        resyncHabitAlerts(session.user.id);
+      }
       reset();
       navigation.getParent()?.dispatch(StackActions.pop());
     } catch (err) {

@@ -17,6 +17,7 @@ type Props = {
   onStartEdit: () => void;
   onCommitEdit: () => void;
   onDelete: () => void;
+  onOpen: () => void;
 };
 
 export function GroupManageRow({
@@ -30,6 +31,7 @@ export function GroupManageRow({
   onStartEdit,
   onCommitEdit,
   onDelete,
+  onOpen,
 }: Props) {
   return (
     <View style={styles.row}>
@@ -57,6 +59,13 @@ export function GroupManageRow({
       <Pressable onPress={onDelete} hitSlop={10}>
         <ThemedText style={styles.delete}>Delete</ThemedText>
       </Pressable>
+      <Pressable
+        onPress={onOpen}
+        hitSlop={10}
+        accessibilityRole="button"
+        accessibilityLabel={`Open ${name}`}>
+        <ThemedText style={styles.open}>›</ThemedText>
+      </Pressable>
     </View>
   );
 }
@@ -75,4 +84,5 @@ const styles = StyleSheet.create({
   nameInput: { flex: 1, padding: 0 },
   count: { fontSize: 13, opacity: 0.5, marginTop: 2 },
   delete: { fontSize: 15, color: '#FF3B30' },
+  open: { fontSize: 22, opacity: 0.3, paddingLeft: 2 },
 });
