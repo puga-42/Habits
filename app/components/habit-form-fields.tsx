@@ -14,6 +14,7 @@ import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import { CardList, FormCard } from '@/components/form-card';
 import { HabitIdentityFields } from '@/components/habit-identity-fields';
 import { ThemedText } from '@/components/themed-text';
+import { describeAlerts } from '@/lib/alerts';
 import { describeGoal, describeRepeat, describeVisibility, useHabitForm } from '@/lib/habit-form';
 import { clampEndDate, defaultEndDate } from '@/lib/habit-ends';
 
@@ -59,6 +60,11 @@ export function HabitFormFields({ lockKind = false, onDelete }: Props) {
               onChange={(d) => update({ endsOn: d })}
             />
           )}
+
+          <Row label="Alerts" onPress={() => router.push('/habit/alerts')}>
+            <ThemedText style={styles.rowValue}>{describeAlerts(draft.alertTimes)}</ThemedText>
+            <ThemedText style={styles.chevron}>›</ThemedText>
+          </Row>
 
           <Row label="Visibility" onPress={() => router.push('/habit/visibility')}>
             <ThemedText style={styles.rowValue}>{describeVisibility(draft.visibility)}</ThemedText>

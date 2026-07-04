@@ -30,6 +30,10 @@ export type Habit = {
   count_unit: CountUnit | null;
   target_seconds: number | null;
   display_unit: TimeDisplayUnit | null;
+  // Alert times ("HH:MM" 24h, device-local) for reminder notifications.
+  // Optional: habit-shaped objects built from RPC payloads (e.g. the feed and
+  // profile views) don't carry it; consumers default absent/null to [].
+  alert_times?: string[] | null;
   sort_index: number;
   created_at: string;
   updated_at: string;
@@ -171,6 +175,8 @@ export type HabitInsert = {
   display_unit?: TimeDisplayUnit;
   // count label (steps / reps / meters / …); null/absent → generic "times"
   count_unit?: CountUnit | null;
+  // reminder notification times ("HH:MM" 24h, device-local)
+  alert_times?: string[];
   // adoption provenance
   adopted_from_user_id?: string;
 };

@@ -2,6 +2,7 @@ import { createContext, useContext, useState, type ReactNode } from 'react';
 
 import { Palette } from '@/constants/colors';
 
+import { normalizeAlertTimes } from './alerts';
 import {
   buildRrule,
   describeRrule,
@@ -35,6 +36,8 @@ export type HabitDraft = {
   color: string;
   icon: string;
   visibility: Visibility;
+  // Reminder notification times ("HH:MM" 24h, device-local). See lib/alerts.ts.
+  alertTimes: string[];
   adoptedFromUserId: string | null;
   // Active group (membership lives in habit_group_members, not on the habit row).
   // null = ungrouped. On edit, seeded by the screen from the active membership;
@@ -59,6 +62,7 @@ function defaultDraft(): HabitDraft {
     color: Palette.primary,
     icon: '',
     visibility: 'private',
+    alertTimes: [],
     adoptedFromUserId: null,
     groupId: null,
   };
@@ -89,6 +93,7 @@ export function habitToDraft(habit: Habit): HabitDraft {
       color: habit.color ?? Palette.primary,
       icon: habit.icon ?? '',
       visibility: habit.visibility,
+      alertTimes: habit.alert_times ?? [],
       adoptedFromUserId: null,
       groupId: null,
     };
@@ -106,6 +111,7 @@ export function habitToDraft(habit: Habit): HabitDraft {
     color: habit.color ?? Palette.primary,
     icon: habit.icon ?? '✨',
     visibility: habit.visibility,
+    alertTimes: habit.alert_times ?? [],
     adoptedFromUserId: null,
     groupId: null,
   };
@@ -139,6 +145,7 @@ export function draftToInsert(draft: HabitDraft): HabitInsert {
       icon: draft.icon,
       color: draft.color,
       visibility: draft.visibility,
+      alert_times: normalizeAlertTimes(draft.alertTimes),
       timezone: tz,
       dtstart: dtstart.toISOString(),
       rrule: buildRrule(draft.recurrence),
@@ -154,6 +161,7 @@ export function draftToInsert(draft: HabitDraft): HabitInsert {
     icon: draft.icon,
     color: draft.color,
     visibility: draft.visibility,
+    alert_times: normalizeAlertTimes(draft.alertTimes),
     timezone: tz,
     target_count: draft.targetCount,
     target_period: draft.targetPeriod,

@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { useThemeColor } from '@/hooks/use-theme-color';
 import { WEEKDAY_NAMES, validateHandle } from '@/lib/profile';
 
 export function WeekStartPicker({
@@ -58,6 +59,7 @@ export function HandleEditor({
 }) {
   const [draft, setDraft] = useState(currentHandle);
   const [error, setError] = useState<string | null>(null);
+  const textColor = useThemeColor({}, 'text');
 
   function handleOpen() {
     setDraft(currentHandle);
@@ -89,13 +91,14 @@ export function HandleEditor({
           </View>
           <View style={e.body}>
             <TextInput
-              style={e.input}
+              style={[e.input, { color: textColor }]}
               value={draft}
               onChangeText={(t) => { setDraft(t); setError(null); }}
               autoCapitalize="none"
               autoCorrect={false}
               maxLength={30}
               placeholder="your_handle"
+              placeholderTextColor="rgba(127,127,127,0.5)"
             />
             {error && <ThemedText style={e.error}>{error}</ThemedText>}
             <ThemedText style={e.hint}>3–30 characters: letters, numbers, and underscores only.</ThemedText>
