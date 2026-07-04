@@ -254,7 +254,7 @@ export default function HabitViewScreen() {
           ) : null}
 
           {session?.user.id ? (
-            <HabitCompletionChart habit={habit} viewerId={session.user.id} />
+            <HabitCompletionChart habit={habit} />
           ) : null}
         </ScrollView>
       </SafeAreaView>

@@ -74,13 +74,21 @@ export async function fetchHabits(ownerId: string): Promise<Habit[]> {
 }
 
 export async function fetchTodayCompletions(ownerId: string): Promise<Completion[]> {
-  const today = isoDate(new Date());
-  const wk = isoDate(weekStart(new Date()));
+  const now = new Date();
+  const today = isoDate(now);
+  const wk = isoDate(weekStart(now));
+  const month = `${today.slice(0, 7)}-01`;
+  // Flex completions bucket by their period start, which is today (day-period),
+  // this week's Monday (week), or the 1st (month) — match all three so day- and
+  // month-period habits aren't dropped from today's summary.
   const { data, error } = await supabase
     .from('habit_completions')
     .select('*')
     .eq('owner_id', ownerId)
-    .or(`occurrence_date.eq.${today},period_start.eq.${wk}`);
+    .or(
+      `occurrence_date.eq.${today},period_start.eq.${today},` +
+        `period_start.eq.${wk},period_start.eq.${month}`,
+    );
   if (error) throw error;
   return (data ?? []) as Completion[];
 }
@@ -125,20 +133,40 @@ export async function markScheduledCompleted(
     owner_id: ownerId,
     occurrence_date: occurrenceDate,
   });
-  if (error) throw error;
+  if (error) {
+    // Unique violation: a concurrent tap (or a retry) already logged this
+    // occurrence. Idempotently return the existing completion's id rather than
+    // surfacing an error or creating a duplicate.
+    if (error.code === '23505') {
+      const { data } = await supabase
+        .from('habit_completions')
+        .select('id')
+        .eq('habit_id', habitId)
+        .eq('occurrence_date', occurrenceDate)
+        .maybeSingle();
+      if (data?.id) return data.id;
+    }
+    throw error;
+  }
   return id;
 }
 
+// `periodStart` must be the flex bucket for the day being logged, computed by
+// the caller via history.flexPeriodStartFor(dateIso, habit.target_period) —
+// NOT assumed to be the current week. A 'day'- or 'month'-period habit, or a
+// retroactively logged day, buckets differently; hardcoding this-week's Monday
+// (the old behavior) meant those completions never counted toward the target.
 export async function markFlexCompleted(
   habitId: string,
   ownerId: string,
+  periodStart: string,
 ): Promise<string> {
   const id = Crypto.randomUUID();
   const { error } = await supabase.from('habit_completions').insert({
     id,
     habit_id: habitId,
     owner_id: ownerId,
-    period_start: isoDate(weekStart(new Date())),
+    period_start: periodStart,
   });
   if (error) throw error;
   return id;

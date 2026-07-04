@@ -63,13 +63,13 @@ export function UserProfileView({ targetId, viewerId, onBack }: Props) {
     dayWindow.current = null; // force the day-view window to refetch
     try {
       const [p, h] = await Promise.all([
-        fetchUserProfile(targetId, viewerId),
-        fetchUserHabits(targetId, viewerId),
+        fetchUserProfile(targetId),
+        fetchUserHabits(targetId),
       ]);
       setProfile(p); setHabits(h);
       const [feed, mf] = await Promise.all([
         fetchUserFeedPage(targetId, undefined, PAGE_SIZE),
-        targetId !== viewerId ? fetchMutualFriends(viewerId, targetId) : Promise.resolve([]),
+        targetId !== viewerId ? fetchMutualFriends(targetId) : Promise.resolve([]),
       ]);
       allItemsRef.current = feed;
       reachedEndAllRef.current = feed.length < PAGE_SIZE;
@@ -135,7 +135,7 @@ export function UserProfileView({ targetId, viewerId, onBack }: Props) {
         const days = nDayRange(parseIsoLocal(addDaysIso(centerIso, -28)), 42); // [-28, +13]
         const from = days[0];
         const to = addDaysIso(days[days.length - 1], 1); // exclusive
-        const { completions, overrides } = await fetchUserDayData(targetId, viewerId, from, to);
+        const { completions, overrides } = await fetchUserDayData(targetId, from, to);
         const full = userHabitsToHabits(habits, targetId);
         const groups = buildDayGroups(days, full, completions, overrides, now);
         setDayGroups(new Map(groups.map((g) => [g.date, g])));
@@ -144,7 +144,7 @@ export function UserProfileView({ targetId, viewerId, onBack }: Props) {
         setDayLoading(false);
       }
     },
-    [targetId, viewerId, habits, now],
+    [targetId, habits, now],
   );
 
   useEffect(() => {
@@ -212,7 +212,7 @@ export function UserProfileView({ targetId, viewerId, onBack }: Props) {
                 </>
               )}
               <ActivityHeatmap
-                targetId={targetId} viewerId={viewerId}
+                targetId={targetId}
                 selectedLineageId={selectedLineageId} selectedDate={selectedDate}
                 onSelectDate={handleDateSelect} habits={habits}
               />
@@ -265,7 +265,7 @@ export function UserProfileView({ targetId, viewerId, onBack }: Props) {
           setItems((p) => p.map((i) => i.id === activeComment.targetId ? { ...i, comment_count: Math.max(0, i.comment_count + delta) } : i));
         }}
       />
-      <MutualFriendsModal visible={mutualModalOpen} userA={viewerId} userB={targetId} onClose={() => setMutualModalOpen(false)} />
+      <MutualFriendsModal visible={mutualModalOpen} targetId={targetId} onClose={() => setMutualModalOpen(false)} />
     </>
   );
 }

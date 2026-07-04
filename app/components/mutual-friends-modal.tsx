@@ -11,19 +11,18 @@ import { fetchMutualFriends } from '@/lib/user-profile';
 
 type Props = {
   visible: boolean;
-  userA: string;
-  userB: string;
+  targetId: string;
   onClose: () => void;
 };
 
-export function MutualFriendsModal({ visible, userA, userB, onClose }: Props) {
+export function MutualFriendsModal({ visible, targetId, onClose }: Props) {
   const router = useRouter();
   const [friends, setFriends] = useState<FriendProfile[]>([]);
 
   useEffect(() => {
     if (!visible) return;
-    fetchMutualFriends(userA, userB, 50).then(setFriends).catch(() => {});
-  }, [visible, userA, userB]);
+    fetchMutualFriends(targetId, 50).then(setFriends).catch(() => {});
+  }, [visible, targetId]);
 
   const goToUser = useCallback((userId: string) => {
     onClose();

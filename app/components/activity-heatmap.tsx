@@ -19,7 +19,6 @@ const DAY_LABELS = ['', 'Mon', '', 'Wed', '', 'Fri', ''] as const;
 
 type Props = {
   targetId: string;
-  viewerId: string;
   selectedLineageId: string | null;
   selectedDate: string | null;
   onSelectDate: (date: string | null, count: number) => void;
@@ -27,7 +26,7 @@ type Props = {
 };
 
 export function ActivityHeatmap({
-  targetId, viewerId, selectedLineageId, selectedDate, onSelectDate, habits,
+  targetId, selectedLineageId, selectedDate, onSelectDate, habits,
 }: Props) {
   const scheme = useColorScheme();
   const isDark = scheme !== 'light';
@@ -49,13 +48,13 @@ export function ActivityHeatmap({
     let cancelled = false;
     setLoading(true);
     fetchActivityHeatmap(
-      targetId, viewerId, from, to,
+      targetId, from, to,
       selectedLineageId ?? undefined,
     ).then((result) => {
       if (!cancelled) { setDays(result); setLoading(false); }
     }).catch(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [targetId, viewerId, from, to, selectedLineageId]);
+  }, [targetId, from, to, selectedLineageId]);
 
   const grid = useMemo(() => buildHeatmapGrid(from, to, days), [from, to, days]);
 

@@ -18,9 +18,9 @@ const BAR_GAP = 4;
 const EMPTY_DARK = '#363647';
 const EMPTY_LIGHT = '#E2E8F0';
 
-type Props = { habit: Habit; viewerId: string };
+type Props = { habit: Habit };
 
-export function HabitCompletionChart({ habit, viewerId }: Props) {
+export function HabitCompletionChart({ habit }: Props) {
   const scheme = useColorScheme();
   const isDark = scheme !== 'light';
   const [days, setDays] = useState<DayActivity[]>([]);
@@ -31,11 +31,11 @@ export function HabitCompletionChart({ habit, viewerId }: Props) {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    fetchHabitDowActivity(habit, viewerId)
+    fetchHabitDowActivity(habit)
       .then((result) => { if (!cancelled) { setDays(result); setLoading(false); } })
       .catch(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [habit, viewerId]);
+  }, [habit]);
 
   const baseColor = habit.color ?? Palette.primary;
   const barColor = useMemo(() => solidTint(baseColor, 0.9, isDark), [baseColor, isDark]);

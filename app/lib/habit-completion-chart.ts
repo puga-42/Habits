@@ -34,12 +34,10 @@ const ALL_TIME_FLOOR = '2015-01-01';
  */
 export async function fetchHabitDowActivity(
   habit: Pick<Habit, 'owner_id' | 'lineage_id'>,
-  viewerId: string,
 ): Promise<DayActivity[]> {
   const to = isoDate(new Date());
   return fetchActivityHeatmap(
     habit.owner_id,
-    viewerId,
     ALL_TIME_FLOOR,
     to,
     habit.lineage_id,

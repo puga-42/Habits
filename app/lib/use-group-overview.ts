@@ -65,7 +65,7 @@ export function useGroupOverview(
 
     // Per-member stats: exact all-time count + the streak inputs.
     const statsList = await Promise.all(
-      lineages.map((lin) => fetchHabitStats(ownerId, ownerId, lin).catch(() => null)),
+      lineages.map((lin) => fetchHabitStats(ownerId, lin).catch(() => null)),
     );
 
     const daysByLineage = new Map<string, Set<string>>();

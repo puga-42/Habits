@@ -123,6 +123,9 @@ export default function CalendarScreen() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const scheduleExtendingRef = useRef(false);
+  // Guards against a double-tap racing two completion inserts before load()
+  // returns. Keyed by habit + day so different rows stay independent.
+  const trailingInFlightRef = useRef<Set<string>>(new Set());
 
   const [toastVisible, setToastVisible] = useState(false);
   const [toastCompletionId, setToastCompletionId] = useState<string | null>(null);
@@ -184,7 +187,7 @@ export default function CalendarScreen() {
         fetchHabits(userId),
         fetchRange(userId, dataRange.from, dataRange.to),
         fetchProfile(userId).catch(() => null),
-        fetchMyHabitsStats(userId).catch(() => new Map<string, LineageStats>()),
+        fetchMyHabitsStats().catch(() => new Map<string, LineageStats>()),
         fetchCompletionCountsByDate(userId, stripRange.from, stripRange.to).catch(
           () => new Map<string, number>(),
         ),
@@ -400,41 +403,53 @@ export default function CalendarScreen() {
     if (!userId) return;
     if (!canCompleteOn(dateIso, today)) return;
 
-    // A resting habit can still be completed (counts toward the streak) without
-    // ending the rest — toggle the completion, leave the rest overrides intact.
-    if (row.kind === 'rest') {
-      if (row.completed && row.completionId) {
-        await unmarkCompleted(row.completionId);
-      } else if (!row.completed) {
-        const completionId = await markScheduledCompleted(row.habitId, userId, dateIso);
-        if (completionId) {
-          setToastCompletionId(completionId);
-          setToastVisible(true);
+    const guardKey = `${row.kind === 'completion' ? row.habit.id : row.habitId}:${dateIso}`;
+    if (trailingInFlightRef.current.has(guardKey)) return;
+    trailingInFlightRef.current.add(guardKey);
+    try {
+      // A resting habit can still be completed (counts toward the streak)
+      // without ending the rest — toggle the completion, leave the rest
+      // overrides intact.
+      if (row.kind === 'rest') {
+        if (row.completed && row.completionId) {
+          await unmarkCompleted(row.completionId);
+        } else if (!row.completed) {
+          const completionId = await markScheduledCompleted(row.habitId, userId, dateIso);
+          if (completionId) {
+            setToastCompletionId(completionId);
+            setToastVisible(true);
+          }
         }
+        await load();
+        return;
+      }
+
+      const habitId = row.kind === 'completion' ? row.habit.id : row.habitId;
+      const habit = habits.find((h) => h.id === habitId);
+
+      if (habit?.unit === 'time') {
+        await handleTimerToggle(habit, dateIso);
+        return;
+      }
+
+      let completionId: string | undefined;
+      if (row.kind === 'scheduled') {
+        completionId = await markScheduledCompleted(row.habitId, userId, dateIso);
+      } else if (row.kind === 'flex') {
+        completionId = await markFlexCompleted(
+          row.habitId,
+          userId,
+          flexPeriodStartFor(dateIso, row.period),
+        );
+      }
+      if (completionId) {
+        setToastCompletionId(completionId);
+        setToastVisible(true);
       }
       await load();
-      return;
+    } finally {
+      trailingInFlightRef.current.delete(guardKey);
     }
-
-    const habitId = row.kind === 'completion' ? row.habit.id : row.habitId;
-    const habit = habits.find((h) => h.id === habitId);
-
-    if (habit?.unit === 'time') {
-      await handleTimerToggle(habit, dateIso);
-      return;
-    }
-
-    let completionId: string | undefined;
-    if (row.kind === 'scheduled') {
-      completionId = await markScheduledCompleted(row.habitId, userId, dateIso);
-    } else if (row.kind === 'flex') {
-      completionId = await markFlexCompleted(row.habitId, userId);
-    }
-    if (completionId) {
-      setToastCompletionId(completionId);
-      setToastVisible(true);
-    }
-    await load();
   }
 
   async function handleTimerToggle(habit: Habit, dateIso: string) {

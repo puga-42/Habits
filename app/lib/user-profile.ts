@@ -62,11 +62,9 @@ export type UserFeedCursor = { sort_key: string; id: string };
 
 export async function fetchUserProfile(
   targetId: string,
-  viewerId: string,
 ): Promise<UserProfileData | null> {
   const { data, error } = await supabase.rpc("get_user_profile_page", {
     p_target_id: targetId,
-    p_viewer_id: viewerId,
   });
   if (error) throw error;
   const rows = data as unknown as UserProfileData[];
@@ -75,11 +73,9 @@ export async function fetchUserProfile(
 
 export async function fetchUserHabits(
   targetId: string,
-  viewerId: string,
 ): Promise<UserHabit[]> {
   const { data, error } = await supabase.rpc("get_user_visible_habits", {
     p_target_id: targetId,
-    p_viewer_id: viewerId,
   });
   if (error) throw error;
   return (data ?? []) as UserHabit[];
@@ -102,14 +98,13 @@ export async function fetchUserFeedPage(
   return mapFeedRows(data ?? []);
 }
 
+// Mutual friends between the caller (auth.uid(), server-side) and targetId.
 export async function fetchMutualFriends(
-  userA: string,
-  userB: string,
+  targetId: string,
   limit = 10,
 ): Promise<FriendProfile[]> {
   const { data, error } = await supabase.rpc("get_mutual_friends", {
-    p_user_a: userA,
-    p_user_b: userB,
+    p_target_id: targetId,
     p_limit: limit,
   });
   if (error) throw error;
@@ -121,20 +116,17 @@ export async function fetchMutualFriends(
 // the owner's day agenda — the cross-user analogue of history.ts `fetchRange`.
 export async function fetchUserDayData(
   targetId: string,
-  viewerId: string,
   fromIso: string,
   toIso: string,
 ): Promise<{ completions: CompletionWithHabit[]; overrides: HabitOverride[] }> {
   const [cRes, oRes] = await Promise.all([
     supabase.rpc("get_user_completions_range", {
       p_target_id: targetId,
-      p_viewer_id: viewerId,
       p_from: fromIso,
       p_to: toIso,
     }),
     supabase.rpc("get_user_overrides_range", {
       p_target_id: targetId,
-      p_viewer_id: viewerId,
       p_from: fromIso,
       p_to: toIso,
     }),

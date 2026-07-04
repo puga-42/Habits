@@ -136,6 +136,25 @@ export function dateParamsForHabitOn(
   };
 }
 
+// Whether a completion already exists for a habit's occurrence (scheduled) or
+// period (flex). Used to keep auto-complete idempotent.
+async function completionExists(
+  habitId: string,
+  key: { occurrenceDate: string } | { periodStart: string },
+): Promise<boolean> {
+  let query = supabase
+    .from('habit_completions')
+    .select('id')
+    .eq('habit_id', habitId);
+  query =
+    'occurrenceDate' in key
+      ? query.eq('occurrence_date', key.occurrenceDate)
+      : query.eq('period_start', key.periodStart);
+  const { data, error } = await query.limit(1).maybeSingle();
+  if (error) throw error;
+  return data != null;
+}
+
 export async function checkAndAutoComplete(
   habitId: string,
   ownerId: string,
@@ -150,10 +169,16 @@ export async function checkAndAutoComplete(
 
   if (total < habit.target_seconds) return false;
 
+  // Auto-complete fires on every timer stop once the target is met. Only create
+  // a completion if one doesn't already exist for this occurrence/period —
+  // otherwise a second session (or a flex habit, which has no DB uniqueness)
+  // would pile up duplicate completions.
   if (habit.kind === 'scheduled' && occurrenceDate) {
+    if (await completionExists(habitId, { occurrenceDate })) return false;
     await markScheduledCompleted(habitId, ownerId, occurrenceDate);
-  } else if (habit.kind === 'flex') {
-    await markFlexCompleted(habitId, ownerId);
+  } else if (habit.kind === 'flex' && periodStart) {
+    if (await completionExists(habitId, { periodStart })) return false;
+    await markFlexCompleted(habitId, ownerId, periodStart);
   }
   return true;
 }

@@ -183,6 +183,24 @@ describe('buildWidgetPayload', () => {
     });
   });
 
+  it('buckets a day-period flex habit by the day, not the week', () => {
+    const habits = [flex('f1', { target_period: 'day', target_count: 1 })];
+    const completions = [
+      completion('f1', { occurrence_date: null, period_start: TODAY_ISO }),
+    ];
+    const result = buildWidgetPayload(habits, completions, [], TODAY);
+    expect(result.habits[0]).toMatchObject({ completedCount: 1, isCompleted: true });
+  });
+
+  it('buckets a month-period flex habit by the month, not the week', () => {
+    const habits = [flex('f1', { target_period: 'month', target_count: 1 })];
+    const completions = [
+      completion('f1', { occurrence_date: null, period_start: '2026-05-01' }),
+    ];
+    const result = buildWidgetPayload(habits, completions, [], TODAY);
+    expect(result.habits[0]).toMatchObject({ completedCount: 1, isCompleted: true });
+  });
+
   it('marks flex habit as completed when target met', () => {
     const habits = [flex('f1', { target_count: 2 })];
     const weekPeriodStart = '2026-05-25';
