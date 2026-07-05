@@ -41,14 +41,18 @@ export function buildDayItems({
   streakByGroupId,
 }: Params): DayItem[] {
   // Bucket each row under the group it belonged to on this day (membership
-  // window-covering), or UNGROUPED.
+  // window-covering), or UNGROUPED. A membership can outlive its group
+  // (deleteGroup soft-deletes and fetchGroups filters deleted rows), so any
+  // group id not in `groups` falls back to UNGROUPED — a group must never
+  // hide a habit.
+  const knownGroupIds = new Set(groups.map((g) => g.id));
   const byGroup = new Map<string, AgendaRow[]>();
   for (const row of rows) {
     const lineageId = habitMap.get(rowHabitId(row))?.lineage_id;
     const gid = lineageId
       ? activeGroupIdFor(memberships, lineageId, dateIso)
       : null;
-    const key = gid ?? UNGROUPED;
+    const key = gid && knownGroupIds.has(gid) ? gid : UNGROUPED;
     const bucket = byGroup.get(key);
     if (bucket) bucket.push(row);
     else byGroup.set(key, [row]);

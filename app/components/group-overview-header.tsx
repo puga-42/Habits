@@ -1,10 +1,11 @@
 // Presentational header for the group overview screen: the group's identity
 // (icon + name + streak), a stat row (members / completions), the description,
-// an Edit affordance, and the photo mosaic ("vision board") built from recent
-// member-completion media. The screen owns all data + the edit navigation.
+// and the photo mosaic ("vision board") built from recent member-completion
+// media. The screen owns all data (the Edit affordance lives in the screen's
+// top bar, in line with Back).
 
 import { Image } from 'expo-image';
-import { Dimensions, Pressable, StyleSheet, View } from 'react-native';
+import { Dimensions, StyleSheet, View } from 'react-native';
 
 import { StreakBadge } from '@/components/streak-badge';
 import { ThemedText } from '@/components/themed-text';
@@ -18,7 +19,6 @@ type Props = {
   memberCount: number;
   completions: number;
   photoUrls: string[];
-  onEdit: () => void;
 };
 
 export function GroupOverviewHeader({
@@ -30,7 +30,6 @@ export function GroupOverviewHeader({
   memberCount,
   completions,
   photoUrls,
-  onEdit,
 }: Props) {
   const tint = color ?? 'rgba(127,127,127,0.6)';
   return (
@@ -45,9 +44,6 @@ export function GroupOverviewHeader({
           </ThemedText>
         </View>
         {streak > 0 ? <StreakBadge streak={streak} /> : null}
-        <Pressable onPress={onEdit} hitSlop={10}>
-          <ThemedText style={styles.edit}>Edit</ThemedText>
-        </Pressable>
       </View>
 
       <View style={styles.stats}>
@@ -107,7 +103,6 @@ const styles = StyleSheet.create({
   iconText: { fontSize: 24 },
   titleWrap: { flex: 1 },
   name: { fontSize: 24, fontWeight: '700' },
-  edit: { fontSize: 16, color: '#0A84FF', fontWeight: '600' },
   stats: { flexDirection: 'row', gap: 28 },
   stat: { alignItems: 'flex-start' },
   statValue: { fontSize: 22, fontWeight: '700' },

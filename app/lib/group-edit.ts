@@ -1,0 +1,92 @@
+// Single-group editor surface — powers app/group/edit.tsx. Pure derivations for
+// the member checklist plus the thin detail-update mutation (the first writer
+// of habit_groups.description, added in 20260626000000). Membership writes
+// reuse group-mutations (addHabitToGroup / removeHabitFromGroupFuture) so the
+// one-active-group and time-window semantics stay in one place.
+// Pure helpers are TDD'd in __tests__/group-edit.test.ts (no mocks).
+
+import { currentHabitByLineage } from './group-overview';
+import { activeGroupIdFor, type GroupMembership, type HabitGroup } from './groups';
+import type { Habit } from './habits';
+import { supabase } from './supabase';
+
+// ─── Pure helpers (TDD core) ───────────────────────────────────────────────
+
+// One checklist row per lineage (the user-facing "habit" — see CONTEXT.md).
+export type GroupHabitChoice = {
+  lineageId: string;
+  title: string;
+  icon: string | null;
+  color: string | null;
+  inGroup: boolean; // active member of the edited group today
+  otherGroupName: string | null; // named when actively in a DIFFERENT group
+};
+
+// The checklist for editing `groupId`'s members: every current habit, members
+// first then alphabetical. A membership pointing at a group missing from
+// `groups` (soft-deleted) counts as ungrouped — a deleted group never claims a
+// habit (mirrors day-items.buildDayItems).
+export function buildGroupHabitChoices(
+  habits: Habit[],
+  memberships: GroupMembership[],
+  groups: HabitGroup[],
+  groupId: string,
+  todayIso: string,
+): GroupHabitChoice[] {
+  const nameById = new Map(groups.map((g) => [g.id, g.name]));
+  const choices: GroupHabitChoice[] = [];
+  for (const habit of currentHabitByLineage(habits).values()) {
+    const gid = activeGroupIdFor(memberships, habit.lineage_id, todayIso);
+    const known = gid !== null && nameById.has(gid);
+    choices.push({
+      lineageId: habit.lineage_id,
+      title: habit.title,
+      icon: habit.icon,
+      color: habit.color,
+      inGroup: gid === groupId,
+      otherGroupName:
+        known && gid !== groupId ? (nameById.get(gid as string) as string) : null,
+    });
+  }
+  return choices.sort(
+    (a, b) =>
+      Number(b.inGroup) - Number(a.inGroup) || a.title.localeCompare(b.title),
+  );
+}
+
+// Reconcile the checklist against the members-on-load: which lineages to add
+// to the group and which to remove (going forward).
+export type MemberEditPlan = {
+  addLineageIds: string[];
+  removeLineageIds: string[];
+};
+
+export function planMemberEdits(
+  initial: string[],
+  selected: string[],
+): MemberEditPlan {
+  const before = new Set(initial);
+  const after = new Set(selected);
+  return {
+    addLineageIds: selected.filter((id) => !before.has(id)),
+    removeLineageIds: initial.filter((id) => !after.has(id)),
+  };
+}
+
+// ─── Mutation ───────────────────────────────────────────────────────────────
+
+// Update the group's identity fields. Name is required (1–100, DB check);
+// description is free-form ≤1000, blank saves as null.
+export async function updateGroupDetails(
+  groupId: string,
+  details: { name: string; description: string | null },
+): Promise<void> {
+  const { error } = await supabase
+    .from('habit_groups')
+    .update({
+      name: details.name,
+      description: details.description,
+    })
+    .eq('id', groupId);
+  if (error) throw error;
+}

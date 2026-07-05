@@ -1,9 +1,11 @@
-// Group streak — "any active member completed", counted daily, walking back from
-// today. A day counts toward the streak if at least one habit whose membership
-// window covered that day was completed on it. Today is neutral if nothing is
-// logged yet (the day isn't over); a day on which the group had ≥1 active member
-// but none completed ends the streak. Days where the group had no active member
-// (before it formed, or a gap between memberships) are bridged as neutral.
+// Group streak — "any member completed", counted daily, walking back from
+// today. Groups are wrappers around habits: the streak is computed over the
+// FULL completion history of the group's *current* members (membership window
+// covering today), regardless of when they joined — a habit added today brings
+// its existing streak with it, and a removed habit stops crediting. Membership
+// windows still govern day-view bucketing and one-active-group; they no longer
+// gate metrics. Today is neutral if nothing is logged yet (the day isn't
+// over); any earlier day with no member completion ends the streak.
 //
 // This is the group-level analogue of lib/streak.ts. Pure + TDD'd; see
 // __tests__/group-streak.test.ts. No network, no mocks.
@@ -30,40 +32,36 @@ export type GroupStreakInput = {
 const MAX_DAYS = 4000;
 
 export function computeGroupStreak(input: GroupStreakInput, now: Date): number {
-  const members = input.memberships.filter((m) => m.group_id === input.groupId);
-  if (members.length === 0) return 0;
-
-  // Stop walking once we pass the earliest day any member belonged to the group.
-  const earliest = members.reduce(
-    (min, m) => (m.effective_from < min ? m.effective_from : min),
-    members[0].effective_from,
-  );
-
   const todayIso = isoDate(now);
+
+  // Current members: lineages with a membership of this group covering today.
+  const lineages = new Set<string>();
+  for (const m of input.memberships) {
+    if (m.group_id !== input.groupId) continue;
+    if (!groupContainsOn(m, todayIso)) continue;
+    lineages.add(m.lineage_id);
+  }
+  if (lineages.size === 0) return 0;
+
+  // Union of the members' completion days — their whole history counts.
+  const completedDays = new Set<string>();
+  for (const lin of lineages) {
+    for (const day of input.completionDaysByLineage.get(lin) ?? []) {
+      completedDays.add(day);
+    }
+  }
+  if (completedDays.size === 0) return 0;
+
+  const earliest = [...completedDays].reduce((a, b) => (b < a ? b : a));
+
   let streak = 0;
   let cursor = todayIso;
-
   for (let guard = 0; guard < MAX_DAYS && cursor >= earliest; guard++) {
-    const activeMembers = members.filter((m) => groupContainsOn(m, cursor));
-
-    if (activeMembers.length === 0) {
-      // The group had no member on this day — neutral, bridge over it.
-      cursor = prevDay(cursor);
-      continue;
-    }
-
-    const completed = activeMembers.some((m) =>
-      input.completionDaysByLineage.get(m.lineage_id)?.has(cursor),
-    );
-
-    if (completed) {
+    if (completedDays.has(cursor)) {
       streak++;
-    } else if (cursor === todayIso) {
-      // Today isn't over — neutral, keep walking.
-    } else {
-      break; // a genuine miss on a day the group was active ends the streak
+    } else if (cursor !== todayIso) {
+      break; // a genuine miss on a past day ends the streak (today is neutral)
     }
-
     cursor = prevDay(cursor);
   }
 

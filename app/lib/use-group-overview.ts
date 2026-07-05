@@ -5,11 +5,11 @@
 // Mirrors lib/use-habit-overview.ts. Failures degrade to empty rather than throw
 // so the page renders what it can.
 
-import { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
 
 import {
   activeMemberLineages,
-  countCompletionsInWindows,
   currentHabitByLineage,
   fetchGroup,
   fetchGroupMemberPhotos,
@@ -89,7 +89,10 @@ export function useGroupOverview(
         now,
       ),
     );
-    setCompletions(countCompletionsInWindows(memberships, groupId, daysByLineage));
+    // Groups are wrappers around habits: the group's completions are the sum of
+    // its current members' exact all-time counts — the header always agrees
+    // with the member rows below it (not window-scoped; see group-streak.ts).
+    setCompletions(memberRows.reduce((sum, r) => sum + r.count, 0));
 
     // Mosaic: recent photos across every habit row of the member lineages.
     const memberHabitIds = habits
@@ -106,10 +109,14 @@ export function useGroupOverview(
     );
   }, [groupId, ownerId]);
 
-  useEffect(() => {
-    setLoading(true);
-    load().finally(() => setLoading(false));
-  }, [load]);
+  // Load on focus, not just mount: coming back from /group/edit (or any pushed
+  // screen) must show the fresh name/description/members. The spinner only
+  // gates the first load — refocus refreshes in place without flashing.
+  useFocusEffect(
+    useCallback(() => {
+      load().finally(() => setLoading(false));
+    }, [load]),
+  );
 
   return {
     group,

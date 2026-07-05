@@ -171,6 +171,21 @@ describe('buildDayItems — grouping', () => {
     expect(items[ungroupedRowIdx]).toMatchObject({ groupId: UNGROUPED });
   });
 
+  it('a habit whose membership points at a group missing from the list (soft-deleted) renders ungrouped instead of vanishing', () => {
+    // Regression: deleteGroup soft-deletes, so an open membership can outlive
+    // its group. fetchGroups filters deleted groups; the row must fall back to
+    // the ungrouped pile, never silently drop out of the day view.
+    const habits = [habit('A', 1)];
+    const rows = [scheduledRow('A')];
+    const members = [member('A', 'G-deleted')];
+
+    const items = build(rows, habits, /* groups */ [], members);
+
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({ kind: 'row', groupId: UNGROUPED });
+    expect((items[0] as any).row.habitId).toBe('A');
+  });
+
   it('a habit removed-going-forward (window closed before the day) is ungrouped that day', () => {
     const habits = [habit('A', 1)];
     const rows = [scheduledRow('A')];

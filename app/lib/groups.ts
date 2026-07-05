@@ -92,6 +92,38 @@ export function planGroupChange(
   return { kind: 'remove', groupId: prev as string };
 }
 
+// How to end open memberships when a lineage leaves a group as of `fromIso`
+// (switching groups, or the group being deleted). Windows that began before
+// `fromIso` close at the day before, keeping past completions attributed. A
+// window that only began ON or after `fromIso` never covered an earlier day —
+// closing it would violate the effective_until >= effective_from check
+// constraint (the same-day group-switch save error) — so its row is deleted.
+export type MembershipEndPlan = { closeIds: string[]; deleteIds: string[] };
+
+export function planMembershipEnd(
+  open: Pick<GroupMembership, 'id' | 'effective_from'>[],
+  fromIso: string,
+): MembershipEndPlan {
+  const closeIds: string[] = [];
+  const deleteIds: string[] = [];
+  for (const m of open) {
+    if (m.effective_from >= fromIso) deleteIds.push(m.id);
+    else closeIds.push(m.id);
+  }
+  return { closeIds, deleteIds };
+}
+
+// YYYY-MM-DD one day earlier, via UTC-noon to dodge DST edges.
+export function dayBefore(iso: string): string {
+  const [y, m, d] = iso.split('-').map((n) => parseInt(n, 10));
+  const dt = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+  dt.setUTCDate(dt.getUTCDate() - 1);
+  const yy = dt.getUTCFullYear();
+  const mm = String(dt.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(dt.getUTCDate()).padStart(2, '0');
+  return `${yy}-${mm}-${dd}`;
+}
+
 // ─── Queries ───────────────────────────────────────────────────────────────
 
 export async function fetchGroups(ownerId: string): Promise<HabitGroup[]> {

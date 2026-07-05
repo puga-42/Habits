@@ -67,14 +67,12 @@ describe('computeGroupStreak', () => {
     expect(computeGroupStreak(input({ memberships, completionDaysByLineage }), NOW)).toBe(1);
   });
 
-  it('a removed-going-forward member still credits days inside its past window', () => {
-    // A left the group going forward (window closed 06-23), but its completion on
-    // 06-23 still counts for the group that day.
+  it('a removed member contributes nothing — the group reflects its CURRENT habits', () => {
+    // A left the group going forward (window closed 06-23). The group is a lens
+    // over the habits in it today, so A's history no longer credits the streak.
     const memberships = [member('A', 'G1', '2026-06-01', '2026-06-23')];
     const completionDaysByLineage = new Map([['A', days('2026-06-23', '2026-06-22')]]);
-    // Today + 06-24 have no active member (A's window ended) → neutral/bridged;
-    // 06-23 and 06-22 counted → 2.
-    expect(computeGroupStreak(input({ memberships, completionDaysByLineage }), NOW)).toBe(2);
+    expect(computeGroupStreak(input({ memberships, completionDaysByLineage }), NOW)).toBe(0);
   });
 
   it('ignores completions from a member of a different group', () => {
@@ -90,11 +88,24 @@ describe('computeGroupStreak', () => {
     expect(computeGroupStreak(input({ memberships, completionDaysByLineage }), NOW)).toBe(1);
   });
 
-  it('does not count a completion on a day before the member joined', () => {
-    // A joined 06-24; a stray completion dated 06-23 (before join) must not count.
+  it('counts completions from before the member joined (join date does not gate history)', () => {
+    // A joined 06-24 with completions back to 06-23. Groups are wrappers around
+    // habits — the habit's full history counts, regardless of when it joined.
     const memberships = [member('A', 'G1', '2026-06-24')];
     const completionDaysByLineage = new Map([['A', days('2026-06-25', '2026-06-24', '2026-06-23')]]);
-    // 06-25 + 06-24 counted; walk stops at 06-23 (before earliest join) → 2.
+    expect(computeGroupStreak(input({ memberships, completionDaysByLineage }), NOW)).toBe(3);
+  });
+
+  it('a member added TODAY credits its existing streak immediately (reported bug)', () => {
+    // Habits with prior completions were added to a fresh group; the group must
+    // not read 0. Nothing logged today → neutral; 06-24 + 06-23 count → 2.
+    const memberships = [member('A', 'G1', '2026-06-25')];
+    const completionDaysByLineage = new Map([['A', days('2026-06-24', '2026-06-23')]]);
     expect(computeGroupStreak(input({ memberships, completionDaysByLineage }), NOW)).toBe(2);
+  });
+
+  it('returns 0 when the only members have no completions at all', () => {
+    const memberships = [member('A', 'G1', '2026-06-01')];
+    expect(computeGroupStreak(input({ memberships }), NOW)).toBe(0);
   });
 });

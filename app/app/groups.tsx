@@ -1,6 +1,8 @@
 // Groups management — create, rename, and delete identity groups. Reached from
 // the FAB ("New group") and the menu drawer ("Manage groups"). Deleting a group
-// ungroups its habits (membership cascade); the habits themselves are untouched.
+// ungroups its habits (deleteGroup ends the open memberships explicitly — the
+// group row is only soft-deleted, so no FK cascade fires); the habits
+// themselves are untouched.
 
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';

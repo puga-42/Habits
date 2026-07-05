@@ -5,8 +5,11 @@
 
 import * as Crypto from 'expo-crypto';
 
-import { nextGroupSortIndexFromList } from './groups';
+import { dayBefore, nextGroupSortIndexFromList, planMembershipEnd } from './groups';
+import { isoDate } from './habits';
 import { supabase } from './supabase';
+
+export { dayBefore } from './groups';
 
 // ─── Group CRUD ──────────────────────────────────────────────────────────────
 
@@ -61,10 +64,24 @@ export async function reorderGroups(orderedIds: string[]): Promise<void> {
   }
 }
 
-// Soft-delete the group. The FK cascade on habit_group_members drops the
-// memberships — a deleted group's habits become ungrouped. Habits themselves
-// are untouched (membership is a separate table).
-export async function deleteGroup(groupId: string): Promise<void> {
+// Delete the group: end its open memberships, then soft-delete the group row.
+// The FK cascade on habit_group_members never fires on a soft delete, so the
+// memberships must be ended explicitly — otherwise they keep pointing at a
+// group the day view no longer fetches and its habits vanish from the list.
+// Habit rows are never touched. Memberships end first so a failed group
+// update leaves a retryable state.
+export async function deleteGroup(
+  groupId: string,
+  todayIso: string = isoDate(new Date()),
+): Promise<void> {
+  const { data, error: mErr } = await supabase
+    .from('habit_group_members')
+    .select('id, effective_from')
+    .eq('group_id', groupId)
+    .is('effective_until', null);
+  if (mErr) throw mErr;
+  await endOpenMemberships((data ?? []) as OpenMembershipRow[], todayIso);
+
   const { error } = await supabase
     .from('habit_groups')
     .update({ deleted_at: new Date().toISOString() })
@@ -86,9 +103,9 @@ async function nextGroupSortIndex(ownerId: string): Promise<number> {
 // ─── Membership mutations ─────────────────────────────────────────────────
 
 // Put a habit (lineage) into a group as of `fromIso`. Enforces one-active-group:
-// any currently-open membership for this lineage is first closed the day before
-// `fromIso` (its past completions stay with the old group). Then a new open
-// membership is inserted. A no-op if the lineage is already actively in `groupId`.
+// any currently-open membership for this lineage is first ended as of `fromIso`
+// (its past completions stay with the old group). Then a new open membership is
+// inserted. A no-op if the lineage is already actively in `groupId`.
 export async function addHabitToGroup(
   ownerId: string,
   lineageId: string,
@@ -97,25 +114,15 @@ export async function addHabitToGroup(
 ): Promise<void> {
   const { data: open, error: fErr } = await supabase
     .from('habit_group_members')
-    .select('id, group_id')
+    .select('id, group_id, effective_from')
     .eq('lineage_id', lineageId)
     .is('effective_until', null);
   if (fErr) throw fErr;
 
-  const existing = (open ?? []) as { id: string; group_id: string }[];
+  const existing = (open ?? []) as (OpenMembershipRow & { group_id: string })[];
   if (existing.some((e) => e.group_id === groupId)) return; // already a member
 
-  if (existing.length > 0) {
-    const until = dayBefore(fromIso);
-    const { error: cErr } = await supabase
-      .from('habit_group_members')
-      .update({ effective_until: until })
-      .in(
-        'id',
-        existing.map((e) => e.id),
-      );
-    if (cErr) throw cErr;
-  }
+  await endOpenMemberships(existing, fromIso);
 
   const { error } = await supabase.from('habit_group_members').insert({
     id: Crypto.randomUUID(),
@@ -135,13 +142,14 @@ export async function removeHabitFromGroupFuture(
   groupId: string,
   todayIso: string,
 ): Promise<void> {
-  const { error } = await supabase
+  const { data, error: fErr } = await supabase
     .from('habit_group_members')
-    .update({ effective_until: dayBefore(todayIso) })
+    .select('id, effective_from')
     .eq('lineage_id', lineageId)
     .eq('group_id', groupId)
     .is('effective_until', null);
-  if (error) throw error;
+  if (fErr) throw fErr;
+  await endOpenMemberships((data ?? []) as OpenMembershipRow[], todayIso);
 }
 
 // Remove "all": the group forgets the habit ever belonged — every membership row
@@ -159,13 +167,29 @@ export async function removeHabitFromGroupAll(
   if (error) throw error;
 }
 
-// YYYY-MM-DD one day earlier, via UTC-noon to dodge DST edges.
-export function dayBefore(iso: string): string {
-  const [y, m, d] = iso.split('-').map((n) => parseInt(n, 10));
-  const dt = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
-  dt.setUTCDate(dt.getUTCDate() - 1);
-  const yy = dt.getUTCFullYear();
-  const mm = String(dt.getUTCMonth() + 1).padStart(2, '0');
-  const dd = String(dt.getUTCDate()).padStart(2, '0');
-  return `${yy}-${mm}-${dd}`;
+type OpenMembershipRow = { id: string; effective_from: string };
+
+// End the given open membership rows as of `fromIso`: windows with active days
+// before `fromIso` close at the day before; windows that began on/after it are
+// deleted outright — closing those would set effective_until < effective_from
+// and violate the table's check constraint (see groups.planMembershipEnd).
+async function endOpenMemberships(
+  rows: OpenMembershipRow[],
+  fromIso: string,
+): Promise<void> {
+  const { closeIds, deleteIds } = planMembershipEnd(rows, fromIso);
+  if (closeIds.length > 0) {
+    const { error } = await supabase
+      .from('habit_group_members')
+      .update({ effective_until: dayBefore(fromIso) })
+      .in('id', closeIds);
+    if (error) throw error;
+  }
+  if (deleteIds.length > 0) {
+    const { error } = await supabase
+      .from('habit_group_members')
+      .delete()
+      .in('id', deleteIds);
+    if (error) throw error;
+  }
 }

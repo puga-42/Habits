@@ -4,6 +4,7 @@ import {
   groupContainsOn,
   nextGroupSortIndexFromList,
   planGroupChange,
+  planMembershipEnd,
   type GroupMembership,
 } from '../groups';
 
@@ -121,6 +122,52 @@ describe('planGroupChange', () => {
 
   it('removes (going forward) when clearing the group', () => {
     expect(planGroupChange('G1', null)).toEqual({ kind: 'remove', groupId: 'G1' });
+  });
+});
+
+describe('planMembershipEnd', () => {
+  // Ending a membership as of `fromIso` closes its window at the day before.
+  // A membership that only began on/after `fromIso` never covered an earlier
+  // day — closing it would violate the effective_until >= effective_from check
+  // constraint (the "created habit + group, switched groups the same day"
+  // save error) — so it must be deleted instead.
+  it('closes memberships that began before fromIso', () => {
+    const plan = planMembershipEnd(
+      [{ id: 'm1', effective_from: '2026-06-01' }],
+      '2026-07-04',
+    );
+    expect(plan).toEqual({ closeIds: ['m1'], deleteIds: [] });
+  });
+
+  it('deletes a membership that began on fromIso (same-day group switch)', () => {
+    const plan = planMembershipEnd(
+      [{ id: 'm1', effective_from: '2026-07-04' }],
+      '2026-07-04',
+    );
+    expect(plan).toEqual({ closeIds: [], deleteIds: ['m1'] });
+  });
+
+  it('deletes a membership that began after fromIso', () => {
+    const plan = planMembershipEnd(
+      [{ id: 'm1', effective_from: '2026-07-10' }],
+      '2026-07-04',
+    );
+    expect(plan).toEqual({ closeIds: [], deleteIds: ['m1'] });
+  });
+
+  it('partitions a mixed list', () => {
+    const plan = planMembershipEnd(
+      [
+        { id: 'old', effective_from: '2026-06-01' },
+        { id: 'today', effective_from: '2026-07-04' },
+      ],
+      '2026-07-04',
+    );
+    expect(plan).toEqual({ closeIds: ['old'], deleteIds: ['today'] });
+  });
+
+  it('returns an empty plan for no open memberships', () => {
+    expect(planMembershipEnd([], '2026-07-04')).toEqual({ closeIds: [], deleteIds: [] });
   });
 });
 

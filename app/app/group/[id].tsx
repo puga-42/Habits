@@ -1,7 +1,7 @@
 // Group overview — read-only detail for a single group. Reached by tapping a
 // group's day-view card header or a row on the /groups manage screen. Shows the
 // group identity, description, metrics, the member habits, and a photo mosaic of
-// recent member-completion media. Editing routes to the /groups manage screen
+// recent member-completion media. Editing routes to /group/edit for THIS group
 // (view-only here). Data + derivations live in lib/use-group-overview.ts.
 
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -40,6 +40,15 @@ export default function GroupOverviewScreen() {
           <Pressable onPress={() => router.back()} hitSlop={12}>
             <ThemedText style={styles.back}>‹ Back</ThemedText>
           </Pressable>
+          {group ? (
+            <Pressable
+              onPress={() =>
+                router.push({ pathname: '/group/edit', params: { id: group.id } })
+              }
+              hitSlop={12}>
+              <ThemedText style={styles.edit}>Edit</ThemedText>
+            </Pressable>
+          ) : null}
         </View>
 
         {loading ? (
@@ -61,7 +70,6 @@ export default function GroupOverviewScreen() {
               memberCount={memberCount}
               completions={completions}
               photoUrls={photoUrls}
-              onEdit={() => router.push('/groups')}
             />
 
             <View style={styles.section}>
@@ -109,8 +117,15 @@ export default function GroupOverviewScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   content: { flex: 1 },
-  bar: { paddingHorizontal: 12, paddingVertical: 10 },
+  bar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
   back: { fontSize: 16, color: '#0A84FF' },
+  edit: { fontSize: 16, color: '#0A84FF', fontWeight: '600' },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
   missing: { opacity: 0.6, fontSize: 15 },
   scroll: { paddingBottom: 48 },

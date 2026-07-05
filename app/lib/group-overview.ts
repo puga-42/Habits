@@ -28,11 +28,11 @@ export function activeMemberLineages(
   return [...seen];
 }
 
-// Group-scoped completion count: the number of member completion-days that fall
-// *within* a member's membership window. This is the group's doctrine — a
-// completion counts toward the group iff the completing habit's window covers
-// its date (see groups.ts). Two members completing the same calendar day are
-// two distinct completions, so the day is counted once per member.
+// Window-scoped completion count: the number of member completion-days that
+// fall *within* a member's membership window. NO LONGER drives the overview
+// header — product decision (2026-07-05): groups are wrappers around habits,
+// so the overview sums the current members' all-time counts instead (see
+// use-group-overview.ts / group-streak.ts). Kept for window-scoped needs.
 //
 // NOTE: `daysByLineage` comes from the lineage completion history (capped at the
 // most recent ~100 days, like the streak inputs), so for a very active group
