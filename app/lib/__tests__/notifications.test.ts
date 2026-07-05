@@ -65,4 +65,29 @@ describe('notificationMessage', () => {
     const n = makeNotification({ kind: 'habit_adopted', habit_title: '' });
     expect(notificationMessage(n)).toBe('adopted your habit');
   });
+
+  it('formats rest_like', () => {
+    const n = makeNotification({ kind: 'rest_like', habit_title: 'Run' });
+    expect(notificationMessage(n)).toBe('liked your Run rest');
+  });
+
+  it('formats rest_comment', () => {
+    const n = makeNotification({ kind: 'rest_comment', habit_title: 'Run' });
+    expect(notificationMessage(n)).toBe('commented on your Run rest');
+  });
+
+  it('formats rest_comment_like', () => {
+    const n = makeNotification({ kind: 'rest_comment_like' });
+    expect(notificationMessage(n)).toBe('liked your comment');
+  });
+
+  it('formats friend_request', () => {
+    const n = makeNotification({ kind: 'friend_request' });
+    expect(notificationMessage(n)).toBe('sent you a friend request');
+  });
+
+  it('formats friend_request_accepted', () => {
+    const n = makeNotification({ kind: 'friend_request_accepted' });
+    expect(notificationMessage(n)).toBe('accepted your friend request');
+  });
 });

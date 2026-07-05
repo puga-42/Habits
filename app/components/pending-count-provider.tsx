@@ -9,8 +9,7 @@ import {
 } from 'react';
 
 import { fetchPendingRequestCount } from '@/lib/friends';
-
-const POLL_MS = 30_000;
+import { supabase } from '@/lib/supabase';
 
 type PendingCountContextValue = {
   pendingCount: number;
@@ -33,11 +32,21 @@ export function PendingCountProvider({
     fetchPendingRequestCount(userId).then(setPendingCount).catch(() => {});
   }, [userId]);
 
+  // Refresh from Realtime on incoming friend requests instead of polling.
   useEffect(() => {
     if (!userId) return;
     refresh();
-    const interval = setInterval(refresh, POLL_MS);
-    return () => clearInterval(interval);
+    const channel = supabase
+      .channel(`pending-requests:${userId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'friend_requests', filter: `to_user=eq.${userId}` },
+        () => refresh(),
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [userId, refresh]);
 
   const value = useMemo<PendingCountContextValue>(

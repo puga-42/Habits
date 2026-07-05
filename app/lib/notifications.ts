@@ -9,7 +9,12 @@ export type NotificationKind =
   | 'activity_like'
   | 'activity_comment'
   | 'activity_comment_like'
-  | 'habit_adopted';
+  | 'habit_adopted'
+  | 'rest_like'
+  | 'rest_comment'
+  | 'rest_comment_like'
+  | 'friend_request'
+  | 'friend_request_accepted';
 
 export type AppNotification = {
   id: string;
@@ -40,6 +45,7 @@ export function notificationMessage(n: AppNotification): string {
         : 'commented on your completion';
     case 'comment_like':
     case 'activity_comment_like':
+    case 'rest_comment_like':
       return 'liked your comment';
     case 'activity_like':
       return title ? `liked your ${title}` : 'liked your habit';
@@ -47,6 +53,14 @@ export function notificationMessage(n: AppNotification): string {
       return title ? `commented on your ${title}` : 'commented on your habit';
     case 'habit_adopted':
       return title ? `adopted your habit ${title}` : 'adopted your habit';
+    case 'rest_like':
+      return title ? `liked your ${title} rest` : 'liked your rest';
+    case 'rest_comment':
+      return title ? `commented on your ${title} rest` : 'commented on your rest';
+    case 'friend_request':
+      return 'sent you a friend request';
+    case 'friend_request_accepted':
+      return 'accepted your friend request';
   }
 }
 
