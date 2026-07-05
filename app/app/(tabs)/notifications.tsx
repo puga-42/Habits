@@ -93,7 +93,12 @@ export default function NotificationsScreen() {
       );
       markRead(n.id).then(refreshUnreadCount).catch(() => {});
     }
-    if (n.kind === 'habit_adopted') {
+    if (
+      n.kind === 'habit_adopted' ||
+      n.kind === 'friend_request' ||
+      n.kind === 'friend_request_accepted'
+    ) {
+      // Adoption/friend events point at the other user, not a feed post.
       router.push(`/user/${n.actor_id}`);
     } else if (
       n.kind === 'completion_like' || n.kind === 'completion_comment' || n.kind === 'comment_like'

@@ -9,6 +9,7 @@ import {
 } from 'react';
 
 import { fetchUnreadCount } from '@/lib/notifications';
+import { supabase } from '@/lib/supabase';
 
 type UnreadCountContextValue = {
   unreadCount: number;
@@ -31,11 +32,22 @@ export function UnreadCountProvider({
     fetchUnreadCount().then(setUnreadCount).catch(() => {});
   }, [userId]);
 
+  // Refresh from a Realtime subscription on this user's notifications instead
+  // of polling — new rows (from the enqueue triggers) update the badge live.
   useEffect(() => {
     if (!userId) return;
     refresh();
-    const interval = setInterval(refresh, 30_000);
-    return () => clearInterval(interval);
+    const channel = supabase
+      .channel(`unread-notifications:${userId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` },
+        () => refresh(),
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [userId, refresh]);
 
   const value = useMemo<UnreadCountContextValue>(
