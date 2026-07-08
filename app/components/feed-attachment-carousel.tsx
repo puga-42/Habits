@@ -14,6 +14,7 @@ import {
 import { FeedAttachment } from '@/components/feed-attachment';
 import type { Attachment } from '@/lib/feed';
 import { signedUrlsForPaths } from '@/lib/feed';
+import { useTokens } from '@/hooks/use-tokens';
 
 type Props = {
   attachments: Attachment[];
@@ -21,6 +22,7 @@ type Props = {
 };
 
 export function FeedAttachmentCarousel({ attachments, cardWidth }: Props) {
+  const t = useTokens();
   const width = cardWidth ?? Dimensions.get('window').width;
   const [page, setPage] = useState(0);
   const [urls, setUrls] = useState<Map<string, string>>(new Map());
@@ -75,7 +77,11 @@ export function FeedAttachmentCarousel({ attachments, cardWidth }: Props) {
         {attachments.map((_, i) => (
           <View
             key={i}
-            style={[styles.dot, i === page && styles.dotActive]}
+            style={[
+              styles.dot,
+              { backgroundColor: t.ink45 },
+              i === page && { backgroundColor: t.ink },
+            ]}
           />
         ))}
       </View>
@@ -94,7 +100,5 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: 'rgba(127,127,127,0.35)',
   },
-  dotActive: { backgroundColor: 'rgba(127,127,127,0.9)' },
 });

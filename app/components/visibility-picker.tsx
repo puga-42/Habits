@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { Palette } from '@/constants/colors';
+import { useTokens } from '@/hooks/use-tokens';
 import type { Visibility } from '@/lib/habits';
 
 type Props = {
@@ -16,6 +16,7 @@ type Option = {
 };
 
 export function VisibilityPicker({ habitVisibility, currentOverride, onChange }: Props) {
+  const t = useTokens();
   if (habitVisibility === 'private') return null;
 
   const options = buildOptions(habitVisibility);
@@ -31,8 +32,8 @@ export function VisibilityPicker({ habitVisibility, currentOverride, onChange }:
             onPress={() => onChange(opt.value)}
             style={styles.row}
           >
-            <View style={[styles.radio, selected && styles.radioSelected]}>
-              {selected && <View style={styles.radioInner} />}
+            <View style={[styles.radio, { borderColor: t.ink45 }, selected && { borderColor: t.accent }]}>
+              {selected && <View style={[styles.radioInner, { backgroundColor: t.accent }]} />}
             </View>
             <ThemedText style={styles.optionLabel}>{opt.label}</ThemedText>
           </Pressable>
@@ -67,17 +68,14 @@ const styles = StyleSheet.create({
     height: 20,
     borderRadius: 10,
     borderWidth: 2,
-    borderColor: 'rgba(127,127,127,0.4)',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 10,
   },
-  radioSelected: { borderColor: Palette.primary },
   radioInner: {
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: Palette.primary,
   },
   optionLabel: { fontSize: 15 },
   hint: { fontSize: 12, opacity: 0.5, marginTop: 8, fontStyle: 'italic' },

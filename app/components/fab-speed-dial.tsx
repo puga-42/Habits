@@ -10,8 +10,8 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
-import { Palette } from '@/constants/colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useTokens } from '@/hooks/use-tokens';
 
 export type FabAction = {
   key: string;
@@ -35,6 +35,7 @@ export function FabSpeedDial({ actions }: Props) {
   const rotation = useSharedValue(0);
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
+  const t = useTokens();
 
   const toggle = useCallback(() => {
     setExpanded((prev) => {
@@ -82,10 +83,14 @@ export function FabSpeedDial({ actions }: Props) {
       <Pressable
         onPress={toggle}
         hitSlop={8}
-        style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
+        style={({ pressed }) => [
+          styles.fab,
+          { backgroundColor: t.accent },
+          pressed && styles.fabPressed,
+        ]}
       >
         <Animated.View style={fabAnimatedStyle}>
-          <ThemedText style={styles.plus}>+</ThemedText>
+          <ThemedText style={[styles.plus, { color: t.onAccent }]}>+</ThemedText>
         </Animated.View>
       </Pressable>
     </View>
@@ -154,7 +159,6 @@ const styles = StyleSheet.create({
     width: FAB_SIZE,
     height: FAB_SIZE,
     borderRadius: FAB_SIZE / 2,
-    backgroundColor: Palette.primary,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
@@ -164,7 +168,7 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   fabPressed: { opacity: 0.85, transform: [{ scale: 0.97 }] },
-  plus: { color: Palette.charcoal, fontSize: 30, lineHeight: 32, fontWeight: '300' },
+  plus: { fontSize: 30, lineHeight: 32, fontWeight: '300' },
   actionRow: {
     position: 'absolute',
     right: FAB_RIGHT,

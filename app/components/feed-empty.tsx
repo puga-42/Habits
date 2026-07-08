@@ -5,8 +5,10 @@ import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { useTokens } from '@/hooks/use-tokens';
 
 export function FeedEmpty() {
+  const t = useTokens();
   const router = useRouter();
   return (
     <View style={styles.root}>
@@ -18,8 +20,12 @@ export function FeedEmpty() {
       </ThemedText>
       <Pressable
         onPress={() => router.push('/(tabs)/friends')}
-        style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed]}>
-        <ThemedText style={styles.ctaText}>Find friends</ThemedText>
+        style={({ pressed }) => [
+          styles.cta,
+          { backgroundColor: t.accentSoft },
+          pressed && styles.ctaPressed,
+        ]}>
+        <ThemedText style={[styles.ctaText, { color: t.accent }]}>Find friends</ThemedText>
       </Pressable>
     </View>
   );
@@ -38,7 +44,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 22,
     borderRadius: 22,
-    backgroundColor: 'rgba(127,127,127,0.15)',
   },
   ctaPressed: { opacity: 0.6 },
   ctaText: { fontSize: 15, fontWeight: '600' },

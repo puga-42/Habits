@@ -13,6 +13,7 @@ import { CompletionNoteEditor } from '@/components/completion-note-editor';
 import { ThemedText } from '@/components/themed-text';
 import { Palette, solidTint } from '@/constants/colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useTokens } from '@/hooks/use-tokens';
 import type { OverviewCompletion } from '@/lib/habit-overview';
 
 type Props = {
@@ -42,9 +43,10 @@ export function CompletionCardStack({
 }: Props) {
   const scheme = useColorScheme();
   const isDark = scheme === 'dark';
-  const cardBg = solidTint(Palette.primary, 0.25, isDark);
-  const borderColor = solidTint(Palette.primary, 0.4, isDark);
-  const lavenderBg = solidTint(Palette.lavender, 0.15, isDark);
+  const t = useTokens();
+  const cardBg = solidTint(t.accent, 0.25, isDark);
+  const borderColor = solidTint(t.accent, 0.4, isDark);
+  const lavenderBg = solidTint(Palette.periwinkle, 0.15, isDark);
 
   const listRef = useRef<FlatList<OverviewCompletion>>(null);
   const [pageWidth, setPageWidth] = useState(0);
@@ -195,12 +197,16 @@ function DotIndicators({
   count: number;
   activeIndex: number;
 }) {
+  const t = useTokens();
   return (
     <View style={styles.dots}>
       {Array.from({ length: count }, (_, i) => (
         <View
           key={i}
-          style={[styles.dot, i === activeIndex && styles.dotActive]}
+          style={[
+            styles.dot,
+            { backgroundColor: i === activeIndex ? t.ink52 : t.hairlineStrong },
+          ]}
         />
       ))}
     </View>
@@ -241,9 +247,5 @@ const styles = StyleSheet.create({
     width: 7,
     height: 7,
     borderRadius: 3.5,
-    backgroundColor: 'rgba(127,127,127,0.25)',
-  },
-  dotActive: {
-    backgroundColor: 'rgba(127,127,127,0.7)',
   },
 });

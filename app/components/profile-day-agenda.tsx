@@ -9,6 +9,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { AgendaRow } from '@/components/agenda-row';
 import { ThemedText } from '@/components/themed-text';
+import { useTokens } from '@/hooks/use-tokens';
 import type { Habit } from '@/lib/habits';
 import {
   partitionRows,
@@ -31,6 +32,7 @@ function rowKey(row: AgendaRowT): string {
 }
 
 export function ProfileDayAgenda({ group, habitMap, onHabitPress }: Props) {
+  const t = useTokens();
   const rows = group?.rows ?? [];
 
   if (rows.length === 0) {
@@ -54,9 +56,9 @@ export function ProfileDayAgenda({ group, habitMap, onHabitPress }: Props) {
       {notCompleted.map(renderRow)}
       {completed.length > 0 && (
         <View style={styles.completedHeader}>
-          <View style={styles.rule} />
+          <View style={[styles.rule, { backgroundColor: t.hairlineStrong }]} />
           <ThemedText style={styles.completedLabel}>Completed</ThemedText>
-          <View style={styles.rule} />
+          <View style={[styles.rule, { backgroundColor: t.hairlineStrong }]} />
         </View>
       )}
       {completed.map(renderRow)}
@@ -78,7 +80,6 @@ const styles = StyleSheet.create({
   rule: {
     flex: 1,
     height: StyleSheet.hairlineWidth,
-    backgroundColor: 'rgba(127,127,127,0.3)',
   },
   completedLabel: {
     fontSize: 12,

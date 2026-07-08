@@ -149,9 +149,9 @@ export function HabitRowSwipeable({
 }
 
 const CHIP_COLORS: Record<SwipeAction, { bg: string; text: string }> = {
-  reset: { bg: Palette.lavenderMuted, text: Palette.lavender },
-  rest: { bg: Palette.lavenderMuted, text: Palette.lavender },
-  wake: { bg: Palette.blushMuted, text: Palette.blush },
+  reset: { bg: Palette.periwinkleMuted, text: Palette.periwinkle },
+  rest: { bg: Palette.periwinkleMuted, text: Palette.periwinkle },
+  wake: { bg: Palette.roseMuted, text: Palette.rose },
 };
 
 const CHIP_LABELS: Record<SwipeAction, string> = {

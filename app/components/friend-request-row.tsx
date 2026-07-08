@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { Palette } from '@/constants/colors';
 import { FeedAvatar } from '@/components/feed-avatar';
 import { ThemedText } from '@/components/themed-text';
+import { useTokens } from '@/hooks/use-tokens';
 import type { FriendRequest } from '@/lib/friends';
 
 type Props = {
@@ -22,6 +23,7 @@ export function FriendRequestRow({
   onCancel,
   loading,
 }: Props) {
+  const t = useTokens();
   return (
     <View style={styles.row}>
       <FeedAvatar
@@ -38,7 +40,7 @@ export function FriendRequestRow({
         <ActivityIndicator size="small" />
       ) : direction === 'incoming' ? (
         <View style={styles.actions}>
-          <Pressable onPress={onAccept} style={[styles.button, styles.buttonAccent]}>
+          <Pressable onPress={onAccept} style={[styles.button, { backgroundColor: t.accent }]}>
             <ThemedText style={[styles.buttonText, styles.buttonTextAccent]}>
               Accept
             </ThemedText>
@@ -77,8 +79,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: 'center',
   },
-  buttonAccent: { backgroundColor: Palette.primary },
-  buttonGhost: { backgroundColor: Palette.blushMuted },
+  buttonGhost: { backgroundColor: Palette.roseMuted },
   buttonText: { fontSize: 13, fontWeight: '600' },
   buttonTextAccent: { color: '#fff' },
   buttonTextGhost: { opacity: 0.7 },

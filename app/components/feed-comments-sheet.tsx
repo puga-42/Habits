@@ -22,10 +22,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { FeedCommentRow } from '@/components/feed-comment-row';
 import { ThemedText } from '@/components/themed-text';
-import { useThemeColor } from '@/hooks/use-theme-color';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Palette } from '@/constants/colors';
 import { useAuth } from '@/lib/auth';
 import {
   applyCommentLikeToggle,
@@ -34,6 +32,7 @@ import {
   type FeedKind,
 } from '@/lib/feed';
 import { commentFnsFor } from '@/lib/feed-dispatch';
+import { useTokens } from '@/hooks/use-tokens';
 
 type Props = {
   visible: boolean;
@@ -56,7 +55,7 @@ export function FeedCommentsSheet({
 }: Props) {
   const { session } = useAuth();
   const insets = useSafeAreaInsets();
-  const textColor = useThemeColor({}, 'text');
+  const t = useTokens();
   const viewerId = session?.user.id ?? null;
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(false);
@@ -204,8 +203,8 @@ export function FeedCommentsSheet({
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
                 keyboardVerticalOffset={kbOffset}
                 style={styles.flex}>
-                <View style={styles.handle} />
-                <View style={styles.headerRow}>
+                <View style={[styles.handle, { backgroundColor: t.ink45 }]} />
+                <View style={[styles.headerRow, { borderBottomColor: t.hairlineStrong }]}>
                   <ThemedText style={styles.headerTitle}>Comments</ThemedText>
                 </View>
 
@@ -237,13 +236,18 @@ export function FeedCommentsSheet({
                   />
                 )}
 
-                <View style={[styles.composer, !kbVisible && { paddingBottom: 10 + insets.bottom }]}>
+                <View
+                  style={[
+                    styles.composer,
+                    { borderTopColor: t.hairlineStrong },
+                    !kbVisible && { paddingBottom: 10 + insets.bottom },
+                  ]}>
                   <TextInput
                     value={input}
                     onChangeText={setInput}
                     placeholder="Add a comment…"
-                    placeholderTextColor="rgba(127,127,127,0.6)"
-                    style={[styles.input, { color: textColor }]}
+                    placeholderTextColor={t.ink45}
+                    style={[styles.input, { color: t.ink, backgroundColor: t.surfaceRaised }]}
                     multiline
                     maxLength={500}
                   />
@@ -252,10 +256,11 @@ export function FeedCommentsSheet({
                     disabled={sending || input.trim().length === 0}
                     style={({ pressed }) => [
                       styles.sendButton,
+                      { backgroundColor: t.accent },
                       (sending || input.trim().length === 0) && styles.sendDisabled,
                       pressed && styles.sendPressed,
                     ]}>
-                    <IconSymbol name="paperplane.fill" color={Palette.charcoal} size={18} />
+                    <IconSymbol name="paperplane.fill" color={t.onAccent} size={18} />
                   </Pressable>
                 </View>
               </KeyboardAvoidingView>
@@ -284,7 +289,6 @@ const styles = StyleSheet.create({
     width: 36,
     height: 4,
     borderRadius: 2,
-    backgroundColor: 'rgba(127,127,127,0.3)',
     alignSelf: 'center',
     marginTop: 8,
     marginBottom: 6,
@@ -293,7 +297,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(127,127,127,0.25)',
   },
   headerTitle: { fontSize: 15, fontWeight: '600', textAlign: 'center' },
   list: { paddingVertical: 4, paddingBottom: 12 },
@@ -306,7 +309,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(127,127,127,0.25)',
   },
   input: {
     flex: 1,
@@ -315,14 +317,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 18,
-    backgroundColor: 'rgba(127,127,127,0.12)',
     fontSize: 15,
   },
   sendButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: Palette.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },

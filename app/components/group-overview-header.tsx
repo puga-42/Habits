@@ -9,6 +9,7 @@ import { Dimensions, StyleSheet, View } from 'react-native';
 
 import { StreakBadge } from '@/components/streak-badge';
 import { ThemedText } from '@/components/themed-text';
+import { useTokens } from '@/hooks/use-tokens';
 
 type Props = {
   name: string;
@@ -31,7 +32,8 @@ export function GroupOverviewHeader({
   completions,
   photoUrls,
 }: Props) {
-  const tint = color ?? 'rgba(127,127,127,0.6)';
+  const t = useTokens();
+  const tint = color ?? t.ink45;
   return (
     <View style={styles.root}>
       <View style={styles.identity}>
@@ -62,7 +64,7 @@ export function GroupOverviewHeader({
             <Image
               key={`${uri}-${i}`}
               source={{ uri }}
-              style={[styles.tile, { width: TILE, height: TILE }]}
+              style={[styles.tile, { width: TILE, height: TILE, backgroundColor: t.surfaceRaised }]}
               contentFit="cover"
               transition={120}
             />
@@ -111,6 +113,5 @@ const styles = StyleSheet.create({
   mosaic: { flexDirection: 'row', flexWrap: 'wrap', gap: GAP },
   tile: {
     borderRadius: 10,
-    backgroundColor: 'rgba(127,127,127,0.12)',
   },
 });

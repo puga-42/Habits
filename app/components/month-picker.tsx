@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { useTokens } from '@/hooks/use-tokens';
 
 type Props = {
   visible: boolean;
@@ -14,6 +15,7 @@ type Props = {
 };
 
 export function MonthPicker({ visible, year, month, onPick, onClose }: Props) {
+  const t = useTokens();
   const [pickerYear, setPickerYear] = useState(year);
 
   useEffect(() => {
@@ -28,7 +30,7 @@ export function MonthPicker({ visible, year, month, onPick, onClose }: Props) {
       onRequestClose={onClose}>
       <ThemedView style={styles.root}>
         <SafeAreaView edges={['top']} style={styles.content}>
-          <View style={styles.header}>
+          <View style={[styles.header, { borderBottomColor: t.hairlineStrong }]}>
             <View style={styles.headerSide} />
             <ThemedText type="defaultSemiBold">Select month</ThemedText>
             <Pressable onPress={onClose} hitSlop={12} style={styles.headerSide}>
@@ -57,7 +59,8 @@ export function MonthPicker({ visible, year, month, onPick, onClose }: Props) {
                   onPress={() => onPick(pickerYear, m)}
                   style={({ pressed }) => [
                     styles.monthBtn,
-                    isSelected && styles.monthBtnSelected,
+                    { borderColor: t.hairlineStrong },
+                    isSelected && { backgroundColor: t.accentSoft, borderColor: t.accent },
                     pressed && styles.monthBtnPressed,
                   ]}>
                   <ThemedText
@@ -88,7 +91,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(127,127,127,0.25)',
   },
   headerSide: { width: 60 },
   done: { fontSize: 16, fontWeight: '600', textAlign: 'right' },
@@ -112,12 +114,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: 'rgba(127,127,127,0.3)',
     alignItems: 'center',
-  },
-  monthBtnSelected: {
-    backgroundColor: 'rgba(127,127,127,0.25)',
-    borderColor: 'rgba(127,127,127,0.6)',
   },
   monthBtnPressed: { opacity: 0.5 },
   monthBtnText: { fontSize: 15 },

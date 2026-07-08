@@ -18,6 +18,7 @@ import { GroupOverviewHeader } from '@/components/group-overview-header';
 import { StreakBadge } from '@/components/streak-badge';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { useTokens } from '@/hooks/use-tokens';
 import { useAuth } from '@/lib/auth';
 import { useGroupOverview, type GroupMember } from '@/lib/use-group-overview';
 
@@ -25,6 +26,7 @@ export default function GroupOverviewScreen() {
   const router = useRouter();
   const { session } = useAuth();
   const { id } = useLocalSearchParams<{ id: string }>();
+  const t = useTokens();
   const state = useGroupOverview(id, session?.user.id);
   const { group, members, memberCount, streak, completions, photoUrls, loading } =
     state;
@@ -38,7 +40,7 @@ export default function GroupOverviewScreen() {
       <SafeAreaView edges={['top']} style={styles.content}>
         <View style={styles.bar}>
           <Pressable onPress={() => router.back()} hitSlop={12}>
-            <ThemedText style={styles.back}>‹ Back</ThemedText>
+            <ThemedText style={[styles.back, { color: t.accent }]}>‹ Back</ThemedText>
           </Pressable>
           {group ? (
             <Pressable
@@ -46,7 +48,7 @@ export default function GroupOverviewScreen() {
                 router.push({ pathname: '/group/edit', params: { id: group.id } })
               }
               hitSlop={12}>
-              <ThemedText style={styles.edit}>Edit</ThemedText>
+              <ThemedText style={[styles.edit, { color: t.accent }]}>Edit</ThemedText>
             </Pressable>
           ) : null}
         </View>
@@ -83,13 +85,13 @@ export default function GroupOverviewScreen() {
                   <Pressable
                     key={member.habit.id}
                     onPress={() => openMember(member)}
-                    style={styles.memberRow}
+                    style={[styles.memberRow, { borderBottomColor: t.hairlineStrong }]}
                     accessibilityRole="button"
                     accessibilityLabel={`Open ${member.habit.title}`}>
                     <View
                       style={[
                         styles.dot,
-                        { backgroundColor: member.habit.color ?? 'rgba(127,127,127,0.5)' },
+                        { backgroundColor: member.habit.color ?? t.ink45 },
                       ]}
                     />
                     <View style={styles.memberBody}>
@@ -124,8 +126,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
-  back: { fontSize: 16, color: '#0A84FF' },
-  edit: { fontSize: 16, color: '#0A84FF', fontWeight: '600' },
+  back: { fontSize: 16 },
+  edit: { fontSize: 16, fontWeight: '600' },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
   missing: { opacity: 0.6, fontSize: 15 },
   scroll: { paddingBottom: 48 },
@@ -144,7 +146,6 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(127,127,127,0.2)',
   },
   dot: { width: 10, height: 10, borderRadius: 5 },
   memberBody: { flex: 1 },

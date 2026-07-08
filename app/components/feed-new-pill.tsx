@@ -4,8 +4,8 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { Palette } from '@/constants/colors';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { useTokens } from '@/hooks/use-tokens';
 
 type Props = {
   count: number;
@@ -13,12 +13,13 @@ type Props = {
 };
 
 export function FeedNewPill({ count, onPress }: Props) {
+  const t = useTokens();
   if (count <= 0) return null;
   return (
     <View pointerEvents="box-none" style={styles.wrap}>
       <Pressable
         onPress={onPress}
-        style={({ pressed }) => [styles.pill, pressed && styles.pillPressed]}>
+        style={({ pressed }) => [styles.pill, { backgroundColor: t.accent }, pressed && styles.pillPressed]}>
         <IconSymbol name="arrow.up" color="#fff" size={16} />
         <ThemedText style={styles.text}>
           {count === 1 ? '1 new post' : `${count} new posts`}
@@ -42,7 +43,6 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingVertical: 8,
     paddingHorizontal: 14,
-    backgroundColor: Palette.primary,
     borderRadius: 18,
     shadowColor: '#000',
     shadowOpacity: 0.18,

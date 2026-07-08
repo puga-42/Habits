@@ -10,6 +10,7 @@ import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import type { Comment } from '@/lib/feed';
 import { formatRelativeTime } from '@/lib/feed';
+import { useTokens } from '@/hooks/use-tokens';
 
 type Props = {
   comment: Comment;
@@ -28,6 +29,7 @@ export function FeedCommentRow({
   onToggleLike,
   onDelete,
 }: Props) {
+  const t = useTokens();
   const router = useRouter();
   const canDelete =
     viewerId === comment.author_id || viewerId === completionOwnerId;
@@ -83,7 +85,7 @@ export function FeedCommentRow({
       <Pressable onPress={handleLike} hitSlop={8} style={styles.heart}>
         <IconSymbol
           name={comment.viewer_liked ? 'heart.fill' : 'heart'}
-          color={comment.viewer_liked ? '#ff3b5c' : 'rgba(127,127,127,0.7)'}
+          color={comment.viewer_liked ? t.danger : t.ink52}
           size={18}
         />
       </Pressable>

@@ -10,8 +10,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { CardList, FormCard } from '@/components/form-card';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Palette } from '@/constants/colors';
-import { useThemeColor } from '@/hooks/use-theme-color';
+import { useTokens } from '@/hooks/use-tokens';
 import { useHabitForm } from '@/lib/habit-form';
 import type { TimeDisplayUnit } from '@/lib/habits';
 import { COUNT_UNITS, type CountUnit } from '@/lib/units';
@@ -25,7 +24,7 @@ const TIME_UNITS: { key: TimeDisplayUnit; label: string }[] = [
 export default function GoalScreen() {
   const router = useRouter();
   const { draft, update } = useHabitForm();
-  const textColor = useThemeColor({}, 'text');
+  const t = useTokens();
 
   const isTime = draft.unit === 'time';
   const amount = isTime ? draft.targetValue : draft.targetCount;
@@ -49,7 +48,7 @@ export default function GoalScreen() {
   return (
     <ThemedView style={styles.root}>
       <SafeAreaView edges={['top']} style={styles.content}>
-        <View style={styles.header}>
+        <View style={[styles.header, { borderBottomColor: t.hairlineStrong }]}>
           <Pressable onPress={() => router.back()} hitSlop={12}>
             <ThemedText style={styles.headerButton}>‹ Back</ThemedText>
           </Pressable>
@@ -67,7 +66,7 @@ export default function GoalScreen() {
                   value={String(amount)}
                   onChangeText={setAmount}
                   keyboardType="number-pad"
-                  style={[styles.input, { color: textColor }]}
+                  style={[styles.input, { color: t.ink }]}
                   selectTextOnFocus
                   autoFocus
                 />
@@ -87,7 +86,7 @@ export default function GoalScreen() {
                 <Pressable key={o.key} style={styles.row} onPress={() => selectCount(o.key)}>
                   <ThemedText style={styles.rowLabel}>{o.label}</ThemedText>
                   {!isTime && draft.countUnit === o.key && (
-                    <ThemedText style={styles.check}>✓</ThemedText>
+                    <ThemedText style={[styles.check, { color: t.accent }]}>✓</ThemedText>
                   )}
                 </Pressable>
               ))}
@@ -100,7 +99,7 @@ export default function GoalScreen() {
                 <Pressable key={o.key} style={styles.row} onPress={() => selectTime(o.key)}>
                   <ThemedText style={styles.rowLabel}>{o.label}</ThemedText>
                   {isTime && draft.displayUnit === o.key && (
-                    <ThemedText style={styles.check}>✓</ThemedText>
+                    <ThemedText style={[styles.check, { color: t.accent }]}>✓</ThemedText>
                   )}
                 </Pressable>
               ))}
@@ -122,7 +121,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(127,127,127,0.25)',
   },
   headerButton: { fontSize: 16 },
   done: { fontWeight: '600' },
@@ -138,5 +136,5 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   rowLabel: { fontSize: 16 },
-  check: { fontSize: 17, fontWeight: '700', color: Palette.primary },
+  check: { fontSize: 17, fontWeight: '700' },
 });

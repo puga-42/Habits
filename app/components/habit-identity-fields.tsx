@@ -3,6 +3,7 @@
 // discoverable (the pill above is a read-only preview) and write to the shared
 // habit draft, so the pill updates live as the user types or picks.
 
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
   Pressable,
@@ -12,13 +13,11 @@ import {
   View,
 } from 'react-native';
 
-import { ColorPickerModal } from '@/components/color-picker-modal';
 import { CardList, FormCard } from '@/components/form-card';
 import { GroupPickerRow } from '@/components/group-picker-row';
-import { HabitPillPreview } from '@/components/habit-pill-preview';
 import { ThemedText } from '@/components/themed-text';
 import { Palette } from '@/constants/colors';
-import { useThemeColor } from '@/hooks/use-theme-color';
+import { useTokens } from '@/hooks/use-tokens';
 import { useHabitForm } from '@/lib/habit-form';
 
 export const HABIT_ICONS = [
@@ -27,15 +26,15 @@ export const HABIT_ICONS = [
 ];
 
 export function HabitIdentityFields() {
+  const router = useRouter();
   const { draft, update } = useHabitForm();
-  const textColor = useThemeColor({}, 'text');
+  const t = useTokens();
   const [showIcons, setShowIcons] = useState(false);
-  const [colorOpen, setColorOpen] = useState(false);
   // Auto-focus the name only when starting from a blank habit, matching the
   // preview pill's previous behavior before editing moved into these fields.
   const [autoFocusName] = useState(() => draft.title.trim().length === 0);
 
-  const color = draft.color ?? Palette.primary;
+  const color = draft.color ?? Palette.habitColors[0];
   const hasIcon = draft.icon.length > 0;
 
   return (
@@ -46,8 +45,8 @@ export function HabitIdentityFields() {
             value={draft.title}
             onChangeText={(t) => update({ title: t })}
             placeholder="Name"
-            placeholderTextColor="rgba(127,127,127,0.5)"
-            style={[styles.input, { color: textColor }]}
+            placeholderTextColor={t.ink45}
+            style={[styles.input, { color: t.ink }]}
             autoFocus={autoFocusName}
             returnKeyType="done"
           />
@@ -58,8 +57,8 @@ export function HabitIdentityFields() {
             value={draft.description}
             onChangeText={(t) => update({ description: t })}
             placeholder="Description"
-            placeholderTextColor="rgba(127,127,127,0.5)"
-            style={[styles.input, styles.multiline, { color: textColor }]}
+            placeholderTextColor={t.ink45}
+            style={[styles.input, styles.multiline, { color: t.ink }]}
             multiline
             textAlignVertical="top"
             scrollEnabled={false}
@@ -73,7 +72,7 @@ export function HabitIdentityFields() {
               {hasIcon ? (
                 <ThemedText style={styles.rowEmoji}>{draft.icon}</ThemedText>
               ) : (
-                <View style={styles.noIcon} />
+                <View style={[styles.noIcon, { borderColor: t.ink45 }]} />
               )}
               <ThemedText style={styles.chevron}>›</ThemedText>
             </View>
@@ -88,14 +87,22 @@ export function HabitIdentityFields() {
                 onPress={() => update({ icon: '' })}
                 accessibilityRole="button"
                 accessibilityLabel="No icon"
-                style={[styles.iconItem, draft.icon === '' && styles.iconItemSelected]}>
-                <View style={styles.noIcon} />
+                style={[
+                  styles.iconItem,
+                  { borderColor: t.hairlineStrong },
+                  draft.icon === '' && { borderColor: t.accent, backgroundColor: t.accentSoft },
+                ]}>
+                <View style={[styles.noIcon, { borderColor: t.ink45 }]} />
               </Pressable>
               {HABIT_ICONS.map((i) => (
                 <Pressable
                   key={i}
                   onPress={() => update({ icon: i })}
-                  style={[styles.iconItem, draft.icon === i && styles.iconItemSelected]}>
+                  style={[
+                    styles.iconItem,
+                    { borderColor: t.hairlineStrong },
+                    draft.icon === i && { borderColor: t.accent, backgroundColor: t.accentSoft },
+                  ]}>
                   <ThemedText style={styles.iconEmoji}>{i}</ThemedText>
                 </Pressable>
               ))}
@@ -103,24 +110,16 @@ export function HabitIdentityFields() {
           )}
         </View>
 
-        <Pressable style={styles.row} onPress={() => setColorOpen(true)}>
+        <Pressable style={styles.row} onPress={() => router.push('/habit/color')}>
           <ThemedText style={styles.rowLabel}>Color</ThemedText>
           <View style={styles.rowRight}>
-            <View style={[styles.swatch, { backgroundColor: color }]} />
+            <View style={[styles.swatch, { backgroundColor: color, borderColor: t.hairlineStrong }]} />
             <ThemedText style={styles.chevron}>›</ThemedText>
           </View>
         </Pressable>
 
         <GroupPickerRow />
       </CardList>
-
-      <ColorPickerModal
-        visible={colorOpen}
-        value={color}
-        onChange={(hex) => update({ color: hex })}
-        onClose={() => setColorOpen(false)}
-        preview={<HabitPillPreview />}
-      />
     </FormCard>
   );
 }
@@ -145,7 +144,6 @@ const styles = StyleSheet.create({
     height: 22,
     borderRadius: 11,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(127,127,127,0.4)',
   },
   pickerRow: {
     paddingHorizontal: 16,
@@ -158,13 +156,8 @@ const styles = StyleSheet.create({
     height: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 8,
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: 'rgba(127,127,127,0.2)',
-  },
-  iconItemSelected: {
-    borderColor: 'rgba(127,127,127,0.7)',
-    backgroundColor: 'rgba(127,127,127,0.12)',
   },
   iconEmoji: { fontSize: 22 },
   noIcon: {
@@ -173,6 +166,5 @@ const styles = StyleSheet.create({
     borderRadius: 11,
     borderWidth: 1.5,
     borderStyle: 'dashed',
-    borderColor: 'rgba(127,127,127,0.6)',
   },
 });

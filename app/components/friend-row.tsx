@@ -4,6 +4,7 @@ import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import { FeedAvatar } from '@/components/feed-avatar';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { useTokens } from '@/hooks/use-tokens';
 import type { FriendProfile } from '@/lib/friends';
 
 type Props = {
@@ -13,6 +14,7 @@ type Props = {
 
 export function FriendRow({ friend, onUnfriend }: Props) {
   const router = useRouter();
+  const t = useTokens();
   const goToUser = () => router.push(`/user/${friend.id}`);
   const openOverflow = () => {
     Alert.alert(
@@ -40,7 +42,7 @@ export function FriendRow({ friend, onUnfriend }: Props) {
         </View>
       </Pressable>
       <Pressable onPress={openOverflow} hitSlop={10} style={styles.menuButton}>
-        <IconSymbol name="ellipsis" color="rgba(127,127,127,0.9)" size={20} />
+        <IconSymbol name="ellipsis" color={t.ink70} size={20} />
       </Pressable>
     </View>
   );

@@ -20,7 +20,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { GroupManageRow } from '@/components/group-manage-row';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { useThemeColor } from '@/hooks/use-theme-color';
+import { useTokens } from '@/hooks/use-tokens';
 import { useAuth } from '@/lib/auth';
 import { createGroup, deleteGroup, renameGroup } from '@/lib/group-mutations';
 import { fetchGroups, fetchMemberships, type HabitGroup } from '@/lib/groups';
@@ -29,7 +29,7 @@ export default function GroupsScreen() {
   const router = useRouter();
   const { session } = useAuth();
   const userId = session?.user.id;
-  const textColor = useThemeColor({}, 'text');
+  const t = useTokens();
 
   const [groups, setGroups] = useState<HabitGroup[]>([]);
   const [memberCount, setMemberCount] = useState<Map<string, number>>(new Map());
@@ -112,7 +112,7 @@ export default function GroupsScreen() {
   return (
     <ThemedView style={styles.root}>
       <SafeAreaView edges={['top']} style={styles.content}>
-        <View style={styles.header}>
+        <View style={[styles.header, { borderBottomColor: t.hairlineStrong }]}>
           <View style={styles.side} />
           <ThemedText type="defaultSemiBold">Groups</ThemedText>
           <Pressable onPress={() => router.back()} hitSlop={12} style={styles.sideRight}>
@@ -120,19 +120,20 @@ export default function GroupsScreen() {
           </Pressable>
         </View>
 
-        <View style={styles.createRow}>
+        <View style={[styles.createRow, { borderBottomColor: t.hairlineStrong }]}>
           <TextInput
             value={newName}
             onChangeText={setNewName}
             placeholder="New group (e.g. Become healthy)"
-            placeholderTextColor="rgba(127,127,127,0.5)"
-            style={[styles.createInput, { color: textColor }]}
+            placeholderTextColor={t.ink45}
+            style={[styles.createInput, { color: t.ink }]}
             returnKeyType="done"
             onSubmitEditing={onCreate}
             maxLength={100}
           />
           <Pressable onPress={onCreate} disabled={!newName.trim() || busy} hitSlop={8}>
-            <ThemedText style={[styles.add, (!newName.trim() || busy) && styles.disabled]}>
+            <ThemedText
+              style={[styles.add, { color: t.accent }, (!newName.trim() || busy) && styles.disabled]}>
               Add
             </ThemedText>
           </Pressable>
@@ -154,7 +155,7 @@ export default function GroupsScreen() {
                 count={memberCount.get(g.id) ?? 0}
                 editing={editingId === g.id}
                 editName={editName}
-                textColor={textColor}
+                textColor={t.ink}
                 onChangeEditName={setEditName}
                 onStartEdit={() => {
                   setEditingId(g.id);
@@ -182,7 +183,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(127,127,127,0.25)',
   },
   side: { width: 48 },
   sideRight: { width: 48, alignItems: 'flex-end' },
@@ -194,10 +194,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(127,127,127,0.15)',
   },
   createInput: { flex: 1, fontSize: 16, padding: 0 },
-  add: { fontSize: 16, fontWeight: '600', color: '#0A84FF' },
+  add: { fontSize: 16, fontWeight: '600' },
   disabled: { opacity: 0.4 },
   loading: { marginTop: 32 },
   empty: { padding: 24, opacity: 0.6, fontSize: 15, lineHeight: 21 },

@@ -2,8 +2,9 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { FeedAvatar } from '@/components/feed-avatar';
 import { ThemedText } from '@/components/themed-text';
-import { Palette } from '@/constants/colors';
+import { withAlpha } from '@/constants/colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useTokens } from '@/hooks/use-tokens';
 import { formatRelativeTime } from '@/lib/feed';
 import { notificationMessage, type AppNotification } from '@/lib/notifications';
 
@@ -15,9 +16,10 @@ type Props = {
 
 export function NotificationItem({ notification, onPress, now }: Props) {
   const colorScheme = useColorScheme();
-  const unreadBg = colorScheme === 'dark'
-    ? 'rgba(9, 237, 226, 0.06)'
-    : 'rgba(9, 237, 226, 0.08)';
+  const t = useTokens();
+  // Unread rows get a whisper of the accent — stronger on light where the
+  // paper ground absorbs more of the tint.
+  const unreadBg = colorScheme === 'dark' ? withAlpha(t.accent, 0.06) : withAlpha(t.accent, 0.08);
 
   return (
     <Pressable
@@ -35,11 +37,11 @@ export function NotificationItem({ notification, onPress, now }: Props) {
           {' '}
           {notificationMessage(notification)}
         </ThemedText>
-        <ThemedText style={styles.time}>
+        <ThemedText style={[styles.time, { color: t.ink52 }]}>
           {formatRelativeTime(notification.created_at, now)}
         </ThemedText>
       </View>
-      {!notification.read && <View style={styles.dot} />}
+      {!notification.read && <View style={[styles.dot, { backgroundColor: t.accent }]} />}
     </Pressable>
   );
 }
@@ -54,11 +56,10 @@ const styles = StyleSheet.create({
   },
   body: { flex: 1 },
   message: { fontSize: 14, lineHeight: 20 },
-  time: { fontSize: 12, color: Palette.coolGray, marginTop: 2 },
+  time: { fontSize: 12, marginTop: 2 },
   dot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: Palette.primary,
   },
 });

@@ -12,7 +12,6 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { Palette } from "@/constants/colors";
 import { useDrawer } from "@/components/drawer-provider";
 import { FeedCommentsSheet } from "@/components/feed-comments-sheet";
 import { FeedEmpty } from "@/components/feed-empty";
@@ -21,6 +20,7 @@ import { FeedRow } from "@/components/feed-row";
 import { ScreenHeader } from "@/components/screen-header";
 import { TabTopBar } from "@/components/tab-top-bar";
 import { ThemedView } from "@/components/themed-view";
+import { useTokens } from "@/hooks/use-tokens";
 import { useAuth } from "@/lib/auth";
 import {
   applyLikeToggle,
@@ -368,7 +368,8 @@ export default function FeedScreen() {
 }
 
 function Separator() {
-  return <View style={styles.separator} />;
+  const t = useTokens();
+  return <View style={[styles.separator, { backgroundColor: t.accent }]} />;
 }
 
 const styles = StyleSheet.create({
@@ -378,7 +379,6 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   separator: {
     height: 2,
-    backgroundColor: Palette.primary,
     marginHorizontal: 0,
   },
   footer: { paddingVertical: 18, alignItems: "center" },

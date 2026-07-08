@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
-import { Palette } from '@/constants/colors';
 import { AgendaRow } from '@/components/agenda-row';
 import { ThemedText } from '@/components/themed-text';
+import { useTokens } from '@/hooks/use-tokens';
 import { isoDate, type Habit } from '@/lib/habits';
 import {
   partitionRows,
@@ -59,6 +59,7 @@ function ColumnsPage({
   habitMap: Map<string, Habit>;
   onRowPress: (row: AgendaRowT, dateIso: string) => void;
 }) {
+  const t = useTokens();
   const days = [0, 1, 2].map((off) => {
     const d = new Date(start);
     d.setDate(start.getDate() + off);
@@ -68,7 +69,12 @@ function ColumnsPage({
   return (
     <View style={styles.columnsRow}>
       {days.map((d, i) => (
-        <View key={i} style={[styles.column, i < 2 && styles.columnDivider]}>
+        <View
+          key={i}
+          style={[
+            styles.column,
+            i < 2 && [styles.columnDivider, { borderRightColor: t.hairlineStrong }],
+          ]}>
           <DayHeader date={d} />
           <DayColumn
             date={d}
@@ -136,13 +142,14 @@ function DayColumn({
 }
 
 function DayHeader({ date }: { date: Date }) {
+  const t = useTokens();
   const isToday = isoDate(date) === isoDate(new Date());
   return (
-    <View style={styles.dayHeader}>
-      <ThemedText style={[styles.dayWeekday, isToday && styles.dayEmphasis]}>
+    <View style={[styles.dayHeader, { borderBottomColor: t.hairlineStrong }]}>
+      <ThemedText style={[styles.dayWeekday, isToday && [styles.dayEmphasis, { color: t.today }]]}>
         {date.toLocaleDateString('en-US', { weekday: 'short' })}
       </ThemedText>
-      <ThemedText style={[styles.dayDate, isToday && styles.dayEmphasis]}>
+      <ThemedText style={[styles.dayDate, isToday && [styles.dayEmphasis, { color: t.today }]]}>
         {date.getDate()}
       </ThemedText>
     </View>
@@ -155,13 +162,11 @@ const styles = StyleSheet.create({
   column: { flex: 1 },
   columnDivider: {
     borderRightWidth: StyleSheet.hairlineWidth,
-    borderRightColor: 'rgba(127,127,127,0.2)',
   },
   dayHeader: {
     paddingVertical: 10,
     alignItems: 'center',
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(127,127,127,0.2)',
   },
   dayWeekday: {
     fontSize: 11,
@@ -170,7 +175,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   dayDate: { fontSize: 20, marginTop: 2 },
-  dayEmphasis: { color: Palette.lavender, opacity: 1 },
+  dayEmphasis: { opacity: 1 },
   columnContent: { padding: 6, paddingBottom: 100 },
   rowWrap: { marginBottom: 6 },
   emptyText: { fontSize: 12, opacity: 0.4, textAlign: 'center', paddingVertical: 20 },

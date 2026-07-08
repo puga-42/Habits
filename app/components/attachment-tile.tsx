@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { useTokens } from '@/hooks/use-tokens';
 import type { AttachmentDetail } from '@/lib/completions';
 
 type Props = {
@@ -13,6 +14,7 @@ type Props = {
 };
 
 export function AttachmentTile({ attachment, signedUrl, onDelete, isActive }: Props) {
+  const t = useTokens();
   const [pressed, setPressed] = useState(false);
 
   const handleLongPress = () => {
@@ -34,6 +36,7 @@ export function AttachmentTile({ attachment, signedUrl, onDelete, isActive }: Pr
       onPressOut={() => setPressed(false)}
       style={[
         styles.tile,
+        { backgroundColor: t.surfaceRaised },
         pressed && styles.tilePressed,
         isActive && styles.tileActive,
       ]}
@@ -63,8 +66,16 @@ type AddTileProps = {
 };
 
 export function AddTile({ onPress }: AddTileProps) {
+  const t = useTokens();
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.tile, styles.addTile, pressed && styles.tilePressed]}>
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.tile,
+        styles.addTile,
+        { backgroundColor: t.surfaceRaised, borderColor: t.hairlineStrong },
+        pressed && styles.tilePressed,
+      ]}>
       <ThemedText style={styles.addIcon}>+</ThemedText>
       <ThemedText style={styles.addLabel}>add</ThemedText>
     </Pressable>
@@ -83,7 +94,6 @@ const styles = StyleSheet.create({
     height: 100,
     borderRadius: 12,
     overflow: 'hidden',
-    backgroundColor: 'rgba(127,127,127,0.12)',
   },
   tilePressed: { opacity: 0.7 },
   tileActive: { opacity: 0.8, transform: [{ scale: 1.05 }] },
@@ -108,7 +118,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
-    borderColor: 'rgba(127,127,127,0.3)',
     borderStyle: 'dashed',
   },
   addIcon: { fontSize: 28, opacity: 0.5 },

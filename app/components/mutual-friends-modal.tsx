@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { FeedAvatar } from '@/components/feed-avatar';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { useTokens } from '@/hooks/use-tokens';
 import type { FriendProfile } from '@/lib/friends';
 import { fetchMutualFriends } from '@/lib/user-profile';
 
@@ -17,6 +18,7 @@ type Props = {
 
 export function MutualFriendsModal({ visible, targetId, onClose }: Props) {
   const router = useRouter();
+  const t = useTokens();
   const [friends, setFriends] = useState<FriendProfile[]>([]);
 
   useEffect(() => {
@@ -37,7 +39,7 @@ export function MutualFriendsModal({ visible, targetId, onClose }: Props) {
       onRequestClose={onClose}>
       <ThemedView style={styles.root}>
         <SafeAreaView edges={['top']} style={styles.content}>
-          <View style={styles.header}>
+          <View style={[styles.header, { borderBottomColor: t.hairlineStrong }]}>
             <View style={styles.headerSide} />
             <ThemedText type="defaultSemiBold">Mutual friends</ThemedText>
             <Pressable onPress={onClose} hitSlop={12} style={styles.headerSide}>
@@ -79,7 +81,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(127,127,127,0.25)',
   },
   headerSide: { width: 60 },
   done: { fontSize: 16, fontWeight: '600', textAlign: 'right' },

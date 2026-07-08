@@ -2,6 +2,7 @@ import {
   hexToHsv,
   hsvToHex,
   hueSatToXY,
+  isPresetColor,
   polarToHueSat,
 } from '../color-wheel';
 
@@ -77,5 +78,22 @@ describe('hueSatToXY', () => {
     const back = polarToHueSat(x, y, 50);
     expect(back.h).toBeCloseTo(90);
     expect(back.s).toBeCloseTo(1);
+  });
+});
+
+describe('isPresetColor', () => {
+  const presets = ['#FF8E62', '#9BC26B'];
+
+  it('matches a preset regardless of case', () => {
+    expect(isPresetColor('#ff8e62', presets)).toBe(true);
+    expect(isPresetColor('#FF8E62', presets)).toBe(true);
+  });
+
+  it('rejects an off-ramp custom color', () => {
+    expect(isPresetColor('#123456', presets)).toBe(false);
+  });
+
+  it('rejects null (no color yet is not a preset)', () => {
+    expect(isPresetColor(null, presets)).toBe(false);
   });
 });

@@ -7,10 +7,10 @@ import DraggableFlatList, {
   type RenderItemParams,
 } from 'react-native-draggable-flatlist';
 
-import { Palette } from '@/constants/colors';
 import { HabitRowSwipeable } from '@/components/habit-row-swipeable';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { useTokens } from '@/hooks/use-tokens';
 import type { Habit } from '@/lib/habits';
 import {
   partitionRows,
@@ -58,6 +58,7 @@ export function CalendarScheduleView({
   onSwipeAction,
   onReorderSection,
 }: Props) {
+  const t = useTokens();
   const habitMap = useMemo(() => {
     const m = new Map<string, Habit>();
     for (const h of habits) m.set(h.id, h);
@@ -103,11 +104,15 @@ export function CalendarScheduleView({
     if (item.kind === 'day-header') {
       return (
         <ThemedView
-          style={[styles.dayHeader, item.isToday && styles.dayHeaderToday]}>
+          style={[
+            styles.dayHeader,
+            { borderBottomColor: t.hairlineStrong },
+            item.isToday && { borderBottomColor: t.today },
+          ]}>
           <ThemedText
             style={[
               styles.dayHeaderText,
-              item.isToday && styles.dayHeaderTextToday,
+              item.isToday && [styles.dayHeaderTextToday, { color: t.today }],
             ]}>
             {formatDay(item.iso)}
             {item.isToday ? '  ·  Today' : ''}
@@ -118,9 +123,9 @@ export function CalendarScheduleView({
     if (item.kind === 'completed-header') {
       return (
         <View style={styles.completedSub}>
-          <View style={styles.completedRule} />
+          <View style={[styles.completedRule, { backgroundColor: t.hairlineStrong }]} />
           <ThemedText style={styles.completedLabel}>Completed</ThemedText>
-          <View style={styles.completedRule} />
+          <View style={[styles.completedRule, { backgroundColor: t.hairlineStrong }]} />
         </View>
       );
     }
@@ -186,14 +191,22 @@ export function CalendarScheduleView({
       ListHeaderComponent={
         <Pressable
           onPress={onLoadEarlier}
-          style={({ pressed }) => [styles.loadAction, pressed && styles.pressed]}>
+          style={({ pressed }) => [
+            styles.loadAction,
+            { borderBottomColor: t.hairlineStrong },
+            pressed && styles.pressed,
+          ]}>
           <ThemedText style={styles.loadActionText}>‹ Load earlier</ThemedText>
         </Pressable>
       }
       ListFooterComponent={
         <Pressable
           onPress={onLoadMore}
-          style={({ pressed }) => [styles.loadAction, pressed && styles.pressed]}>
+          style={({ pressed }) => [
+            styles.loadAction,
+            { borderBottomColor: t.hairlineStrong },
+            pressed && styles.pressed,
+          ]}>
           <ThemedText style={styles.loadActionText}>Load more ›</ThemedText>
         </Pressable>
       }
@@ -288,7 +301,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     alignItems: 'center',
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(127,127,127,0.2)',
     marginBottom: 4,
   },
   pressed: { opacity: 0.5 },
@@ -297,11 +309,9 @@ const styles = StyleSheet.create({
     paddingTop: 14,
     paddingBottom: 6,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(127,127,127,0.18)',
   },
-  dayHeaderToday: { borderBottomColor: Palette.lavender },
   dayHeaderText: { fontSize: 14, opacity: 0.7, fontWeight: '600' },
-  dayHeaderTextToday: { color: Palette.lavender, opacity: 1 },
+  dayHeaderTextToday: { opacity: 1 },
   empty: { fontSize: 13, opacity: 0.4, paddingVertical: 8, fontStyle: 'italic' },
   completedSub: {
     flexDirection: 'row',
@@ -313,7 +323,6 @@ const styles = StyleSheet.create({
   completedRule: {
     flex: 1,
     height: StyleSheet.hairlineWidth,
-    backgroundColor: 'rgba(127,127,127,0.25)',
   },
   completedLabel: {
     fontSize: 11,

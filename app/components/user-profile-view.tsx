@@ -13,6 +13,7 @@ import { ProfileDayAgenda } from '@/components/profile-day-agenda';
 import { SegmentedControl } from '@/components/segmented-control';
 import { ThemedText } from '@/components/themed-text';
 import { UserHero } from '@/components/user-hero';
+import { useTokens } from '@/hooks/use-tokens';
 import { applyLikeToggle, blockUser, muteHabit, reportContent, type FeedItem, type FeedKind } from '@/lib/feed';
 import { socialFnsFor } from '@/lib/feed-dispatch';
 import type { FriendProfile } from '@/lib/friends';
@@ -270,7 +271,10 @@ export function UserProfileView({ targetId, viewerId, onBack }: Props) {
   );
 }
 
-function Sep() { return <View style={s.sep} />; }
+function Sep() {
+  const t = useTokens();
+  return <View style={[s.sep, { backgroundColor: t.hairlineStrong }]} />;
+}
 
 function parseIsoLocal(iso: string): Date {
   const [y, m, d] = iso.split('-').map(Number);
@@ -292,6 +296,6 @@ const s = StyleSheet.create({
   segmentWrap: { paddingHorizontal: 14, paddingVertical: 8 },
   dayWrap: { paddingTop: 4, paddingBottom: 12 },
   empty: { textAlign: 'center', opacity: 0.5, paddingTop: 40, fontSize: 15 },
-  sep: { height: StyleSheet.hairlineWidth, backgroundColor: 'rgba(127,127,127,0.25)', marginHorizontal: 14 },
+  sep: { height: StyleSheet.hairlineWidth, marginHorizontal: 14 },
   footer: { paddingVertical: 18, alignItems: 'center' },
 });

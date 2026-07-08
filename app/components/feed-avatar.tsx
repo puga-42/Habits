@@ -5,6 +5,7 @@ import { Image } from 'expo-image';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { useTokens } from '@/hooks/use-tokens';
 
 type Props = {
   url: string | null;
@@ -16,13 +17,14 @@ type Props = {
 
 export function FeedAvatar({ url, handle, size = 36, tintColor, onPress }: Props) {
   const radius = size / 2;
+  const t = useTokens();
   const initial = (handle || '?').trim().charAt(0).toUpperCase();
-  const bg = tintColor ?? 'rgba(127,127,127,0.45)';
+  const bg = tintColor ?? t.ink45;
 
   const content = url ? (
     <Image
       source={{ uri: url }}
-      style={[styles.avatar, { width: size, height: size, borderRadius: radius }]}
+      style={[styles.avatar, { backgroundColor: t.surfaceRaised, width: size, height: size, borderRadius: radius }]}
       contentFit="cover"
       transition={150}
     />
@@ -50,7 +52,7 @@ export function FeedAvatar({ url, handle, size = 36, tintColor, onPress }: Props
 }
 
 const styles = StyleSheet.create({
-  avatar: { backgroundColor: 'rgba(127,127,127,0.15)' },
+  avatar: {},
   fallback: { alignItems: 'center', justifyContent: 'center' },
   initial: { color: '#fff', fontWeight: '700' },
 });

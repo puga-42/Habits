@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { useThemeColor } from '@/hooks/use-theme-color';
+import { useTokens } from '@/hooks/use-tokens';
 import { WEEKDAY_NAMES, validateHandle } from '@/lib/profile';
 
 export function WeekStartPicker({
@@ -18,11 +18,12 @@ export function WeekStartPicker({
   onPick: (v: number) => void;
   onClose: () => void;
 }) {
+  const t = useTokens();
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <ThemedView style={s.root}>
         <SafeAreaView edges={['top']} style={s.root}>
-          <View style={s.header}>
+          <View style={[s.header, { borderBottomColor: t.hairlineStrong }]}>
             <View style={s.headerSide} />
             <ThemedText type="defaultSemiBold">Week starts on</ThemedText>
             <Pressable onPress={onClose} hitSlop={12} style={s.headerSide}>
@@ -59,7 +60,7 @@ export function HandleEditor({
 }) {
   const [draft, setDraft] = useState(currentHandle);
   const [error, setError] = useState<string | null>(null);
-  const textColor = useThemeColor({}, 'text');
+  const t = useTokens();
 
   function handleOpen() {
     setDraft(currentHandle);
@@ -80,7 +81,7 @@ export function HandleEditor({
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose} onShow={handleOpen}>
       <ThemedView style={s.root}>
         <SafeAreaView edges={['top']} style={s.root}>
-          <View style={s.header}>
+          <View style={[s.header, { borderBottomColor: t.hairlineStrong }]}>
             <Pressable onPress={onClose} hitSlop={12} style={s.headerSide}>
               <ThemedText style={e.cancel}>Cancel</ThemedText>
             </Pressable>
@@ -91,14 +92,14 @@ export function HandleEditor({
           </View>
           <View style={e.body}>
             <TextInput
-              style={[e.input, { color: textColor }]}
+              style={[e.input, { borderBottomColor: t.ink45, color: t.ink }]}
               value={draft}
               onChangeText={(t) => { setDraft(t); setError(null); }}
               autoCapitalize="none"
               autoCorrect={false}
               maxLength={30}
               placeholder="your_handle"
-              placeholderTextColor="rgba(127,127,127,0.5)"
+              placeholderTextColor={t.ink45}
             />
             {error && <ThemedText style={e.error}>{error}</ThemedText>}
             <ThemedText style={e.hint}>3–30 characters: letters, numbers, and underscores only.</ThemedText>
@@ -118,7 +119,6 @@ const s = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(127,127,127,0.25)',
   },
   headerSide: { width: 60 },
   done: { fontSize: 16, fontWeight: '600', textAlign: 'right' },
@@ -142,7 +142,6 @@ const e = StyleSheet.create({
   input: {
     fontSize: 18,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(127,127,127,0.5)',
     paddingVertical: 8,
   },
   error: { fontSize: 13, color: '#c0392b' },

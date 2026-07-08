@@ -16,7 +16,8 @@ export function TabTopBar({ title, onMenuPress, rightSlot }: Props) {
         <ThemedText style={styles.menuIcon}>☰</ThemedText>
       </Pressable>
       <View style={styles.titleWrap}>
-        <ThemedText type="defaultSemiBold" style={styles.title} numberOfLines={1}>
+        {/* Screen titles speak in the Ember display voice (SF Pro Rounded). */}
+        <ThemedText type="displaySemiBold" style={styles.title} numberOfLines={1}>
           {title}
         </ThemedText>
       </View>

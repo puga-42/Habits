@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, AppState, Pressable, StyleSheet, View } from 'react-native';
 
 import { Palette } from '@/constants/colors';
+import { useTokens } from '@/hooks/use-tokens';
 import { Calendar3DayView } from '@/components/calendar-3day-view';
 import { CalendarDayView } from '@/components/calendar-day-view';
 import type { ViewMode } from '@/components/calendar-menu-drawer';
@@ -84,6 +85,7 @@ const SCHEDULE_EXTEND_BY = 7;
 
 export default function CalendarScreen() {
   const router = useRouter();
+  const t = useTokens();
   const { session } = useAuth();
   const userId = session?.user.id;
 
@@ -661,7 +663,7 @@ export default function CalendarScreen() {
             rightSlot={
               !isOnToday ? (
                 <Pressable onPress={jumpToToday} hitSlop={8}>
-                  <ThemedText style={styles.todayBtn}>Today</ThemedText>
+                  <ThemedText style={[styles.todayBtn, { color: t.today }]}>Today</ThemedText>
                 </Pressable>
               ) : undefined
             }
@@ -778,19 +780,19 @@ export default function CalendarScreen() {
             {
               key: 'new-habit',
               label: 'New habit',
-              icon: <IconSymbol name="plus.circle" size={20} color={Palette.primary} />,
+              icon: <IconSymbol name="plus.circle" size={20} color={t.accent} />,
               onPress: () => router.push('/habit/new'),
             },
             {
               key: 'new-group',
               label: 'New group',
-              icon: <IconSymbol name="folder.badge.plus" size={20} color={Palette.lavender} />,
+              icon: <IconSymbol name="folder.badge.plus" size={20} color={Palette.periwinkle} />,
               onPress: () => router.push('/groups'),
             },
             {
               key: 'feedback',
               label: 'Feedback',
-              icon: <IconSymbol name="bubble.left" size={20} color={Palette.blush} />,
+              icon: <IconSymbol name="bubble.left" size={20} color={Palette.rose} />,
               onPress: () => router.push('/feedback'),
             },
           ]}
@@ -862,7 +864,7 @@ function parseIsoLocal(iso: string): Date {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   content: { flex: 1 },
-  todayBtn: { fontSize: 14, color: Palette.lavender, fontWeight: '600' },
+  todayBtn: { fontSize: 14, fontWeight: '600' },
   subBar: {
     flexDirection: 'row',
     alignItems: 'center',

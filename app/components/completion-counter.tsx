@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { Palette } from '@/constants/colors';
+import { useTokens } from '@/hooks/use-tokens';
 import type { Habit } from '@/lib/habits';
 import { normalizeCountUnit, unitNoun } from '@/lib/units';
 
@@ -22,7 +23,7 @@ export function CompletionCounter({
   disabled,
   busy,
 }: Props) {
-  const color = habit.color ?? Palette.primary;
+  const color = habit.color ?? Palette.habitColors[0];
 
   if (habit.kind === 'scheduled') {
     return (
@@ -101,6 +102,7 @@ function FlexCounter({
   onDecrement: () => void;
   disabled: boolean;
 }) {
+  const t = useTokens();
   return (
     <View style={styles.container}>
       <View style={styles.flexRow}>
@@ -109,6 +111,7 @@ function FlexCounter({
           disabled={disabled || count === 0}
           style={({ pressed }) => [
             styles.flexButton,
+            { backgroundColor: t.surfaceRaised },
             pressed && styles.pressed,
             (disabled || count === 0) && styles.disabledBtn,
           ]}
@@ -129,6 +132,7 @@ function FlexCounter({
           disabled={disabled}
           style={({ pressed }) => [
             styles.flexButton,
+            { backgroundColor: t.surfaceRaised },
             pressed && styles.pressed,
             disabled && styles.disabledBtn,
           ]}
@@ -157,7 +161,6 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(127,127,127,0.12)',
     alignItems: 'center',
     justifyContent: 'center',
   },

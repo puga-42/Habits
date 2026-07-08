@@ -16,6 +16,7 @@ import { CompletionNoteEditor } from '@/components/completion-note-editor';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { VisibilityPicker } from '@/components/visibility-picker';
+import { useTokens } from '@/hooks/use-tokens';
 import { useAuth } from '@/lib/auth';
 import {
   deleteAttachment,
@@ -37,6 +38,7 @@ export default function CompletionDetailScreen() {
   const router = useRouter();
   const { session } = useAuth();
   const viewerId = session?.user.id;
+  const t = useTokens();
 
   const [completion, setCompletion] = useState<CompletionDetail | null>(null);
   const [signedUrls, setSignedUrls] = useState<Map<string, string>>(new Map());
@@ -185,7 +187,7 @@ export default function CompletionDetailScreen() {
     { hour: 'numeric', minute: '2-digit' },
   );
 
-  const habitColor = completion.habit.color ?? Palette.primary;
+  const habitColor = completion.habit.color ?? Palette.habitColors[0];
 
   return (
     <ThemedView style={styles.root}>
@@ -242,13 +244,13 @@ export default function CompletionDetailScreen() {
             <View style={styles.actionRow}>
               <Pressable
                 onPress={handleAdd}
-                style={({ pressed }) => [styles.actionBtn, pressed && styles.actionBtnPressed]}
+                style={({ pressed }) => [styles.actionBtn, { backgroundColor: t.surfaceRaised }, pressed && styles.actionBtnPressed]}
               >
                 <ThemedText style={styles.actionBtnText}>+ photo</ThemedText>
               </Pressable>
               <Pressable
                 onPress={handleAdd}
-                style={({ pressed }) => [styles.actionBtn, pressed && styles.actionBtnPressed]}
+                style={({ pressed }) => [styles.actionBtn, { backgroundColor: t.surfaceRaised }, pressed && styles.actionBtnPressed]}
               >
                 <ThemedText style={styles.actionBtnText}>+ video</ThemedText>
               </Pressable>
@@ -341,7 +343,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 18,
-    backgroundColor: 'rgba(127,127,127,0.1)',
   },
   actionBtnPressed: { opacity: 0.6 },
   actionBtnText: { fontSize: 14, fontWeight: '500' },

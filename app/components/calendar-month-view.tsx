@@ -5,7 +5,7 @@ import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { Palette } from '@/constants/colors';
+import { useTokens } from '@/hooks/use-tokens';
 import type { DayGroup, MonthCell } from '@/lib/history';
 
 type CellHabit = {
@@ -24,8 +24,6 @@ type Props = {
 
 const WEEKDAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
-const TODAY_RING = Palette.lavender;
-const SELECTED_RING = Palette.primary;
 const MAX_CHIPS = 3;
 
 export function CalendarMonthView({
@@ -89,6 +87,7 @@ function MonthCellView({
   isSelected: boolean;
   onPress: () => void;
 }) {
+  const t = useTokens();
   const habits = useMemo(() => uniqueHabits(group?.rows ?? []), [group]);
   const visible = habits.slice(0, MAX_CHIPS);
   const overflow = Math.max(0, habits.length - MAX_CHIPS);
@@ -98,8 +97,8 @@ function MonthCellView({
       onPress={onPress}
       style={({ pressed }) => [
         styles.cell,
-        cell.isToday && !isSelected && { borderColor: TODAY_RING },
-        isSelected && { borderColor: SELECTED_RING, borderWidth: 2 },
+        cell.isToday && !isSelected && { borderColor: t.today },
+        isSelected && { borderColor: t.accent, borderWidth: 2 },
         pressed && styles.cellPressed,
       ]}>
       <ThemedText
@@ -120,10 +119,7 @@ function MonthCellView({
           ) : (
             <View
               key={h.id}
-              style={[
-                styles.dot,
-                h.color ? { backgroundColor: h.color } : styles.dotFallback,
-              ]}
+              style={[styles.dot, { backgroundColor: h.color ?? t.ink45 }]}
             />
           ),
         )}
@@ -185,6 +181,5 @@ const styles = StyleSheet.create({
   chips: { marginTop: 4, gap: 2, flexDirection: 'row', flexWrap: 'wrap' },
   chipIcon: { fontSize: 12, lineHeight: 16 },
   dot: { width: 6, height: 6, borderRadius: 3, marginTop: 4 },
-  dotFallback: { backgroundColor: 'rgba(127,127,127,0.5)' },
   overflow: { fontSize: 10, opacity: 0.5, marginTop: 2 },
 });

@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { GestureResponderEvent, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { Palette } from '@/constants/colors';
+import { useTokens } from '@/hooks/use-tokens';
 import { isoDate, type Habit } from '@/lib/habits';
 import {
   partitionRows,
@@ -104,6 +104,7 @@ function WeekColumn({
   onColumnPress: (iso: string) => void;
   onRowPress: (row: AgendaRowT, dateIso: string) => void;
 }) {
+  const t = useTokens();
   const [y, m, d] = iso.split('-').map((n) => parseInt(n, 10));
   const date = new Date(y, m - 1, d);
   const isToday = iso === todayIso;
@@ -119,14 +120,14 @@ function WeekColumn({
       onPress={() => onColumnPress(iso)}
       style={({ pressed }) => [
         styles.column,
-        !isLast && styles.columnDivider,
-        pressed && styles.columnPressed,
+        !isLast && [styles.columnDivider, { borderRightColor: t.hairlineStrong }],
+        pressed && { backgroundColor: t.surfaceRaised },
       ]}>
-      <View style={styles.dayHeader}>
-        <ThemedText style={[styles.weekday, isToday && styles.todayText]}>
+      <View style={[styles.dayHeader, { borderBottomColor: t.hairlineStrong }]}>
+        <ThemedText style={[styles.weekday, isToday && [styles.todayText, { color: t.today }]]}>
           {date.toLocaleDateString('en-US', { weekday: 'narrow' })}
         </ThemedText>
-        <ThemedText style={[styles.dateNum, isToday && styles.todayText]}>
+        <ThemedText style={[styles.dateNum, isToday && [styles.todayText, { color: t.today }]]}>
           {date.getDate()}
         </ThemedText>
       </View>
@@ -152,6 +153,7 @@ function CompactRow({
   dateIso: string;
   onPress: (row: AgendaRowT, dateIso: string) => void;
 }) {
+  const t = useTokens();
   const isRest = row.kind === 'rest';
   const isCompletion = row.kind === 'completion';
   return (
@@ -162,7 +164,8 @@ function CompactRow({
       }}
       style={[
         styles.compactRow,
-        row.habit.color ? { borderLeftColor: row.habit.color } : null,
+        { backgroundColor: t.surfaceRaised },
+        { borderLeftColor: row.habit.color ?? t.ink45 },
         (isCompletion || isRest) && styles.compactRowMuted,
       ]}>
       {row.habit.icon ? (
@@ -171,9 +174,7 @@ function CompactRow({
         <View
           style={[
             styles.dot,
-            row.habit.color
-              ? { backgroundColor: row.habit.color }
-              : styles.dotFallback,
+            { backgroundColor: row.habit.color ?? t.ink45 },
           ]}
         />
       )}
@@ -187,18 +188,15 @@ const styles = StyleSheet.create({
   column: { flex: 1 },
   columnDivider: {
     borderRightWidth: StyleSheet.hairlineWidth,
-    borderRightColor: 'rgba(127,127,127,0.2)',
   },
-  columnPressed: { backgroundColor: 'rgba(127,127,127,0.08)' },
   dayHeader: {
     paddingVertical: 8,
     alignItems: 'center',
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(127,127,127,0.2)',
   },
   weekday: { fontSize: 10, opacity: 0.55, textTransform: 'uppercase', letterSpacing: 0.5 },
   dateNum: { fontSize: 16, marginTop: 1 },
-  todayText: { color: Palette.lavender, fontWeight: '600', opacity: 1 },
+  todayText: { fontWeight: '600', opacity: 1 },
   cellContent: { padding: 2, paddingBottom: 80, gap: 2 },
   compactRow: {
     flexDirection: 'row',
@@ -206,13 +204,10 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     paddingHorizontal: 4,
     borderLeftWidth: 3,
-    borderLeftColor: 'rgba(127,127,127,0.4)',
-    backgroundColor: 'rgba(127,127,127,0.06)',
     borderRadius: 4,
     gap: 2,
   },
   compactRowMuted: { opacity: 0.5 },
   icon: { fontSize: 14 },
   dot: { width: 6, height: 6, borderRadius: 3 },
-  dotFallback: { backgroundColor: 'rgba(127,127,127,0.5)' },
 });

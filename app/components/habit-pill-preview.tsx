@@ -8,6 +8,7 @@ import { StyleSheet, useColorScheme, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { Palette, solidTint } from '@/constants/colors';
+import { useTokens } from '@/hooks/use-tokens';
 import { useHabitForm } from '@/lib/habit-form';
 
 const PILL_TINT = 0.22;
@@ -15,14 +16,15 @@ const PILL_TINT = 0.22;
 export function HabitPillPreview() {
   const { draft } = useHabitForm();
   const isDark = useColorScheme() !== 'light';
+  const t = useTokens();
 
-  const color = draft.color ?? Palette.primary;
+  const color = draft.color ?? Palette.habitColors[0];
   const pillBg = solidTint(color, PILL_TINT, isDark);
   const hasIcon = draft.icon.length > 0;
   const hasDescription = draft.description.trim().length > 0;
 
   return (
-    <View style={styles.wrap}>
+    <View style={[styles.wrap, { borderBottomColor: t.hairlineStrong }]}>
       <View style={[styles.pill, { backgroundColor: pillBg }]}>
         <View
           style={[
@@ -59,7 +61,6 @@ const styles = StyleSheet.create({
     paddingTop: 14,
     paddingBottom: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(127,127,127,0.25)',
   },
   pill: {
     flexDirection: 'row',

@@ -14,8 +14,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { CardList, FormCard } from '@/components/form-card';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Palette } from '@/constants/colors';
-import { useThemeColor } from '@/hooks/use-theme-color';
+import { withAlpha } from '@/constants/colors';
+import { useTokens } from '@/hooks/use-tokens';
 import { useHabitForm } from '@/lib/habit-form';
 import type { FlexPeriod } from '@/lib/habits';
 import {
@@ -57,6 +57,7 @@ function SelectRow({
   onPress: () => void;
   disabled?: boolean;
 }) {
+  const t = useTokens();
   return (
     <Pressable
       onPress={disabled ? undefined : onPress}
@@ -65,7 +66,7 @@ function SelectRow({
         <ThemedText style={styles.rowLabel}>{label}</ThemedText>
         {description ? <ThemedText style={styles.rowSub}>{description}</ThemedText> : null}
       </View>
-      {selected && <ThemedText style={styles.check}>✓</ThemedText>}
+      {selected && <ThemedText style={[styles.check, { color: t.accent }]}>✓</ThemedText>}
     </Pressable>
   );
 }
@@ -75,8 +76,12 @@ export default function RepeatScreen() {
   const { lock } = useLocalSearchParams<{ lock?: string }>();
   const locked = lock === '1';
   const { draft, update } = useHabitForm();
-  const textColor = useThemeColor({}, 'text');
+  const t = useTokens();
   const { recurrence } = draft;
+  const chipSelected = {
+    backgroundColor: withAlpha(t.accent, 0.18),
+    borderColor: t.accent,
+  };
 
   function setPattern(pattern: Pattern) {
     if (pattern === 'weekly' && recurrence.byDays.length === 0) {
@@ -107,7 +112,7 @@ export default function RepeatScreen() {
   return (
     <ThemedView style={styles.root}>
       <SafeAreaView edges={['top']} style={styles.content}>
-        <View style={styles.header}>
+        <View style={[styles.header, { borderBottomColor: t.hairlineStrong }]}>
           <Pressable onPress={() => router.back()} hitSlop={12}>
             <ThemedText style={styles.headerButton}>‹ Back</ThemedText>
           </Pressable>
@@ -166,8 +171,12 @@ export default function RepeatScreen() {
                           <Pressable
                             key={d}
                             onPress={() => toggleDay(d)}
-                            style={[styles.dayChip, selected && styles.chipSelected]}>
-                            <ThemedText style={[styles.chipText, selected && styles.chipTextSelected]}>
+                            style={[styles.dayChip, { borderColor: t.hairlineStrong }, selected && chipSelected]}>
+                            <ThemedText
+                              style={[
+                                styles.chipText,
+                                selected && [styles.chipTextSelected, { color: t.accent }],
+                              ]}>
                               {WEEKDAY_LABELS[d]}
                             </ThemedText>
                           </Pressable>
@@ -188,8 +197,12 @@ export default function RepeatScreen() {
                           <Pressable
                             key={d}
                             onPress={() => toggleMonthDay(d)}
-                            style={[styles.monthChip, selected && styles.chipSelected]}>
-                            <ThemedText style={[styles.chipText, selected && styles.chipTextSelected]}>
+                            style={[styles.monthChip, { borderColor: t.hairlineStrong }, selected && chipSelected]}>
+                            <ThemedText
+                              style={[
+                                styles.chipText,
+                                selected && [styles.chipTextSelected, { color: t.accent }],
+                              ]}>
                               {d}
                             </ThemedText>
                           </Pressable>
@@ -211,7 +224,7 @@ export default function RepeatScreen() {
                           update({ recurrence: { ...recurrence, interval: isNaN(n) || n < 1 ? 1 : n } });
                         }}
                         keyboardType="number-pad"
-                        style={[styles.input, { color: textColor }]}
+                        style={[styles.input, { color: t.ink }]}
                         selectTextOnFocus
                       />
                       <ThemedText style={styles.intervalSuffix}>days</ThemedText>
@@ -252,7 +265,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(127,127,127,0.25)',
   },
   headerButton: { fontSize: 16 },
   done: { fontWeight: '600' },
@@ -267,7 +279,7 @@ const styles = StyleSheet.create({
   rowMain: { flex: 1 },
   rowLabel: { fontSize: 16 },
   rowSub: { fontSize: 13, opacity: 0.55, marginTop: 2 },
-  check: { fontSize: 17, fontWeight: '700', color: Palette.primary },
+  check: { fontSize: 17, fontWeight: '700' },
   disabled: { opacity: 0.4 },
   cell: { paddingHorizontal: 16, paddingVertical: 12 },
   daysRow: { flexDirection: 'row', gap: 8, justifyContent: 'space-between' },
@@ -279,7 +291,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: 19,
     borderWidth: 1,
-    borderColor: 'rgba(127,127,127,0.3)',
   },
   monthChip: {
     width: 40,
@@ -288,14 +299,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: 'rgba(127,127,127,0.3)',
-  },
-  chipSelected: {
-    backgroundColor: 'rgba(9,237,226,0.18)',
-    borderColor: Palette.primary,
   },
   chipText: { fontSize: 14 },
-  chipTextSelected: { fontWeight: '700', color: Palette.primaryDark },
+  chipTextSelected: { fontWeight: '700' },
   intervalRow: { flexDirection: 'row', alignItems: 'baseline', gap: 8 },
   input: { fontSize: 17, padding: 0, minWidth: 40 },
   intervalSuffix: { fontSize: 16, opacity: 0.6 },

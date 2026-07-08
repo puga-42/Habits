@@ -5,6 +5,7 @@ import {
 
 import { ThemedText } from '@/components/themed-text';
 import { Palette } from '@/constants/colors';
+import { useTokens } from '@/hooks/use-tokens';
 import {
   buildHeatmapGrid, fetchActivityHeatmap, heatmapColor,
   type DayActivity, type HeatmapDay,
@@ -30,6 +31,7 @@ export function ActivityHeatmap({
 }: Props) {
   const scheme = useColorScheme();
   const isDark = scheme !== 'light';
+  const t = useTokens();
   const scrollRef = useRef<ScrollView>(null);
   const [days, setDays] = useState<DayActivity[]>([]);
   const [loading, setLoading] = useState(true);
@@ -59,10 +61,10 @@ export function ActivityHeatmap({
   const grid = useMemo(() => buildHeatmapGrid(from, to, days), [from, to, days]);
 
   const baseColor = useMemo(() => {
-    if (!selectedLineageId) return Palette.primary;
+    if (!selectedLineageId) return t.accent;
     const habit = habits.find((h) => h.lineage_id === selectedLineageId);
-    return habit?.color ?? Palette.primary;
-  }, [selectedLineageId, habits]);
+    return habit?.color ?? Palette.habitColors[0];
+  }, [selectedLineageId, habits, t.accent]);
 
   const handlePress = useCallback((day: HeatmapDay) => {
     const next = selectedDate === day.date ? null : day.date;

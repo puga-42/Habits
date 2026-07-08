@@ -35,12 +35,15 @@ import {
 } from '@/components/time-trailing-icon';
 import { solidTint } from '@/constants/colors';
 import { TRAILING_ICON_SIZE } from '@/constants/theme';
+import { useTokens } from '@/hooks/use-tokens';
 import type { FlexPeriod } from '@/lib/habits';
 import { useContentTransition } from '@/lib/use-content-transition';
 import type { AgendaRow as AgendaRowT } from '@/lib/history';
 
 const LONG_PRESS_MS = 300;
-const FALLBACK_COLOR = '#5C5C6A';
+// Warm plum-gray for habits with no color set — reads neutral on the Ember
+// ground without going cold. Used for both the icon circle and the pill tint.
+const FALLBACK_COLOR = '#6E6272';
 const PILL_TINT = 0.22;
 
 type Props = {
@@ -84,7 +87,7 @@ export function AgendaRow({
 
   const isDark = useColorScheme() !== 'light';
   const habitColor = row.habit.color ?? FALLBACK_COLOR;
-  const pillBg = solidTint(row.habit.color ?? '#94A3B8', PILL_TINT, isDark);
+  const pillBg = solidTint(habitColor, PILL_TINT, isDark);
   const iconSize = isTight ? 24 : compact ? 32 : 40;
   const emojiSize = isTight ? 14 : compact ? 18 : 22;
 
@@ -186,7 +189,7 @@ export function AgendaRow({
                 row.completed ? (
                   <ThemedText style={[styles.markerCheck, { color: habitColor }]}>✓</ThemedText>
                 ) : (
-                  <View style={styles.incompleteCircle} />
+                  <IncompleteRing />
                 )
               ) : (
                 <Marker kind={row.kind} color={habitColor} />
@@ -230,7 +233,14 @@ function Marker({
   // scheduled — an empty ring whose outer diameter and stroke match the timer's
   // circular progress ring (and play/pause button), so the trailing control is
   // the same size across habit kinds.
-  return <View style={styles.incompleteCircle} />;
+  return <IncompleteRing />;
+}
+
+// The not-yet-completed ring, stroked in warm ink so it reads as an actionable
+// control on the Ember ground (was the retired dead gray).
+function IncompleteRing() {
+  const t = useTokens();
+  return <View style={[styles.incompleteCircle, { borderColor: t.ink45 }]} />;
 }
 
 // A quarter-stepped ring rendered via four border-color sides on a circular
@@ -247,7 +257,7 @@ function FlexRing({
   color: string;
 }) {
   const pct = target > 0 ? Math.min(count / target, 1) : 0;
-  const track = 'rgba(127,127,127,0.25)';
+  const track = useTokens().hairlineStrong;
   const opacity = useSharedValue(1);
   const prevCount = useRef(count);
 
@@ -336,7 +346,6 @@ const styles = StyleSheet.create({
     height: RING_SIZE,
     borderRadius: RING_SIZE / 2,
     borderWidth: RING_STROKE,
-    borderColor: 'rgba(127,127,127,0.5)',
   },
   markerCheck: { fontSize: TRAILING_ICON_SIZE, fontWeight: '700' },
   ring: {
