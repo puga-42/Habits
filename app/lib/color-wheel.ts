@@ -63,3 +63,16 @@ export function hueSatToXY(h: number, s: number, radius: number): { x: number; y
   const rad = (h * Math.PI) / 180;
   return { x: Math.cos(rad) * s * radius, y: -Math.sin(rad) * s * radius };
 }
+
+// Is `hex` one of the curated preset swatches (case-insensitive)? The color
+// picker opens with the custom wheel expanded only for off-ramp colors, so
+// existing custom-colored habits stay directly editable while the garden
+// swatches remain the default path (see PLAN.md "UI overhaul", slice 3).
+export function isPresetColor(
+  hex: string | null,
+  presets: readonly string[],
+): boolean {
+  if (!hex) return false;
+  const target = hex.toUpperCase();
+  return presets.some((p) => p.toUpperCase() === target);
+}

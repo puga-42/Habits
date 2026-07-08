@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { useThemeColor } from '@/hooks/use-theme-color';
+import { useTokens } from '@/hooks/use-tokens';
 
 type Props = {
   value: string;
@@ -10,24 +10,24 @@ type Props = {
 };
 
 export function FriendSearchBar({ value, onChangeText, onClear }: Props) {
-  const textColor = useThemeColor({}, 'text');
+  const t = useTokens();
 
   return (
-    <View style={styles.container}>
-      <IconSymbol name="magnifyingglass" size={16} color="rgba(127,127,127,0.6)" />
+    <View style={[styles.container, { backgroundColor: t.surfaceRaised }]}>
+      <IconSymbol name="magnifyingglass" size={16} color={t.ink52} />
       <TextInput
-        style={[styles.input, { color: textColor }]}
+        style={[styles.input, { color: t.ink }]}
         value={value}
         onChangeText={onChangeText}
         placeholder="Search by handle"
-        placeholderTextColor="rgba(127,127,127,0.5)"
+        placeholderTextColor={t.ink45}
         autoCapitalize="none"
         autoCorrect={false}
         returnKeyType="search"
       />
       {value.length > 0 && (
         <Pressable onPress={onClear} hitSlop={8}>
-          <IconSymbol name="xmark.circle.fill" size={18} color="rgba(127,127,127,0.5)" />
+          <IconSymbol name="xmark.circle.fill" size={18} color={t.ink45} />
         </Pressable>
       )}
     </View>
@@ -38,7 +38,6 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(127,127,127,0.12)',
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 8,

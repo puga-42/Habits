@@ -9,12 +9,11 @@ import {
 } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { Palette, solidTint } from '@/constants/colors';
+import { solidTint } from '@/constants/colors';
+import { useTokens } from '@/hooks/use-tokens';
 import { isoDate } from '@/lib/habits';
 import { densityBucket } from '@/lib/history';
 
-const ACCENT = Palette.primary;
-const TODAY_ACCENT = Palette.lavender;
 const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const DENSITY_ALPHA = [0, 0.12, 0.26, 0.45, 0.68] as const;
 
@@ -55,6 +54,7 @@ export function WeekStrip({
   const anchorIso = isoDate(anchorDate);
   const todayIso = isoDate(today);
   const isDark = useColorScheme() !== 'light';
+  const t = useTokens();
   const listRef = useRef<FlatList<string>>(null);
   const { width: screenWidth } = useWindowDimensions();
   const cellWidth = Math.floor(screenWidth / 7);
@@ -126,8 +126,8 @@ export function WeekStrip({
       const bucket = densityBucket(count);
       const isSelected = iso === anchorIso;
       const isToday = iso === todayIso;
-      // Both the selected day and today get a solid fill; today (lavender) wins
-      // when it is also the selected day.
+      // Both the selected day and today get a solid fill; today (t.today
+      // periwinkle) wins when it is also the selected day.
       const filled = isSelected || isToday;
 
       return (
@@ -142,13 +142,14 @@ export function WeekStrip({
           <View
             style={[
               styles.cellInner,
-              isSelected && !isToday && styles.cellSelected,
-              isToday && styles.cellToday,
+              isSelected && !isToday && { backgroundColor: t.accent },
+              isToday && { backgroundColor: t.today },
             ]}>
             <ThemedText
               style={[
                 styles.weekdayLetter,
-                filled && styles.filledText,
+                { color: t.ink52 },
+                filled && { color: t.onAccent },
               ]}>
               {letter}
             </ThemedText>
@@ -157,7 +158,7 @@ export function WeekStrip({
                 styles.dayBubble,
                 bucket > 0 && !filled && {
                   backgroundColor: solidTint(
-                    ACCENT,
+                    t.accent,
                     DENSITY_ALPHA[bucket],
                     isDark,
                   ),
@@ -167,7 +168,7 @@ export function WeekStrip({
                 style={[
                   styles.dayNumber,
                   filled && styles.selectedText,
-                  filled && styles.filledText,
+                  filled && { color: t.onAccent },
                 ]}>
                 {day}
               </ThemedText>
@@ -176,7 +177,7 @@ export function WeekStrip({
         </Pressable>
       );
     },
-    [anchorIso, todayIso, countByDate, isDark, onSelect, cellWidth],
+    [anchorIso, todayIso, countByDate, isDark, onSelect, cellWidth, t],
   );
 
   const keyExtractor = useCallback((iso: string) => iso, []);
@@ -217,16 +218,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  cellToday: {
-    backgroundColor: TODAY_ACCENT,
-  },
-  cellSelected: {
-    backgroundColor: ACCENT,
-  },
   cellPressed: { opacity: 0.6 },
   weekdayLetter: {
     fontSize: 11,
-    opacity: 0.55,
     fontWeight: '600',
     marginBottom: 2,
   },
@@ -239,5 +233,4 @@ const styles = StyleSheet.create({
   },
   dayNumber: { fontSize: 15, fontWeight: '500' },
   selectedText: { fontWeight: '700' },
-  filledText: { color: '#fff', opacity: 1 },
 });

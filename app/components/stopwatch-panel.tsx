@@ -4,6 +4,7 @@ import { type LayoutChangeEvent, Pressable, StyleSheet, View } from 'react-nativ
 import { ProgressRing } from '@/components/progress-ring';
 import { ThemedText } from '@/components/themed-text';
 import { Palette } from '@/constants/colors';
+import { useTokens } from '@/hooks/use-tokens';
 import type { Habit } from '@/lib/habits';
 import { formatElapsed, formatTarget } from '@/lib/time-format';
 import { useStopwatch } from '@/lib/use-stopwatch';
@@ -23,6 +24,7 @@ export function StopwatchPanel({
   periodStart,
   isAlreadyComplete,
 }: Props) {
+  const t = useTokens();
   const sw = useStopwatch(
     habit.id,
     userId,
@@ -37,7 +39,7 @@ export function StopwatchPanel({
     setContainerWidth(e.nativeEvent.layout.width);
 
   const displayUnit = habit.display_unit ?? 'minutes';
-  const color = habit.color ?? Palette.primary;
+  const color = habit.color ?? Palette.habitColors[0];
   const ringSize = Math.round(containerWidth * 0.3);
   const stopSize = Math.round(ringSize * 0.2);
   const playSize = Math.round(ringSize * 0.32);
@@ -61,7 +63,7 @@ export function StopwatchPanel({
             strokeWidth={8}
             fraction={sw.progressFraction}
             color={color}
-            trackColor="rgba(127,127,127,0.2)">
+            trackColor={t.hairlineStrong}>
             {isComplete ? (
               <ThemedText style={[styles.ringCheck, { color, fontSize: Math.round(ringSize * 0.3) }]}>✓</ThemedText>
             ) : sw.status === 'running' ? (

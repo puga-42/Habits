@@ -23,7 +23,7 @@ import { OverviewSocial } from "@/components/overview-social";
 import { StopwatchPanel } from "@/components/stopwatch-panel";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
-import { Palette } from "@/constants/colors";
+import { useTokens } from "@/hooks/use-tokens";
 import { useAuth } from "@/lib/auth";
 import { useHabitForm } from "@/lib/habit-form";
 import { currentPeriodStart } from "@/lib/habit-overview";
@@ -42,6 +42,7 @@ export default function HabitViewScreen() {
     }>();
 
   const navigation = useNavigation();
+  const t = useTokens();
   const { seedFromHabit, update } = useHabitForm();
   const state = useHabitOverview(
     id,
@@ -102,7 +103,7 @@ export default function HabitViewScreen() {
   return (
     <ThemedView style={styles.root}>
       <SafeAreaView edges={["top"]} style={styles.content}>
-        <View style={styles.header}>
+        <View style={[styles.header, { borderBottomColor: t.hairlineStrong }]}>
           <Pressable onPress={handleClose} hitSlop={12}>
             <ThemedText style={styles.headerButton}>Close</ThemedText>
           </Pressable>
@@ -115,13 +116,13 @@ export default function HabitViewScreen() {
           </ThemedText>
           {isOwner ? (
             <Pressable onPress={handleEdit} hitSlop={12}>
-              <ThemedText style={[styles.headerButton, styles.editButton]}>
+              <ThemedText style={[styles.headerButton, styles.editButton, { color: t.accent }]}>
                 Edit
               </ThemedText>
             </Pressable>
           ) : (
             <Pressable onPress={handleAdopt} hitSlop={12}>
-              <ThemedText style={[styles.headerButton, styles.adoptButton]}>
+              <ThemedText style={[styles.headerButton, styles.adoptButton, { color: t.accent }]}>
                 Adopt
               </ThemedText>
             </Pressable>
@@ -219,7 +220,7 @@ export default function HabitViewScreen() {
             ) : isOwner ||
               completions[0].note ||
               completions[0].attachments.length > 0 ? (
-              <View style={styles.completionsSection}>
+              <View style={[styles.completionsSection, { borderTopColor: t.hairlineStrong }]}>
                 {completions.map((c) => (
                   <CompletionInlineEditor
                     key={c.id}
@@ -273,12 +274,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "rgba(127,127,127,0.25)",
   },
   headerButton: { fontSize: 16 },
   headerTitle: { flex: 1, textAlign: "center", marginHorizontal: 8 },
-  editButton: { fontWeight: "600", color: Palette.primary },
-  adoptButton: { fontWeight: "600", color: Palette.primary },
+  editButton: { fontWeight: "600" },
+  adoptButton: { fontWeight: "600" },
   scroll: { padding: 20, paddingBottom: 40 },
   ownerRow: {
     flexDirection: "row",
@@ -299,7 +299,6 @@ const styles = StyleSheet.create({
   description: { fontSize: 15, marginTop: 4, opacity: 0.7 },
   completionsSection: {
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: "rgba(127,127,127,0.2)",
     paddingTop: 12,
     gap: 8,
   },

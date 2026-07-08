@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { Palette } from '@/constants/colors';
+import { useTokens } from '@/hooks/use-tokens';
 
 type Props = {
   onPress: () => void;
@@ -9,12 +9,20 @@ type Props = {
 };
 
 export function CalendarFAB({ onPress, style }: Props) {
+  const t = useTokens();
   return (
     <Pressable
       onPress={onPress}
       hitSlop={8}
-      style={({ pressed }) => [styles.fab, pressed && styles.fabPressed, style]}>
-      <ThemedText style={styles.plus}>+</ThemedText>
+      style={({ pressed }) => [
+        styles.fab,
+        // Ember accent with a soft coral glow instead of a plain black drop
+        // shadow — the FAB is the day view's one bold moment.
+        { backgroundColor: t.accent, shadowColor: t.accent },
+        pressed && styles.fabPressed,
+        style,
+      ]}>
+      <ThemedText style={[styles.plus, { color: t.onAccent }]}>+</ThemedText>
     </Pressable>
   );
 }
@@ -27,15 +35,13 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: Palette.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.18,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
     elevation: 6,
   },
   fabPressed: { opacity: 0.85, transform: [{ scale: 0.97 }] },
-  plus: { color: Palette.charcoal, fontSize: 30, lineHeight: 32, fontWeight: '300' },
+  plus: { fontSize: 30, lineHeight: 32, fontWeight: '400' },
 });

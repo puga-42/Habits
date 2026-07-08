@@ -5,10 +5,10 @@
 // first or below the last. Used by the habit create/edit form groups.
 
 import { Children, Fragment } from 'react';
-import { StyleSheet, useColorScheme, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { Palette } from '@/constants/colors';
+import { useTokens } from '@/hooks/use-tokens';
 
 export function FormCard({
   title,
@@ -17,23 +17,23 @@ export function FormCard({
   title?: string;
   children: React.ReactNode;
 }) {
-  const isDark = useColorScheme() !== 'light';
-  const bg = isDark ? Palette.charcoalElevated : '#FFFFFF';
+  const t = useTokens();
   return (
     <View style={styles.group}>
       {title ? <ThemedText style={styles.header}>{title}</ThemedText> : null}
-      <View style={[styles.card, { backgroundColor: bg }]}>{children}</View>
+      <View style={[styles.card, { backgroundColor: t.surface }]}>{children}</View>
     </View>
   );
 }
 
 export function CardList({ children }: { children: React.ReactNode }) {
   const items = Children.toArray(children); // drops null/false/undefined
+  const t = useTokens();
   return (
     <>
       {items.map((child, i) => (
         <Fragment key={i}>
-          {i > 0 && <View style={styles.divider} />}
+          {i > 0 && <View style={[styles.divider, { backgroundColor: t.hairlineStrong }]} />}
           {child}
         </Fragment>
       ))}
@@ -54,7 +54,6 @@ const styles = StyleSheet.create({
   card: { borderRadius: 14, overflow: 'hidden' },
   divider: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: 'rgba(127,127,127,0.3)',
     marginLeft: 16,
   },
 });

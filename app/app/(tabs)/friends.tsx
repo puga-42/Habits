@@ -20,7 +20,7 @@ import { FriendSearchResultRow } from '@/components/friend-search-result-row';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabTopBar } from '@/components/tab-top-bar';
 import { ThemedText } from '@/components/themed-text';
-import { useThemeColor } from '@/hooks/use-theme-color';
+import { useTokens } from '@/hooks/use-tokens';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useAuth } from '@/lib/auth';
 import {
@@ -46,7 +46,7 @@ export default function FriendsScreen() {
   const { session } = useAuth();
   const { openDrawer } = useDrawer();
   const { refreshPendingCount } = usePendingCount();
-  const backgroundColor = useThemeColor({}, 'background');
+  const t = useTokens();
   const viewerId = session?.user.id ?? null;
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -279,7 +279,7 @@ export default function FriendsScreen() {
 
   if (!viewerId) {
     return (
-      <Pressable style={[styles.root, { backgroundColor }]} onPress={Keyboard.dismiss}>
+      <Pressable style={[styles.root, { backgroundColor: t.bg }]} onPress={Keyboard.dismiss}>
         <SafeAreaView edges={[]} style={styles.content}>
           <ScreenHeader>
             <TabTopBar title="Friends" onMenuPress={openDrawer} />
@@ -294,7 +294,7 @@ export default function FriendsScreen() {
   const showEmpty = !loading && friends.length === 0 && !hasRequests;
 
   return (
-    <Pressable style={[styles.root, { backgroundColor }]} onPress={Keyboard.dismiss}>
+    <Pressable style={[styles.root, { backgroundColor: t.bg }]} onPress={Keyboard.dismiss}>
       <SafeAreaView edges={[]} style={styles.safe}>
         <ScreenHeader>
           <TabTopBar title="Friends" onMenuPress={openDrawer} />
@@ -404,6 +404,7 @@ function RequestsSection({
   onDecline: (id: string) => void;
   onCancel: (id: string) => void;
 }) {
+  const t = useTokens();
   const total = incoming.length + outgoing.length;
 
   return (
@@ -415,7 +416,7 @@ function RequestsSection({
         <IconSymbol
           name={expanded ? 'chevron.up' : 'chevron.down'}
           size={14}
-          color="rgba(127,127,127,0.6)"
+          color={t.ink52}
         />
       </Pressable>
 
@@ -446,13 +447,14 @@ function RequestsSection({
         </>
       )}
 
-      <View style={styles.sectionSeparator} />
+      <View style={[styles.sectionSeparator, { backgroundColor: t.hairlineStrong }]} />
     </View>
   );
 }
 
 function Separator() {
-  return <View style={styles.separator} />;
+  const t = useTokens();
+  return <View style={[styles.separator, { backgroundColor: t.hairlineStrong }]} />;
 }
 
 // ─── Styles ──────────────────────────────────────────────────────────────
@@ -488,13 +490,11 @@ const styles = StyleSheet.create({
   requestsTitle: { fontSize: 14, fontWeight: '600', opacity: 0.6 },
   sectionSeparator: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: 'rgba(127,127,127,0.25)',
     marginHorizontal: 14,
     marginTop: 6,
   },
   separator: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: 'rgba(127,127,127,0.25)',
     marginHorizontal: 14,
   },
   footer: { paddingVertical: 18, alignItems: 'center' },

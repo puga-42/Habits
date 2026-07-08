@@ -7,6 +7,7 @@ import Animated, {
 
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { useTokens } from '@/hooks/use-tokens';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const AVATAR_SIZE = 280;
@@ -21,6 +22,7 @@ type Props = {
 };
 
 export function AvatarViewerModal({ visible, imageUri, handle, onClose }: Props) {
+  const t = useTokens();
   const scale = useSharedValue(1);
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
@@ -114,7 +116,7 @@ export function AvatarViewerModal({ visible, imageUri, handle, onClose }: Props)
             </Animated.View>
           </GestureDetector>
         ) : (
-          <View style={st.fallback}>
+          <View style={[st.fallback, { backgroundColor: t.ink45 }]}>
             <ThemedText style={st.initial}>{initial}</ThemedText>
           </View>
         )}
@@ -130,7 +132,7 @@ const st = StyleSheet.create({
   avatar: { width: AVATAR_SIZE, height: AVATAR_SIZE, borderRadius: AVATAR_R },
   fallback: {
     width: AVATAR_SIZE, height: AVATAR_SIZE, borderRadius: AVATAR_R,
-    backgroundColor: 'rgba(127,127,127,0.45)', alignItems: 'center', justifyContent: 'center',
+    alignItems: 'center', justifyContent: 'center',
   },
   initial: { color: '#fff', fontSize: AVATAR_SIZE * 0.4, fontWeight: '700' },
 });

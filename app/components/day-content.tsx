@@ -10,6 +10,7 @@ import { GroupCardHeader } from '@/components/group-card-header';
 import { HabitRowSwipeable } from '@/components/habit-row-swipeable';
 import type { TimerStatus } from '@/components/time-trailing-icon';
 import { ThemedText } from '@/components/themed-text';
+import { useTokens } from '@/hooks/use-tokens';
 import { diffDayHabits } from '@/lib/day-diff';
 import { buildDayItems, UNGROUPED } from '@/lib/day-items';
 import { dayItemKey, type DayItem, type Section } from '@/lib/day-item-key';
@@ -68,6 +69,7 @@ export function DayContent({
 }: Props) {
   const iso = isoDate(date);
   const rows = group?.rows ?? [];
+  const t = useTokens();
 
   // Per-section (group-scoped) Resting expand state, keyed by group id / UNGROUPED.
   const [restingExpanded, setRestingExpanded] = useState<Set<string>>(new Set());
@@ -122,7 +124,7 @@ export function DayContent({
   if (rows.length === 0) {
     return (
       <View style={styles.emptyState}>
-        <ThemedText style={styles.emptyText}>
+        <ThemedText style={[styles.emptyText, { color: t.ink52 }]}>
           Nothing scheduled for this day.
         </ThemedText>
       </View>
@@ -150,23 +152,23 @@ export function DayContent({
       // Subtle divider marking the start of the ungrouped habits below the cards.
       return (
         <Animated.View style={styles.ungroupedHeader}>
-          <View style={styles.rule} />
+          <View style={[styles.rule, { backgroundColor: t.hairlineStrong }]} />
         </Animated.View>
       );
     }
     if (item.kind === 'all-done') {
       return (
         <Animated.View>
-          <ThemedText style={styles.allDone}>Everything done for today.</ThemedText>
+          <ThemedText style={[styles.allDone, { color: t.ink52 }]}>Everything done for today.</ThemedText>
         </Animated.View>
       );
     }
     if (item.kind === 'completed-header') {
       return (
         <Animated.View style={styles.sectionHeader}>
-          <View style={styles.rule} />
-          <ThemedText style={styles.sectionLabel}>Completed</ThemedText>
-          <View style={styles.rule} />
+          <View style={[styles.rule, { backgroundColor: t.hairlineStrong }]} />
+          <ThemedText style={[styles.sectionLabel, { color: t.ink52 }]}>Completed</ThemedText>
+          <View style={[styles.rule, { backgroundColor: t.hairlineStrong }]} />
         </Animated.View>
       );
     }
@@ -178,11 +180,11 @@ export function DayContent({
           style={styles.sectionHeader}
           accessibilityRole="button"
           accessibilityLabel={expanded ? 'Collapse resting' : 'Expand resting'}>
-          <View style={styles.rule} />
-          <ThemedText style={styles.sectionLabel}>Resting</ThemedText>
-          <ThemedText style={styles.zzz}>zᶻᶻ</ThemedText>
-          <ThemedText style={styles.restChevron}>{expanded ? '▾' : '▸'}</ThemedText>
-          <View style={styles.rule} />
+          <View style={[styles.rule, { backgroundColor: t.hairlineStrong }]} />
+          <ThemedText style={[styles.sectionLabel, { color: t.ink52 }]}>Resting</ThemedText>
+          <ThemedText style={[styles.zzz, { color: t.ink45 }]}>zᶻᶻ</ThemedText>
+          <ThemedText style={[styles.restChevron, { color: t.ink52 }]}>{expanded ? '▾' : '▸'}</ThemedText>
+          <View style={[styles.rule, { backgroundColor: t.hairlineStrong }]} />
         </Pressable>
       );
     }
@@ -302,8 +304,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 32,
   },
-  emptyText: { opacity: 0.55, fontSize: 15 },
-  allDone: { paddingVertical: 16, opacity: 0.55, fontSize: 14 },
+  emptyText: { fontSize: 15 },
+  allDone: { paddingVertical: 16, fontSize: 14 },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -313,15 +315,13 @@ const styles = StyleSheet.create({
   rule: {
     flex: 1,
     height: StyleSheet.hairlineWidth,
-    backgroundColor: 'rgba(127,127,127,0.3)',
   },
   sectionLabel: {
     fontSize: 12,
-    opacity: 0.55,
     textTransform: 'uppercase',
     letterSpacing: 0.6,
   },
-  zzz: { fontSize: 12, opacity: 0.5, fontStyle: 'italic' },
-  restChevron: { fontSize: 12, opacity: 0.55 },
+  zzz: { fontSize: 12, fontStyle: 'italic' },
+  restChevron: { fontSize: 12 },
   ungroupedHeader: { paddingTop: 18, paddingBottom: 4 },
 });

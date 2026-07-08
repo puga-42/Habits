@@ -1,12 +1,21 @@
 import { StyleSheet, Text, type TextProps } from 'react-native';
 
-import { Palette } from '@/constants/colors';
+import { Fonts } from '@/constants/theme';
 import { useThemeColor } from '@/hooks/use-theme-color';
+import { useTokens } from '@/hooks/use-tokens';
 
 export type ThemedTextProps = TextProps & {
   lightColor?: string;
   darkColor?: string;
-  type?: 'default' | 'title' | 'defaultSemiBold' | 'subtitle' | 'link' | 'icon';
+  type?:
+    | 'default'
+    | 'title'
+    | 'defaultSemiBold'
+    | 'subtitle'
+    | 'link'
+    | 'icon'
+    | 'display'
+    | 'displaySemiBold';
 };
 
 export function ThemedText({
@@ -17,6 +26,7 @@ export function ThemedText({
   ...rest
 }: ThemedTextProps) {
   const color = useThemeColor({ light: lightColor, dark: darkColor }, 'text');
+  const tokens = useTokens();
 
   return (
     <Text
@@ -26,7 +36,9 @@ export function ThemedText({
         type === 'title' ? styles.title : undefined,
         type === 'defaultSemiBold' ? styles.defaultSemiBold : undefined,
         type === 'subtitle' ? styles.subtitle : undefined,
-        type === 'link' ? styles.link : undefined,
+        type === 'link' ? [styles.link, { color: tokens.accent }] : undefined,
+        type === 'display' ? styles.display : undefined,
+        type === 'displaySemiBold' ? styles.displaySemiBold : undefined,
         style,
       ]}
       {...rest}
@@ -56,6 +68,20 @@ const styles = StyleSheet.create({
   link: {
     lineHeight: 30,
     fontSize: 16,
-    color: Palette.primaryDark,
+  },
+  // Ember display voice — SF Pro Rounded for the friendly surfaces: screen
+  // titles, group names, stat values, streak numbers (see PLAN.md).
+  display: {
+    fontFamily: Fonts?.rounded,
+    fontSize: 28,
+    lineHeight: 33,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+  },
+  displaySemiBold: {
+    fontFamily: Fonts?.rounded,
+    fontSize: 17,
+    lineHeight: 23,
+    fontWeight: '700',
   },
 });

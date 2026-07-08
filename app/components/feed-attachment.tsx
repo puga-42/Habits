@@ -13,6 +13,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import type { Attachment } from '@/lib/feed';
 import { signedUrlsForPaths } from '@/lib/feed';
+import { useTokens } from '@/hooks/use-tokens';
 
 type Props = {
   attachment: Attachment;
@@ -29,6 +30,7 @@ export function FeedAttachment({
   aspectRatio,
   onPress,
 }: Props) {
+  const t = useTokens();
   const [resolvedUrl, setResolvedUrl] = useState<string | null>(
     signedUrl ?? null,
   );
@@ -63,12 +65,12 @@ export function FeedAttachment({
       {resolvedUrl ? (
         <Image
           source={{ uri: resolvedUrl }}
-          style={styles.media}
+          style={[styles.media, { backgroundColor: t.surfaceRaised }]}
           contentFit="cover"
           transition={200}
         />
       ) : (
-        <View style={[styles.media, styles.placeholder]} />
+        <View style={[styles.media, { backgroundColor: t.surfaceRaised }]} />
       )}
       {attachment.kind === 'video' ? (
         <View style={styles.playOverlay} pointerEvents="none">
@@ -85,9 +87,7 @@ const styles = StyleSheet.create({
   media: {
     width: '100%',
     height: '100%',
-    backgroundColor: 'rgba(127,127,127,0.15)',
   },
-  placeholder: { backgroundColor: 'rgba(127,127,127,0.1)' },
   playOverlay: {
     ...StyleSheet.absoluteFillObject,
     alignItems: 'center',

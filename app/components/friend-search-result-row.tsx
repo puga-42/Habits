@@ -3,7 +3,7 @@ import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { FeedAvatar } from '@/components/feed-avatar';
 import { ThemedText } from '@/components/themed-text';
-import { Palette } from '@/constants/colors';
+import { useTokens } from '@/hooks/use-tokens';
 import type { SearchResult } from '@/lib/friends';
 
 type Props = {
@@ -20,6 +20,7 @@ export function FriendSearchResultRow({
   loading,
 }: Props) {
   const router = useRouter();
+  const t = useTokens();
   const goToUser = () => router.push(`/user/${result.id}`);
   const { label, onPress, accent } = buttonConfig(
     result.friendship_status,
@@ -50,7 +51,7 @@ export function FriendSearchResultRow({
         disabled={disabled}
         style={[
           styles.button,
-          accent ? styles.buttonAccent : styles.buttonGhost,
+          accent ? { backgroundColor: t.accent } : { backgroundColor: t.surfaceRaised },
           disabled && styles.buttonDisabled,
         ]}>
         {loading ? (
@@ -103,10 +104,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     minWidth: 72,
     alignItems: 'center',
-  },
-  buttonAccent: { backgroundColor: Palette.primary },
-  buttonGhost: {
-    backgroundColor: 'rgba(127,127,127,0.12)',
   },
   buttonDisabled: { opacity: 0.5 },
   buttonText: { fontSize: 13, fontWeight: '600' },

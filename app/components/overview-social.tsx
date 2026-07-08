@@ -8,6 +8,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { FeedActionBar } from '@/components/feed-action-bar';
 import { FeedCommentsSheet } from '@/components/feed-comments-sheet';
+import { useTokens } from '@/hooks/use-tokens';
 import type { FeedKind, SocialCounts } from '@/lib/feed';
 
 type Props = {
@@ -28,9 +29,10 @@ export function OverviewSocial({
   onCommentCountChange,
 }: Props) {
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const t = useTokens();
 
   return (
-    <View style={styles.wrap}>
+    <View style={[styles.wrap, { borderTopColor: t.hairlineStrong }]}>
       <FeedActionBar
         targetId={targetId}
         targetKind={targetKind}
@@ -56,7 +58,6 @@ const styles = StyleSheet.create({
   wrap: {
     marginTop: 16,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(127,127,127,0.2)',
     paddingTop: 12,
   },
 });

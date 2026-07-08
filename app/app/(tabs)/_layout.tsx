@@ -7,9 +7,7 @@ import { HapticTab } from '@/components/haptic-tab';
 import { PendingCountProvider, usePendingCount } from '@/components/pending-count-provider';
 import { UnreadCountProvider, useUnreadCount } from '@/components/unread-count-provider';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Palette } from '@/constants/colors';
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useTokens } from '@/hooks/use-tokens';
 import { useAuth } from '@/lib/auth';
 
 const AVAILABLE_VIEWS = ['day', '3day', 'week', 'month'] as const;
@@ -29,8 +27,7 @@ export default function TabLayout() {
 }
 
 function TabLayoutInner() {
-  const colorScheme = useColorScheme();
-  const tint = Colors[colorScheme ?? 'light'].tint;
+  const t = useTokens();
   const router = useRouter();
   const { pendingCount } = usePendingCount();
   const { unreadCount } = useUnreadCount();
@@ -40,14 +37,12 @@ function TabLayoutInner() {
     <>
       <Tabs
         screenOptions={{
-          tabBarActiveTintColor: tint,
+          tabBarActiveTintColor: t.accent,
           headerShown: false,
           tabBarButton: HapticTab,
           tabBarStyle: {
-            backgroundColor: colorScheme === 'dark' ? Palette.charcoalElevated : Palette.ghostWhite,
-            borderTopColor: colorScheme === 'dark'
-              ? 'rgba(255,255,255,0.08)'
-              : Palette.slate200,
+            backgroundColor: t.surface,
+            borderTopColor: t.hairlineStrong,
           },
         }}>
         <Tabs.Screen

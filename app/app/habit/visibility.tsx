@@ -9,7 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { CardList, FormCard } from '@/components/form-card';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Palette } from '@/constants/colors';
+import { useTokens } from '@/hooks/use-tokens';
 import { useHabitForm } from '@/lib/habit-form';
 import type { Visibility } from '@/lib/habits';
 
@@ -22,11 +22,12 @@ const OPTIONS: { key: Visibility; label: string; description: string }[] = [
 export default function VisibilityScreen() {
   const router = useRouter();
   const { draft, update } = useHabitForm();
+  const t = useTokens();
 
   return (
     <ThemedView style={styles.root}>
       <SafeAreaView edges={['top']} style={styles.content}>
-        <View style={styles.header}>
+        <View style={[styles.header, { borderBottomColor: t.hairlineStrong }]}>
           <Pressable onPress={() => router.back()} hitSlop={12}>
             <ThemedText style={styles.headerButton}>‹ Back</ThemedText>
           </Pressable>
@@ -45,7 +46,9 @@ export default function VisibilityScreen() {
                     <ThemedText style={styles.rowLabel}>{o.label}</ThemedText>
                     <ThemedText style={styles.rowSub}>{o.description}</ThemedText>
                   </View>
-                  {draft.visibility === o.key && <ThemedText style={styles.check}>✓</ThemedText>}
+                  {draft.visibility === o.key && (
+                    <ThemedText style={[styles.check, { color: t.accent }]}>✓</ThemedText>
+                  )}
                 </Pressable>
               ))}
             </CardList>
@@ -66,7 +69,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(127,127,127,0.25)',
   },
   headerButton: { fontSize: 16 },
   done: { fontWeight: '600' },
@@ -81,5 +83,5 @@ const styles = StyleSheet.create({
   rowMain: { flex: 1 },
   rowLabel: { fontSize: 16 },
   rowSub: { fontSize: 13, opacity: 0.55, marginTop: 2 },
-  check: { fontSize: 17, fontWeight: '700', color: Palette.primary },
+  check: { fontSize: 17, fontWeight: '700' },
 });

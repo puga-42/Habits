@@ -8,6 +8,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { useTokens } from '@/hooks/use-tokens';
 import type { FeedKind } from '@/lib/feed';
 import { likerKindFor } from '@/lib/feed-dispatch';
 
@@ -30,6 +31,7 @@ export function FeedActionBar({
   onToggleLike,
   onOpenComments,
 }: Props) {
+  const t = useTokens();
   const router = useRouter();
 
   const handleLike = () => {
@@ -56,12 +58,12 @@ export function FeedActionBar({
         <Pressable onPress={handleLike} hitSlop={8} style={styles.iconButton}>
           <IconSymbol
             name={viewerLiked ? 'heart.fill' : 'heart'}
-            color={viewerLiked ? '#ff3b5c' : 'rgba(127,127,127,0.9)'}
+            color={viewerLiked ? t.danger : t.ink70}
             size={26}
           />
         </Pressable>
         <Pressable onPress={onOpenComments} hitSlop={8} style={styles.commentButton}>
-          <IconSymbol name="bubble.right" color="rgba(127,127,127,0.9)" size={24} />
+          <IconSymbol name="bubble.right" color={t.ink70} size={24} />
           {commentCount > 0 ? (
             <ThemedText style={styles.commentCount}>{commentCount}</ThemedText>
           ) : null}

@@ -15,7 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { CardList, FormCard } from '@/components/form-card';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Palette } from '@/constants/colors';
+import { useTokens } from '@/hooks/use-tokens';
 import { ensureAlertPermissions } from '@/lib/alert-scheduler';
 import { formatAlertTime, normalizeAlertTimes } from '@/lib/alerts';
 import { useHabitForm } from '@/lib/habit-form';
@@ -24,6 +24,7 @@ import { formatTime } from '@/lib/habits';
 export default function AlertsScreen() {
   const router = useRouter();
   const { draft, update } = useHabitForm();
+  const t = useTokens();
   const [showPicker, setShowPicker] = useState(false);
   // Staged picker value so iOS's spinning wheel doesn't commit every tick.
   const [pickerValue, setPickerValue] = useState(() => {
@@ -66,7 +67,7 @@ export default function AlertsScreen() {
   return (
     <ThemedView style={styles.root}>
       <SafeAreaView edges={['top']} style={styles.content}>
-        <View style={styles.header}>
+        <View style={[styles.header, { borderBottomColor: t.hairlineStrong }]}>
           <Pressable onPress={() => router.back()} hitSlop={12}>
             <ThemedText style={styles.headerButton}>‹ Back</ThemedText>
           </Pressable>
@@ -103,12 +104,14 @@ export default function AlertsScreen() {
                     onChange={handlePicked}
                   />
                   <Pressable onPress={confirmAdd} style={styles.addConfirm}>
-                    <ThemedText style={styles.addConfirmText}>Add this alert</ThemedText>
+                    <ThemedText style={[styles.addConfirmText, { color: t.accent }]}>
+                      Add this alert
+                    </ThemedText>
                   </Pressable>
                 </View>
               )}
               <Pressable style={styles.row} onPress={() => setShowPicker(true)}>
-                <ThemedText style={styles.add}>+ Add alert</ThemedText>
+                <ThemedText style={[styles.add, { color: t.accent }]}>+ Add alert</ThemedText>
               </Pressable>
             </CardList>
           </FormCard>
@@ -136,7 +139,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(127,127,127,0.25)',
   },
   headerButton: { fontSize: 16 },
   done: { fontWeight: '600' },
@@ -151,8 +153,8 @@ const styles = StyleSheet.create({
   rowLabel: { fontSize: 16 },
   remove: { fontSize: 14, color: '#ef4444' },
   empty: { fontSize: 14, opacity: 0.55 },
-  add: { fontSize: 16, color: Palette.primary, fontWeight: '600' },
+  add: { fontSize: 16, fontWeight: '600' },
   pickerRow: { paddingHorizontal: 16, paddingBottom: 8, alignItems: 'center' },
   addConfirm: { paddingVertical: 10 },
-  addConfirmText: { fontSize: 16, color: Palette.primary, fontWeight: '600' },
+  addConfirmText: { fontSize: 16, fontWeight: '600' },
 });

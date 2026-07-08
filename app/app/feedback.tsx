@@ -18,7 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { Palette } from '@/constants/colors';
+import { useTokens } from '@/hooks/use-tokens';
 import {
   MAX_FEEDBACK_LENGTH,
   submitFeedback,
@@ -33,6 +33,7 @@ export default function FeedbackScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
+  const t = useTokens();
 
   const [category, setCategory] = useState<FeedbackCategory | null>(null);
   const [desiredBehavior, setDesiredBehavior] = useState('');
@@ -94,7 +95,7 @@ export default function FeedbackScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.flex} edges={['top']}>
-        <View style={styles.header}>
+        <View style={[styles.header, { borderBottomColor: t.hairlineStrong }]}>
           <Pressable onPress={() => router.back()} hitSlop={8}>
             <ThemedText style={styles.cancelText}>Cancel</ThemedText>
           </Pressable>
@@ -104,7 +105,11 @@ export default function FeedbackScreen() {
               <ActivityIndicator size="small" />
             ) : (
               <ThemedText
-                style={[styles.submitText, !canSubmit && styles.submitDisabled]}
+                style={[
+                  styles.submitText,
+                  { color: t.accent },
+                  !canSubmit && styles.submitDisabled,
+                ]}
               >
                 Submit
               </ThemedText>
@@ -219,6 +224,7 @@ function CategoryPicker({
   onChange: (c: FeedbackCategory) => void;
   isDark: boolean;
 }) {
+  const t = useTokens();
   const inactiveBg = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)';
 
   return (
@@ -231,7 +237,7 @@ function CategoryPicker({
             onPress={() => onChange(cat)}
             style={[
               styles.categoryButton,
-              { backgroundColor: active ? Palette.primary : inactiveBg },
+              { backgroundColor: active ? t.accent : inactiveBg },
             ]}
           >
             <ThemedText
@@ -275,11 +281,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(127,127,127,0.2)',
   },
   cancelText: { fontSize: 16 },
   title: { fontSize: 17, fontWeight: '600' },
-  submitText: { fontSize: 16, fontWeight: '600', color: Palette.primary },
+  submitText: { fontSize: 16, fontWeight: '600' },
   submitDisabled: { opacity: 0.4 },
 
   categoryRow: {

@@ -12,7 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Palette } from '@/constants/colors';
+import { useTokens } from '@/hooks/use-tokens';
 
 export type ViewMode = 'day' | '3day' | 'week' | 'month' | 'schedule';
 
@@ -27,7 +27,6 @@ type Props = {
 };
 
 const DRAWER_WIDTH = 280;
-const ACTIVE_TINT = Palette.primary;
 
 const VIEW_OPTIONS: Array<{ key: ViewMode; label: string }> = [
   { key: 'day', label: 'Day' },
@@ -47,6 +46,9 @@ export function CalendarMenuDrawer({
   onClose,
 }: Props) {
   const insets = useSafeAreaInsets();
+  const t = useTokens();
+  const rowPressed = [styles.rowPressed, { backgroundColor: t.surfaceRaised }];
+  const bullet = [styles.bullet, { backgroundColor: t.ink45 }];
   const translateX = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
 
   useEffect(() => {
@@ -92,9 +94,9 @@ export function CalendarMenuDrawer({
                         style={({ pressed }) => [
                           styles.row,
                           !enabled && styles.rowDisabled,
-                          pressed && enabled && styles.rowPressed,
+                          pressed && enabled && rowPressed,
                         ]}>
-                        <View style={[styles.bullet, active && styles.bulletActive]} />
+                        <View style={[bullet, active && { backgroundColor: t.accent }]} />
                         <ThemedText
                           style={[styles.rowText, active && styles.rowTextActive]}>
                           {opt.label}
@@ -113,8 +115,8 @@ export function CalendarMenuDrawer({
                       onOpenGroups();
                       onClose();
                     }}
-                    style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}>
-                    <View style={styles.bullet} />
+                    style={({ pressed }) => [styles.row, pressed && rowPressed]}>
+                    <View style={bullet} />
                     <ThemedText style={styles.rowText}>Manage groups</ThemedText>
                   </Pressable>
                   <Pressable
@@ -122,8 +124,8 @@ export function CalendarMenuDrawer({
                       onOpenSettings();
                       onClose();
                     }}
-                    style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}>
-                    <View style={styles.bullet} />
+                    style={({ pressed }) => [styles.row, pressed && rowPressed]}>
+                    <View style={bullet} />
                     <ThemedText style={styles.rowText}>Settings</ThemedText>
                   </Pressable>
                 </Section>
@@ -180,14 +182,12 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   rowDisabled: { opacity: 0.45 },
-  rowPressed: { opacity: 0.55, backgroundColor: 'rgba(127,127,127,0.08)' },
+  rowPressed: { opacity: 0.55 },
   bullet: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: 'rgba(127,127,127,0.4)',
   },
-  bulletActive: { backgroundColor: ACTIVE_TINT },
   rowText: { fontSize: 16, flex: 1 },
   rowTextActive: { fontWeight: '600' },
   soon: { fontSize: 13, opacity: 0.55, fontStyle: 'italic' },

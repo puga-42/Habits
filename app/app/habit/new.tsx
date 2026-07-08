@@ -7,6 +7,7 @@ import { HabitFormFields } from '@/components/habit-form-fields';
 import { HabitPillPreview } from '@/components/habit-pill-preview';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { useTokens } from '@/hooks/use-tokens';
 import { resyncHabitAlerts } from '@/lib/alert-scheduler';
 import { useAuth } from '@/lib/auth';
 import { addHabitToGroup } from '@/lib/group-mutations';
@@ -19,6 +20,7 @@ export default function NewHabitScreen() {
   const { session } = useAuth();
   const { draft, reset } = useHabitForm();
   const [saving, setSaving] = useState(false);
+  const t = useTokens();
 
   async function onSave() {
     const title = draft.title.trim();
@@ -61,7 +63,7 @@ export default function NewHabitScreen() {
   return (
     <ThemedView style={styles.root}>
       <SafeAreaView edges={['top']} style={styles.content}>
-        <View style={styles.header}>
+        <View style={[styles.header, { borderBottomColor: t.hairlineStrong }]}>
           <Pressable onPress={onCancel} hitSlop={12}>
             <ThemedText style={styles.headerButton}>Cancel</ThemedText>
           </Pressable>
@@ -90,7 +92,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(127,127,127,0.25)',
   },
   headerButton: { fontSize: 16 },
   save: { fontWeight: '600' },

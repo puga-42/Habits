@@ -2,12 +2,12 @@ import * as ImagePicker from 'expo-image-picker';
 import { useState } from 'react';
 import { ActionSheetIOS, ActivityIndicator, Alert, Platform, Pressable, StyleSheet, View } from 'react-native';
 
-import { Palette } from '@/constants/colors';
 import { AvatarCropModal } from '@/components/avatar-crop-modal';
 import { AvatarViewerModal } from '@/components/avatar-viewer-modal';
 import { FeedAvatar } from '@/components/feed-avatar';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { useTokens } from '@/hooks/use-tokens';
 import { blockUser, reportContent } from '@/lib/feed';
 import {
   acceptFriendRequest,
@@ -38,6 +38,7 @@ async function pickImage(source: 'library' | 'camera'): Promise<ImagePicker.Imag
 }
 
 export function UserHero({ profile, viewerId, targetId, onReload, onBack }: Props) {
+  const t = useTokens();
   const isSelf = profile.friendship_status === 'self';
   const label = friendshipActionLabel(profile.friendship_status);
   const [uploading, setUploading] = useState(false);
@@ -162,11 +163,11 @@ export function UserHero({ profile, viewerId, targetId, onReload, onBack }: Prop
 
       {!isSelf && label && (
         <View style={styles.actions}>
-          <Pressable onPress={handleFriendAction} style={[styles.btn, btnBg(profile.friendship_status)]}>
+          <Pressable onPress={handleFriendAction} style={[styles.btn, btnBg(profile.friendship_status, t.accent, t.surfaceRaised)]}>
             <ThemedText style={[styles.btnText, btnFg(profile.friendship_status)]}>{label}</ThemedText>
           </Pressable>
           <Pressable onPress={openOverflow} hitSlop={10} style={styles.overflow}>
-            <IconSymbol name="ellipsis" color="rgba(127,127,127,0.9)" size={22} />
+            <IconSymbol name="ellipsis" color={t.ink70} size={22} />
           </Pressable>
         </View>
       )}
@@ -187,8 +188,10 @@ export function UserHero({ profile, viewerId, targetId, onReload, onBack }: Prop
   );
 }
 
-function btnBg(st: FriendshipStatus) {
-  return st === 'none' || st === 'pending_incoming' ? styles.btnAccent : styles.btnGhost;
+function btnBg(st: FriendshipStatus, accentBg: string, ghostBg: string) {
+  return st === 'none' || st === 'pending_incoming'
+    ? { backgroundColor: accentBg }
+    : { backgroundColor: ghostBg };
 }
 function btnFg(st: FriendshipStatus) {
   return st === 'none' || st === 'pending_incoming' ? styles.btnTextAccent : styles.btnTextGhost;
@@ -210,8 +213,6 @@ const styles = StyleSheet.create({
   handle: { marginTop: 4 },
   actions: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 4 },
   btn: { paddingHorizontal: 20, paddingVertical: 8, borderRadius: 20, minWidth: 110, alignItems: 'center' },
-  btnAccent: { backgroundColor: Palette.primary },
-  btnGhost: { backgroundColor: 'rgba(127,127,127,0.12)' },
   btnText: { fontSize: 14, fontWeight: '600' },
   btnTextAccent: { color: '#fff' },
   btnTextGhost: { opacity: 0.7 },

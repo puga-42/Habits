@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { AttachmentGrid } from '@/components/attachment-grid';
 import { CompletionNoteEditor } from '@/components/completion-note-editor';
 import { ThemedText } from '@/components/themed-text';
+import { useTokens } from '@/hooks/use-tokens';
 import type { OverviewCompletion } from '@/lib/habit-overview';
 
 type Props = {
@@ -28,6 +29,7 @@ export function CompletionInlineEditor({
   onAttachmentDelete,
   onAttachmentReorder,
 }: Props) {
+  const t = useTokens();
   if (!expanded) {
     return (
       <CollapsedRow
@@ -68,7 +70,7 @@ export function CompletionInlineEditor({
         <View style={styles.actionRow}>
           <Pressable
             onPress={() => onAttachmentAdd(completion.id)}
-            style={({ pressed }) => [styles.actionBtn, pressed && styles.pressed]}
+            style={({ pressed }) => [styles.actionBtn, { backgroundColor: t.surfaceRaised }, pressed && styles.pressed]}
           >
             <ThemedText style={styles.actionBtnText}>+ photo / video</ThemedText>
           </Pressable>
@@ -85,6 +87,7 @@ function CollapsedRow({
   completion: OverviewCompletion;
   onToggle: () => void;
 }) {
+  const t = useTokens();
   const time = new Date(completion.completed_at).toLocaleTimeString('en-US', {
     hour: 'numeric',
     minute: '2-digit',
@@ -111,7 +114,7 @@ function CollapsedRow({
         )}
       </View>
       {mediaCount > 0 && (
-        <ThemedText style={styles.mediaBadge}>
+        <ThemedText style={[styles.mediaBadge, { backgroundColor: t.surfaceRaised }]}>
           {mediaCount} {mediaCount === 1 ? 'file' : 'files'}
         </ThemedText>
       )}
@@ -120,15 +123,16 @@ function CollapsedRow({
 }
 
 export function DisabledEditorPlaceholder() {
+  const t = useTokens();
   return (
     <View style={styles.placeholder}>
       <ThemedText style={styles.placeholderLabel}>Note</ThemedText>
-      <View style={styles.placeholderInput}>
+      <View style={[styles.placeholderInput, { backgroundColor: t.surfaceRaised }]}>
         <ThemedText style={styles.placeholderText}>
           Complete this habit to add a note
         </ThemedText>
       </View>
-      <View style={[styles.placeholderInput, { marginTop: 16 }]}>
+      <View style={[styles.placeholderInput, { backgroundColor: t.surfaceRaised, marginTop: 16 }]}>
         <ThemedText style={styles.placeholderText}>
           Complete this habit to add photos or videos
         </ThemedText>
@@ -150,7 +154,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 18,
-    backgroundColor: 'rgba(127,127,127,0.1)',
   },
   actionBtnText: { fontSize: 14, fontWeight: '500' },
   pressed: { opacity: 0.6 },
@@ -168,7 +171,6 @@ const styles = StyleSheet.create({
   mediaBadge: {
     fontSize: 12,
     opacity: 0.5,
-    backgroundColor: 'rgba(127,127,127,0.1)',
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 8,
@@ -183,7 +185,6 @@ const styles = StyleSheet.create({
   placeholderInput: {
     padding: 12,
     borderRadius: 10,
-    backgroundColor: 'rgba(127,127,127,0.06)',
   },
   placeholderText: { fontSize: 14 },
 });

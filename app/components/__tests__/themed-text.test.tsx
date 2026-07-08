@@ -24,4 +24,17 @@ describe('ThemedText', () => {
       : node.props.style;
     expect(flatStyle.lineHeight).toBe(24);
   });
+
+  it('display types set the rounded font family (Ember voice)', () => {
+    // Titles, group names, stat values, and streak numbers use SF Pro Rounded
+    // via Fonts.rounded — the friendly display voice of the Ember direction.
+    for (const type of ['display', 'displaySemiBold'] as const) {
+      const { getByText } = render(<ThemedText type={type}>Workout</ThemedText>);
+      const node = getByText('Workout');
+      const flatStyle = Array.isArray(node.props.style)
+        ? Object.assign({}, ...node.props.style.filter(Boolean))
+        : node.props.style;
+      expect(flatStyle.fontFamily).toBeTruthy();
+    }
+  });
 });

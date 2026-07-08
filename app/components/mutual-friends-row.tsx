@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { FeedAvatar } from '@/components/feed-avatar';
 import { ThemedText } from '@/components/themed-text';
+import { useTokens } from '@/hooks/use-tokens';
 import type { FriendProfile } from '@/lib/friends';
 
 type Props = {
@@ -15,6 +16,7 @@ const AVATAR_SIZE = 28;
 const OVERLAP = 10;
 
 export function MutualFriendsRow({ friends, totalCount, onPress }: Props) {
+  const t = useTokens();
   if (totalCount === 0) return null;
   const shown = friends.slice(0, MAX_SHOWN);
 
@@ -28,7 +30,10 @@ export function MutualFriendsRow({ friends, totalCount, onPress }: Props) {
         {shown.map((f, i) => (
           <View
             key={f.id}
-            style={[styles.avatarWrap, { left: i * (AVATAR_SIZE - OVERLAP) }]}>
+            style={[
+              styles.avatarWrap,
+              { left: i * (AVATAR_SIZE - OVERLAP), borderColor: t.hairlineStrong },
+            ]}>
             <FeedAvatar
               url={f.avatar_url}
               handle={f.handle}
@@ -58,7 +63,6 @@ const styles = StyleSheet.create({
     top: 0,
     borderRadius: AVATAR_SIZE / 2,
     borderWidth: 2,
-    borderColor: 'rgba(127,127,127,0.15)',
     overflow: 'hidden',
   },
   label: { fontSize: 13, opacity: 0.65, fontWeight: '500' },

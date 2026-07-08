@@ -8,6 +8,7 @@ import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import type { FeedItem } from '@/lib/feed';
 import { feedItemSortKey, formatRelativeTime } from '@/lib/feed';
+import { useTokens } from '@/hooks/use-tokens';
 
 type Props = {
   item: FeedItem;
@@ -56,7 +57,8 @@ export const FeedActivityCard = memo(function FeedActivityCard({
     Alert.alert('Options', undefined, buttons, { cancelable: true });
   };
 
-  const fallbackColor = item.habit_color ?? 'rgba(127,127,127,0.45)';
+  const t = useTokens();
+  const fallbackColor = item.habit_color ?? t.ink45;
 
   return (
     <Pressable style={styles.card} onPress={onHabitPress}>
@@ -82,11 +84,7 @@ export const FeedActivityCard = memo(function FeedActivityCard({
           onPress={openOverflow}
           hitSlop={10}
           style={styles.menuButton}>
-          <IconSymbol
-            name="ellipsis"
-            color="rgba(127,127,127,0.9)"
-            size={22}
-          />
+          <IconSymbol name="ellipsis" color={t.ink70} size={22} />
         </Pressable>
       </View>
 

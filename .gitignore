@@ -40,3 +40,7 @@ yarn-error.log
 # Supabase (later)
 supabase/.branches
 supabase/.temp
+
+# Local working notes — not part of the repo
+OUTBOX_DEPLOY_CHECKLIST.md
+features-and-bugs_01.rtf

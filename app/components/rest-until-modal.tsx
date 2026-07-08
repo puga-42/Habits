@@ -4,10 +4,11 @@
 
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useEffect, useState } from 'react';
-import { Modal, Platform, Pressable, StyleSheet, useColorScheme, View } from 'react-native';
+import { Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { Palette } from '@/constants/colors';
+import { withAlpha } from '@/constants/colors';
+import { useTokens } from '@/hooks/use-tokens';
 import { isoDate } from '@/lib/habits';
 
 type Props = {
@@ -30,7 +31,7 @@ function addDays(d: Date, n: number): Date {
 }
 
 export function RestUntilModal({ visible, habitTitle, fromIso, onConfirm, onClose }: Props) {
-  const isDark = useColorScheme() !== 'light';
+  const t = useTokens();
   const from = parseIso(fromIso);
   const [date, setDate] = useState(() => addDays(from, 7));
 
@@ -44,7 +45,7 @@ export function RestUntilModal({ visible, habitTitle, fromIso, onConfirm, onClos
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable
-          style={[styles.card, { backgroundColor: isDark ? Palette.charcoalElevated : '#FFFFFF' }]}
+          style={[styles.card, { backgroundColor: t.surface }]}
           onPress={() => {}}>
           <ThemedText style={styles.title} numberOfLines={1}>
             Rest {habitTitle}
@@ -66,8 +67,8 @@ export function RestUntilModal({ visible, habitTitle, fromIso, onConfirm, onClos
             <Pressable
               onPress={() => onConfirm(isoDate(date))}
               hitSlop={8}
-              style={[styles.btn, styles.restBtn]}>
-              <ThemedText style={styles.restText}>Rest</ThemedText>
+              style={[styles.btn, { backgroundColor: withAlpha(t.accent, 0.18) }]}>
+              <ThemedText style={[styles.restText, { color: t.accent }]}>Rest</ThemedText>
             </Pressable>
           </View>
         </Pressable>
@@ -107,6 +108,5 @@ const styles = StyleSheet.create({
   },
   btn: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8 },
   cancel: { fontSize: 16, opacity: 0.7 },
-  restBtn: { backgroundColor: 'rgba(9,237,226,0.18)' },
-  restText: { fontSize: 16, fontWeight: '700', color: Palette.primaryDark },
+  restText: { fontSize: 16, fontWeight: '700' },
 });

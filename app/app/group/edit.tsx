@@ -20,7 +20,7 @@ import { GroupEditDetails } from '@/components/group-edit-details';
 import { GroupEditHabitRow } from '@/components/group-edit-habit-row';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { useThemeColor } from '@/hooks/use-theme-color';
+import { useTokens } from '@/hooks/use-tokens';
 import { useAuth } from '@/lib/auth';
 import {
   buildGroupHabitChoices,
@@ -38,7 +38,7 @@ export default function EditGroupScreen() {
   const { session } = useAuth();
   const userId = session?.user.id;
   const { id } = useLocalSearchParams<{ id: string }>();
-  const textColor = useThemeColor({}, 'text');
+  const t = useTokens();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -118,7 +118,7 @@ export default function EditGroupScreen() {
   return (
     <ThemedView style={styles.root}>
       <SafeAreaView edges={['top']} style={styles.content}>
-        <View style={styles.header}>
+        <View style={[styles.header, { borderBottomColor: t.hairlineStrong }]}>
           <Pressable onPress={() => router.back()} hitSlop={12}>
             <ThemedText style={styles.headerButton}>Cancel</ThemedText>
           </Pressable>
@@ -144,7 +144,7 @@ export default function EditGroupScreen() {
             <GroupEditDetails
               name={name}
               description={description}
-              textColor={textColor}
+              textColor={t.ink}
               onChangeName={setName}
               onChangeDescription={setDescription}
             />
@@ -179,7 +179,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(127,127,127,0.25)',
   },
   headerButton: { fontSize: 16 },
   save: { fontWeight: '600' },

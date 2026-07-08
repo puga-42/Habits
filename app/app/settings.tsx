@@ -3,10 +3,11 @@ import { useCallback, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Switch, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { SegmentedControl } from '@/components/segmented-control';
 import { HandleEditor, WeekStartPicker } from '@/components/settings-modals';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Palette } from '@/constants/colors';
+import { useTokens } from '@/hooks/use-tokens';
 import { useAuth } from '@/lib/auth';
 import {
   fetchProfile,
@@ -16,16 +17,25 @@ import {
   weekdayName,
   type Profile,
 } from '@/lib/profile';
+import {
+  applyThemePreference,
+  loadThemePreference,
+  saveThemePreference,
+  type ThemePreference,
+} from '@/lib/theme-preference';
 
 export default function SettingsScreen() {
   const { session, signOut } = useAuth();
   const router = useRouter();
+  const t = useTokens();
   const email = session?.user?.email ?? 'unknown';
   const [profile, setProfile] = useState<Profile | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [handleEditorOpen, setHandleEditorOpen] = useState(false);
+  const [theme, setTheme] = useState<ThemePreference>('system');
 
   const load = useCallback(async () => {
+    loadThemePreference().then(setTheme);
     if (!session?.user.id) return;
     try {
       const p = await fetchProfile(session.user.id);
@@ -36,6 +46,12 @@ export default function SettingsScreen() {
   }, [session?.user.id]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  function onPickTheme(pref: ThemePreference) {
+    setTheme(pref);
+    applyThemePreference(pref); // takes effect immediately, app-wide
+    saveThemePreference(pref);
+  }
 
   async function onSaveHandle(newHandle: string) {
     if (!session?.user.id || !profile) return;
@@ -95,7 +111,11 @@ export default function SettingsScreen() {
           <ThemedText style={styles.sectionTitle}>Profile</ThemedText>
           <Pressable
             onPress={() => setHandleEditorOpen(true)}
-            style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}>
+            style={({ pressed }) => [
+              styles.row,
+              { borderBottomColor: t.hairlineStrong },
+              pressed && styles.rowPressed,
+            ]}>
             <ThemedText style={styles.rowLabel}>Handle</ThemedText>
             <ThemedText style={styles.rowValue}>
               {profile ? `@${profile.handle}` : '…'}
@@ -104,10 +124,27 @@ export default function SettingsScreen() {
         </View>
 
         <View style={styles.section}>
+          <ThemedText style={styles.sectionTitle}>Appearance</ThemedText>
+          <SegmentedControl
+            options={[
+              { value: 'system', label: 'System' },
+              { value: 'light', label: 'Light' },
+              { value: 'dark', label: 'Dark' },
+            ]}
+            value={theme}
+            onChange={onPickTheme}
+          />
+        </View>
+
+        <View style={styles.section}>
           <ThemedText style={styles.sectionTitle}>Calendar</ThemedText>
           <Pressable
             onPress={() => setPickerOpen(true)}
-            style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}>
+            style={({ pressed }) => [
+              styles.row,
+              { borderBottomColor: t.hairlineStrong },
+              pressed && styles.rowPressed,
+            ]}>
             <ThemedText style={styles.rowLabel}>Week starts on</ThemedText>
             <ThemedText style={styles.rowValue}>
               {profile ? weekdayName(profile.week_start) : '…'}
@@ -117,25 +154,25 @@ export default function SettingsScreen() {
 
         <View style={styles.section}>
           <ThemedText style={styles.sectionTitle}>Notifications</ThemedText>
-          <View style={styles.row}>
+          <View style={[styles.row, { borderBottomColor: t.hairlineStrong }]}>
             <ThemedText style={styles.rowLabel}>Likes</ThemedText>
             <Switch
               value={profile?.notify_likes ?? true}
               onValueChange={(v) => onToggleNotif('notify_likes', v)}
-              trackColor={{ true: Palette.primary }}
+              trackColor={{ true: t.accent }}
             />
           </View>
-          <View style={styles.row}>
+          <View style={[styles.row, { borderBottomColor: t.hairlineStrong }]}>
             <ThemedText style={styles.rowLabel}>Comments</ThemedText>
             <Switch
               value={profile?.notify_comments ?? true}
               onValueChange={(v) => onToggleNotif('notify_comments', v)}
-              trackColor={{ true: Palette.primary }}
+              trackColor={{ true: t.accent }}
             />
           </View>
         </View>
 
-        <Pressable onPress={signOut} style={styles.signOut}>
+        <Pressable onPress={signOut} style={[styles.signOut, { borderColor: t.ink45 }]}>
           <ThemedText type="defaultSemiBold" style={styles.signOutText}>
             Sign out
           </ThemedText>
@@ -183,7 +220,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(127,127,127,0.25)',
   },
   rowPressed: { opacity: 0.5 },
   rowLabel: { fontSize: 16 },
@@ -191,7 +227,6 @@ const styles = StyleSheet.create({
   signOut: {
     marginTop: 32,
     borderWidth: 1,
-    borderColor: 'rgba(127,127,127,0.4)',
     borderRadius: 8,
     paddingVertical: 12,
     paddingHorizontal: 16,

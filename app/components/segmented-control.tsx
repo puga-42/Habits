@@ -1,10 +1,10 @@
 // Small iOS-style segmented control: a track holding N equal segments, the
 // selected one raised on an elevated pill. Generic over the option value.
 
-import { Pressable, StyleSheet, useColorScheme, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { Palette } from '@/constants/colors';
+import { useTokens } from '@/hooks/use-tokens';
 
 type Option<T extends string> = { value: T; label: string };
 
@@ -19,8 +19,7 @@ export function SegmentedControl<T extends string>({
   value,
   onChange,
 }: Props<T>) {
-  const isDark = useColorScheme() !== 'light';
-  const selectedBg = isDark ? Palette.charcoalElevated : '#FFFFFF';
+  const t = useTokens();
 
   return (
     <View style={styles.track}>
@@ -30,7 +29,7 @@ export function SegmentedControl<T extends string>({
           <Pressable
             key={opt.value}
             onPress={() => onChange(opt.value)}
-            style={[styles.segment, selected && { backgroundColor: selectedBg }]}>
+            style={[styles.segment, selected && { backgroundColor: t.surface }]}>
             <ThemedText style={[styles.label, selected && styles.labelSelected]}>
               {opt.label}
             </ThemedText>

@@ -10,6 +10,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { StreakBadge } from '@/components/streak-badge';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { useTokens } from '@/hooks/use-tokens';
 
 type Props = {
   groupId: string;
@@ -29,6 +30,7 @@ export function GroupCardHeader({
   onToggle,
 }: Props) {
   const router = useRouter();
+  const t = useTokens();
   return (
     <View style={styles.header}>
       <Pressable
@@ -36,8 +38,9 @@ export function GroupCardHeader({
         style={styles.titleArea}
         accessibilityRole="button"
         accessibilityLabel={`Open ${name}`}>
-        <View style={[styles.dot, { backgroundColor: color ?? 'rgba(127,127,127,0.5)' }]} />
-        <ThemedText style={styles.title} numberOfLines={1}>
+        <View style={[styles.dot, { backgroundColor: color ?? t.ink45 }]} />
+        {/* Group names speak in the Ember display voice (SF Pro Rounded). */}
+        <ThemedText type="displaySemiBold" style={styles.title} numberOfLines={1}>
           {name}
         </ThemedText>
         {streak != null && streak > 0 ? (
@@ -58,7 +61,7 @@ export function GroupCardHeader({
           name="chevron.right"
           size={18}
           weight="semibold"
-          color="rgba(127,127,127,0.9)"
+          color={t.ink52}
           style={{ transform: [{ rotate: collapsed ? '0deg' : '90deg' }] }}
         />
       </Pressable>
@@ -76,7 +79,7 @@ const styles = StyleSheet.create({
   },
   titleArea: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
   dot: { width: 10, height: 10, borderRadius: 5 },
-  title: { flex: 1, fontSize: 17, fontWeight: '700' },
+  title: { flex: 1, fontSize: 17 },
   streak: { marginRight: 2 },
   chevron: { paddingLeft: 4 },
 });

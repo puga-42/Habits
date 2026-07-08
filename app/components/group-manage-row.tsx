@@ -5,6 +5,7 @@
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { useTokens } from '@/hooks/use-tokens';
 
 type Props = {
   name: string;
@@ -33,9 +34,10 @@ export function GroupManageRow({
   onDelete,
   onOpen,
 }: Props) {
+  const t = useTokens();
   return (
     <View style={styles.row}>
-      <View style={[styles.dot, { backgroundColor: color ?? 'rgba(127,127,127,0.5)' }]} />
+      <View style={[styles.dot, { backgroundColor: color ?? t.ink45 }]} />
       {editing ? (
         <TextInput
           value={editName}
@@ -57,7 +59,7 @@ export function GroupManageRow({
         </Pressable>
       )}
       <Pressable onPress={onDelete} hitSlop={10}>
-        <ThemedText style={styles.delete}>Delete</ThemedText>
+        <ThemedText style={[styles.delete, { color: t.danger }]}>Delete</ThemedText>
       </Pressable>
       <Pressable
         onPress={onOpen}
@@ -83,6 +85,6 @@ const styles = StyleSheet.create({
   name: { fontSize: 16 },
   nameInput: { flex: 1, padding: 0 },
   count: { fontSize: 13, opacity: 0.5, marginTop: 2 },
-  delete: { fontSize: 15, color: '#FF3B30' },
+  delete: { fontSize: 15 },
   open: { fontSize: 22, opacity: 0.3, paddingLeft: 2 },
 });

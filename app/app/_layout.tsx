@@ -8,6 +8,7 @@ import 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AuthProvider, useAuth } from '@/lib/auth';
+import { applyThemePreference, loadThemePreference } from '@/lib/theme-preference';
 import { syncWidgetData } from '@/lib/widget-sync';
 
 export const unstable_settings = {
@@ -43,7 +44,9 @@ function AuthGate() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="sign-in" />
-      <Stack.Screen name="habit" options={{ presentation: 'modal' }} />
+      {/* Full pages, not modals: create/edit/overview (and their detail pages
+          goal/repeat/visibility/color) push like everything else. */}
+      <Stack.Screen name="habit" />
       <Stack.Screen name="completion" />
       <Stack.Screen name="likers" />
       <Stack.Screen name="user" />
@@ -56,6 +59,12 @@ function AuthGate() {
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+
+  // Re-apply the persisted Appearance override (Settings → Appearance) on
+  // launch; useColorScheme everywhere then reflects it automatically.
+  useEffect(() => {
+    loadThemePreference().then(applyThemePreference);
+  }, []);
 
   return (
     // GestureHandlerRootView is required by react-native-draggable-flatlist

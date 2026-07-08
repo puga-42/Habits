@@ -5,6 +5,7 @@
 import { StyleSheet, TextInput } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { useTokens } from '@/hooks/use-tokens';
 
 type Props = {
   name: string;
@@ -21,13 +22,14 @@ export function GroupEditDetails({
   onChangeName,
   onChangeDescription,
 }: Props) {
+  const t = useTokens();
   return (
     <>
       <ThemedText style={styles.label}>Name</ThemedText>
       <TextInput
         value={name}
         onChangeText={onChangeName}
-        style={[styles.input, { color: textColor }]}
+        style={[styles.input, { backgroundColor: t.surfaceRaised, color: textColor }]}
         maxLength={100}
         returnKeyType="done"
       />
@@ -37,8 +39,8 @@ export function GroupEditDetails({
         value={description}
         onChangeText={onChangeDescription}
         placeholder="Who does this group help you become?"
-        placeholderTextColor="rgba(127,127,127,0.5)"
-        style={[styles.input, styles.multiline, { color: textColor }]}
+        placeholderTextColor={t.ink45}
+        style={[styles.input, styles.multiline, { backgroundColor: t.surfaceRaised, color: textColor }]}
         maxLength={1000}
         multiline
       />
@@ -60,7 +62,6 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 12,
     borderRadius: 10,
-    backgroundColor: 'rgba(127,127,127,0.12)',
   },
   multiline: { minHeight: 72, textAlignVertical: 'top' },
 });

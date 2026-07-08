@@ -2,6 +2,8 @@ import type { ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 
+import { useTokens } from '@/hooks/use-tokens';
+
 type Props = {
   size: number;
   strokeWidth: number;
@@ -16,9 +18,10 @@ export function ProgressRing({
   strokeWidth,
   fraction,
   color,
-  trackColor = 'rgba(127,127,127,0.25)',
+  trackColor,
   children,
 }: Props) {
+  const t = useTokens();
   const f = Math.max(0, Math.min(1, fraction));
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
@@ -31,7 +34,7 @@ export function ProgressRing({
           cx={size / 2}
           cy={size / 2}
           r={radius}
-          stroke={trackColor}
+          stroke={trackColor ?? t.hairlineStrong}
           strokeWidth={strokeWidth}
           fill="none"
         />

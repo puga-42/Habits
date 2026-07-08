@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { useThemeColor } from '@/hooks/use-theme-color';
+import { useTokens } from '@/hooks/use-tokens';
 
 const MAX_NOTE_LENGTH = 2000;
 const CHAR_WARNING_THRESHOLD = 1800;
@@ -19,7 +19,7 @@ export function CompletionNoteEditor({ initialNote, editable, onSave, inputBackg
   const [isFocused, setIsFocused] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<TextInput>(null);
-  const textColor = useThemeColor({}, 'text');
+  const t = useTokens();
   const savedRef = useRef(initialNote ?? '');
 
   useEffect(() => {
@@ -80,13 +80,13 @@ export function CompletionNoteEditor({ initialNote, editable, onSave, inputBackg
         <TextInput
           ref={inputRef}
           pointerEvents={isFocused ? 'auto' : 'none'}
-          style={[styles.input, { color: textColor }, inputBackgroundColor != null && { backgroundColor: inputBackgroundColor }]}
+          style={[styles.input, { color: t.ink, backgroundColor: t.surfaceRaised }, inputBackgroundColor != null && { backgroundColor: inputBackgroundColor }]}
           value={text}
           onChangeText={handleChange}
           onFocus={handleFocus}
           onBlur={handleBlur}
           placeholder="Add a note..."
-          placeholderTextColor="rgba(127,127,127,0.5)"
+          placeholderTextColor={t.ink45}
           multiline
           maxLength={MAX_NOTE_LENGTH}
           scrollEnabled={false}
@@ -110,7 +110,6 @@ const styles = StyleSheet.create({
     minHeight: 60,
     padding: 12,
     borderRadius: 10,
-    backgroundColor: 'rgba(127,127,127,0.08)',
   },
   readOnly: { fontSize: 15, lineHeight: 21 },
   charCount: {

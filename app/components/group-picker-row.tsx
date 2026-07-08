@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { useThemeColor } from '@/hooks/use-theme-color';
+import { useTokens } from '@/hooks/use-tokens';
 import { useAuth } from '@/lib/auth';
 import { createGroup } from '@/lib/group-mutations';
 import { fetchGroups, type HabitGroup } from '@/lib/groups';
@@ -17,7 +17,7 @@ export function GroupPickerRow() {
   const { draft, update } = useHabitForm();
   const { session } = useAuth();
   const userId = session?.user.id;
-  const textColor = useThemeColor({}, 'text');
+  const t = useTokens();
 
   const [open, setOpen] = useState(false);
   const [groups, setGroups] = useState<HabitGroup[]>([]);
@@ -90,8 +90,8 @@ export function GroupPickerRow() {
               value={newName}
               onChangeText={setNewName}
               placeholder="New group…"
-              placeholderTextColor="rgba(127,127,127,0.5)"
-              style={[styles.createInput, { color: textColor }]}
+              placeholderTextColor={t.ink45}
+              style={[styles.createInput, { color: t.ink }]}
               returnKeyType="done"
               onSubmitEditing={onCreate}
               maxLength={100}
@@ -101,7 +101,11 @@ export function GroupPickerRow() {
               disabled={!newName.trim() || creating}
               hitSlop={8}>
               <ThemedText
-                style={[styles.add, (!newName.trim() || creating) && styles.addDisabled]}>
+                style={[
+                  styles.add,
+                  { color: t.accent },
+                  (!newName.trim() || creating) && styles.addDisabled,
+                ]}>
                 Add
               </ThemedText>
             </Pressable>
@@ -166,6 +170,6 @@ const styles = StyleSheet.create({
     paddingTop: 8,
   },
   createInput: { flex: 1, fontSize: 15, padding: 0 },
-  add: { fontSize: 15, fontWeight: '600', color: '#0A84FF' },
+  add: { fontSize: 15, fontWeight: '600' },
   addDisabled: { opacity: 0.4 },
 });

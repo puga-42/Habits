@@ -6,6 +6,7 @@ import {
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Palette, solidTint } from '@/constants/colors';
+import { useTokens } from '@/hooks/use-tokens';
 import type { DayActivity } from '@/lib/activity-heatmap';
 import {
   bucketByView, fetchHabitDowActivity, maxBarCount, yAxisTicks,
@@ -23,6 +24,7 @@ type Props = { habit: Habit };
 export function HabitCompletionChart({ habit }: Props) {
   const scheme = useColorScheme();
   const isDark = scheme !== 'light';
+  const t = useTokens();
   const [days, setDays] = useState<DayActivity[]>([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<ChartView>('weekly');
@@ -37,7 +39,7 @@ export function HabitCompletionChart({ habit }: Props) {
     return () => { cancelled = true; };
   }, [habit]);
 
-  const baseColor = habit.color ?? Palette.primary;
+  const baseColor = habit.color ?? Palette.habitColors[0];
   const barColor = useMemo(() => solidTint(baseColor, 0.9, isDark), [baseColor, isDark]);
   const emptyColor = isDark ? EMPTY_DARK : EMPTY_LIGHT;
 
@@ -51,13 +53,16 @@ export function HabitCompletionChart({ habit }: Props) {
   const barWidth = view === 'weekly' ? 26 : view === 'month' ? 18 : 14;
 
   return (
-    <View style={s.root}>
+    <View style={[s.root, { borderTopColor: t.hairlineStrong }]}>
       <View style={s.header}>
         <View style={s.headerLeft}>
           <ThemedText style={s.title}>Completions</ThemedText>
           <ThemedText style={s.total}>{total}</ThemedText>
         </View>
-        <Pressable style={s.dropdown} onPress={() => setMenuOpen(true)} hitSlop={6}>
+        <Pressable
+          style={[s.dropdown, { backgroundColor: t.surfaceRaised }]}
+          onPress={() => setMenuOpen(true)}
+          hitSlop={6}>
           <ThemedText style={s.dropdownText}>{activeLabel}</ThemedText>
           <ThemedText style={s.chevron}>▾</ThemedText>
         </Pressable>
@@ -65,7 +70,7 @@ export function HabitCompletionChart({ habit }: Props) {
 
       <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
         <Pressable style={s.backdrop} onPress={() => setMenuOpen(false)}>
-          <ThemedView style={s.menu}>
+          <ThemedView style={[s.menu, { borderColor: t.hairlineStrong }]}>
             {CHART_VIEWS.map((v) => {
               const active = v.key === view;
               return (
@@ -94,21 +99,27 @@ export function HabitCompletionChart({ habit }: Props) {
       ) : (
         <View style={s.chartRow}>
           <View style={s.yAxis}>
-            {ticks.map((t) => (
+            {ticks.map((tick) => (
               <ThemedText
-                key={t}
-                style={[s.yLabel, { bottom: (t / axisMax) * CHART_HEIGHT - 7 }]}
+                key={tick}
+                style={[s.yLabel, { bottom: (tick / axisMax) * CHART_HEIGHT - 7 }]}
                 numberOfLines={1}
               >
-                {t}
+                {tick}
               </ThemedText>
             ))}
           </View>
 
           <View style={s.plot}>
             <View style={s.gridArea} pointerEvents="none">
-              {ticks.map((t) => (
-                <View key={t} style={[s.gridline, { bottom: (t / axisMax) * CHART_HEIGHT }]} />
+              {ticks.map((tick) => (
+                <View
+                  key={tick}
+                  style={[
+                    s.gridline,
+                    { bottom: (tick / axisMax) * CHART_HEIGHT, backgroundColor: t.hairlineStrong },
+                  ]}
+                />
               ))}
             </View>
 
@@ -149,7 +160,6 @@ const s = StyleSheet.create({
     marginTop: 8,
     paddingTop: 14,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(127,127,127,0.2)',
   },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
   headerLeft: { flexDirection: 'row', alignItems: 'baseline', gap: 8 },
@@ -162,7 +172,6 @@ const s = StyleSheet.create({
     paddingVertical: 5,
     paddingHorizontal: 10,
     borderRadius: 8,
-    backgroundColor: 'rgba(127,127,127,0.12)',
   },
   dropdownText: { fontSize: 13, fontWeight: '600' },
   chevron: { fontSize: 10, opacity: 0.6 },
@@ -172,7 +181,6 @@ const s = StyleSheet.create({
     borderRadius: 14,
     paddingVertical: 6,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(127,127,127,0.25)',
   },
   menuRow: {
     flexDirection: 'row',
@@ -203,7 +211,6 @@ const s = StyleSheet.create({
     left: 0,
     right: 0,
     height: StyleSheet.hairlineWidth,
-    backgroundColor: 'rgba(127,127,127,0.18)',
   },
   fill: { flexGrow: 1 },
   bars: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', flex: 1 },

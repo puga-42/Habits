@@ -14,8 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Palette } from '@/constants/colors';
-import { useThemeColor } from '@/hooks/use-theme-color';
+import { useTokens } from '@/hooks/use-tokens';
 import {
   keyboardAvoidingBehavior,
   signInWithApple,
@@ -24,8 +23,7 @@ import {
 } from '@/lib/sign-in';
 
 export default function SignInScreen() {
-  const textColor = useThemeColor({}, 'text');
-  const inputBg = useThemeColor({ light: '#fff', dark: 'rgba(255,255,255,0.08)' }, 'background');
+  const t = useTokens();
   const [busy, setBusy] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -79,7 +77,10 @@ export default function SignInScreen() {
             </View>
             <View style={styles.buttonContainer}>
               <TextInput
-                style={[styles.input, { color: textColor, backgroundColor: inputBg }]}
+                style={[
+                  styles.input,
+                  { color: t.ink, backgroundColor: t.surface, borderColor: t.hairlineStrong },
+                ]}
                 placeholder="Email"
                 placeholderTextColor="#999"
                 autoCapitalize="none"
@@ -89,7 +90,10 @@ export default function SignInScreen() {
                 onChangeText={setEmail}
               />
               <TextInput
-                style={[styles.input, { color: textColor, backgroundColor: inputBg }]}
+                style={[
+                  styles.input,
+                  { color: t.ink, backgroundColor: t.surface, borderColor: t.hairlineStrong },
+                ]}
                 placeholder="Password"
                 placeholderTextColor="#999"
                 autoCapitalize="none"
@@ -99,11 +103,11 @@ export default function SignInScreen() {
                 onChangeText={setPassword}
               />
               <Pressable
-                style={styles.emailButton}
+                style={[styles.emailButton, { backgroundColor: t.accent }]}
                 onPress={handleEmailAuth}
                 disabled={busy}
               >
-                <ThemedText style={styles.emailButtonText}>
+                <ThemedText style={[styles.emailButtonText, { color: t.onAccent }]}>
                   {isSignUp ? 'Create account' : 'Sign in'}
                 </ThemedText>
               </Pressable>
@@ -150,19 +154,16 @@ const styles = StyleSheet.create({
     height: 50,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: Palette.slate200,
     paddingHorizontal: 16,
     fontSize: 16,
   },
   emailButton: {
     height: 50,
     borderRadius: 8,
-    backgroundColor: Palette.charcoal,
     justifyContent: 'center',
     alignItems: 'center',
   },
   emailButtonText: {
-    color: '#fff',
     fontSize: 17,
     fontWeight: '600',
   },

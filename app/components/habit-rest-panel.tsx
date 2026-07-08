@@ -8,6 +8,7 @@ import { StyleSheet, View } from 'react-native';
 import { AttachmentGrid } from '@/components/attachment-grid';
 import { CompletionNoteEditor } from '@/components/completion-note-editor';
 import { ThemedText } from '@/components/themed-text';
+import { useTokens } from '@/hooks/use-tokens';
 import {
   fetchActiveRestForHabit,
   updateRestNote,
@@ -31,6 +32,7 @@ function formatUntil(endIso: string): string {
 }
 
 export function HabitRestPanel({ habitId, userId, isOwner, dateIso }: Props) {
+  const t = useTokens();
   const [rest, setRest] = useState<ActiveRest | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -60,7 +62,7 @@ export function HabitRestPanel({ habitId, userId, isOwner, dateIso }: Props) {
   if (loading || !rest) return null;
 
   return (
-    <View style={styles.panel}>
+    <View style={[styles.panel, { borderColor: t.hairlineStrong }]}>
       <ThemedText style={styles.title}>
         Resting until {formatUntil(rest.end_date)} zᶻᶻ
       </ThemedText>
@@ -90,7 +92,6 @@ const styles = StyleSheet.create({
   panel: {
     borderTopWidth: StyleSheet.hairlineWidth,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(127,127,127,0.2)',
     paddingVertical: 12,
     marginBottom: 14,
   },
