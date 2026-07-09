@@ -59,7 +59,7 @@ export default function GroupOverviewScreen() {
           </View>
         ) : !group ? (
           <View style={styles.centered}>
-            <ThemedText style={styles.missing}>This group no longer exists.</ThemedText>
+            <ThemedText style={styles.missing}>This identity no longer exists.</ThemedText>
           </View>
         ) : (
           <ScrollView contentContainerStyle={styles.scroll}>
@@ -78,7 +78,7 @@ export default function GroupOverviewScreen() {
               <ThemedText style={styles.sectionLabel}>Habits</ThemedText>
               {members.length === 0 ? (
                 <ThemedText style={styles.empty}>
-                  No habits in this group yet. Add one from a habit&apos;s Group field.
+                  No habits in this identity yet. Add them with Edit, or from a habit&apos;s Identity field.
                 </ThemedText>
               ) : (
                 members.map((member) => (

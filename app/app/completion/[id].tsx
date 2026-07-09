@@ -32,6 +32,7 @@ import {
 import { signedUrlsForPaths } from '@/lib/feed';
 import { Palette } from '@/constants/colors';
 import type { Visibility } from '@/lib/habits';
+import { errorMessage } from '@/lib/error-message';
 
 export default function CompletionDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -154,7 +155,7 @@ export default function CompletionDetailScreen() {
         return next;
       });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : (err as any)?.message ?? JSON.stringify(err);
+      const msg = errorMessage(err);
       console.error('Upload error:', msg);
       Alert.alert('Upload failed', msg);
     } finally {

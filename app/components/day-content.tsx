@@ -13,6 +13,7 @@ import { ThemedText } from '@/components/themed-text';
 import { useTokens } from '@/hooks/use-tokens';
 import { diffDayHabits } from '@/lib/day-diff';
 import { buildDayItems, UNGROUPED } from '@/lib/day-items';
+import { Radii } from '@/constants/theme';
 import { dayItemKey, type DayItem, type Section } from '@/lib/day-item-key';
 import type { GroupMembership, HabitGroup } from '@/lib/groups';
 import { isoDate, type Habit } from '@/lib/habits';
@@ -112,6 +113,11 @@ export function DayContent({
     prevRows.current = rows;
   }
 
+  // Group expansion: rows mounting because a card just expanded wait out the
+  // 300ms layout transition (AnimatedHabitRow's delayed FadeIn) instead of
+  // popping in while the card is still growing.
+  const justExpandedGroup = useRef<string | null>(null);
+
   const closeCurrentDrawer = useRef<(() => void) | null>(null);
   const handleDrawerOpen = useCallback((closeFn: () => void) => {
     closeCurrentDrawer.current?.();
@@ -133,7 +139,7 @@ export function DayContent({
 
   const keyExtractor = (item: DayItem): string => dayItemKey(item);
 
-  const renderItem = ({ item, drag, isActive }: RenderItemParams<DayItem>) => {
+  const renderItem = ({ item, drag, isActive, getIndex }: RenderItemParams<DayItem>) => {
     if (item.kind === 'group-header') {
       return (
         <Animated.View>
@@ -143,18 +149,39 @@ export function DayContent({
             collapsed={item.collapsed}
             color={item.color}
             streak={item.streak}
-            onToggle={() => onToggleGroup(item.groupId, !item.collapsed)}
+            onToggle={() => {
+              if (item.collapsed) {
+                justExpandedGroup.current = item.groupId;
+                setTimeout(() => {
+                  if (justExpandedGroup.current === item.groupId) {
+                    justExpandedGroup.current = null;
+                  }
+                }, 700);
+              }
+              onToggleGroup(item.groupId, !item.collapsed);
+            }}
           />
         </Animated.View>
       );
     }
-    if (item.kind === 'ungrouped-header') {
-      // Subtle divider marking the start of the ungrouped habits below the cards.
+    if (item.kind === 'group-footer') {
+      // Bottom cap of the card: closes the surface the header opened and
+      // provides the gap to whatever follows.
       return (
-        <Animated.View style={styles.ungroupedHeader}>
-          <View style={[styles.rule, { backgroundColor: t.hairlineStrong }]} />
-        </Animated.View>
+        <Animated.View
+          style={[
+            styles.groupFooter,
+            { backgroundColor: t.surface, borderBottomLeftRadius: Radii.card, borderBottomRightRadius: Radii.card },
+          ]}
+        />
       );
+    }
+    if (item.kind === 'ungrouped-header') {
+      // Boundary between the group cards and the ungrouped pile. Kept as a
+      // data item (drag-reorder walks it to attribute drops) but rendered as
+      // plain breathing room — the cards' contained shape vs the full-width
+      // loose pills already tells the two regions apart.
+      return <Animated.View style={styles.ungroupedHeader} />;
     }
     if (item.kind === 'all-done') {
       return (
@@ -174,10 +201,11 @@ export function DayContent({
     }
     if (item.kind === 'resting-header') {
       const expanded = restingExpanded.has(item.groupId);
+      const inCard = item.groupId !== UNGROUPED;
       return (
         <Pressable
           onPress={() => toggleResting(item.groupId)}
-          style={styles.sectionHeader}
+          style={[styles.sectionHeader, inCard && [styles.cardInset, { backgroundColor: t.surface }]]}
           accessibilityRole="button"
           accessibilityLabel={expanded ? 'Collapse resting' : 'Expand resting'}>
           <View style={[styles.rule, { backgroundColor: t.hairlineStrong }]} />
@@ -199,9 +227,29 @@ export function DayContent({
             ? 'running'
             : 'idle'
         : undefined;
-    const isEntering = enteringIds.current.has(habitId);
+    const fromExpand = item.groupId === justExpandedGroup.current;
+    const isEntering = enteringIds.current.has(habitId) || fromExpand;
+    // Cascade: rows of a just-expanded card start almost with the layout
+    // transition and stagger downward, so the card rolls open instead of
+    // sitting empty until one big fade (position within the card, capped).
+    let enterDelay: number | undefined;
+    if (fromExpand) {
+      const headerIdx = data.findIndex(
+        (d) => d.kind === 'group-header' && d.groupId === item.groupId,
+      );
+      const myIdx = getIndex() ?? data.indexOf(item);
+      const ordinal = headerIdx >= 0 && myIdx > headerIdx ? myIdx - headerIdx - 1 : 0;
+      enterDelay = Math.min(120 + ordinal * 45, 500);
+    }
+    const inCard = item.groupId !== UNGROUPED;
     return (
-      <AnimatedHabitRow entering={isEntering}>
+      <View
+        style={
+          inCard
+            ? [styles.cardRow, { backgroundColor: t.surface }]
+            : styles.looseRow
+        }>
+      <AnimatedHabitRow entering={isEntering} enterDelay={enterDelay}>
         <HabitRowSwipeable
           row={item.row}
           dateIso={iso}
@@ -219,10 +267,9 @@ export function DayContent({
           isFuture={isFuture}
         />
       </AnimatedHabitRow>
+      </View>
     );
   };
-
-  const ItemSeparator = () => <View style={styles.itemSeparator} />;
 
   const onDragEnd = ({
     data: newData,
@@ -246,7 +293,9 @@ export function DayContent({
     let landedSection: Section = 'notCompleted';
     for (let i = 0; i < to; i++) {
       const it = newData[i];
-      if (it.kind === 'group-header') {
+      if (it.kind === 'group-footer') {
+        continue; // card cap — attribution unchanged
+      } else if (it.kind === 'group-header') {
         landedGroup = it.groupId;
         landedSection = 'notCompleted';
       } else if (it.kind === 'ungrouped-header') {
@@ -282,11 +331,24 @@ export function DayContent({
       animationConfig={SNAPPY_DROP}
       autoscrollSpeed={0}
       autoscrollThreshold={0}
+      // Render the whole day in one pass and keep a huge window: the trailing
+      // cells otherwise get unmounted/remounted by list windowing when an
+      // expand grows the data, which plays the exiting fade instead of the
+      // layout slide (the "completed habit fades instead of sliding" bug).
+      // Day lists are small, so opting out of virtualization is free.
+      initialNumToRender={40}
+      maxToRenderPerBatch={40}
+      windowSize={41}
+      // Anchor the first visible item when content above it grows or shrinks:
+      // collapsing a card removes its rows from layout in one frame, and
+      // without anchoring the stale scroll offset points at different content
+      // (worst case clamped to the top). With it, expand/collapse only ever
+      // reads as the cards sliding.
+      maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
       enableLayoutAnimationExperimental
       itemLayoutAnimation={LinearTransition.duration(300)}
       containerStyle={styles.scrollRoot}
       contentContainerStyle={styles.scrollContent}
-      ItemSeparatorComponent={ItemSeparator}
       keyboardShouldPersistTaps="handled"
       activationDistance={10}
       itemExitingAnimation={FadeOut.duration(200)}
@@ -297,7 +359,12 @@ export function DayContent({
 const styles = StyleSheet.create({
   scrollRoot: { flex: 1 },
   scrollContent: { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 120 },
-  itemSeparator: { height: 10 },
+  // In-card rows sit inset on the card surface — narrower than ungrouped
+  // pills, so containment reads at a glance; the padding doubles as the gap.
+  cardRow: { paddingHorizontal: 10, paddingBottom: 10 },
+  cardInset: { paddingHorizontal: 14, marginHorizontal: 0 },
+  looseRow: { marginBottom: 10 },
+  groupFooter: { height: 6, marginBottom: 14 },
   emptyState: {
     flex: 1,
     alignItems: 'center',
@@ -323,5 +390,5 @@ const styles = StyleSheet.create({
   },
   zzz: { fontSize: 12, fontStyle: 'italic' },
   restChevron: { fontSize: 12 },
-  ungroupedHeader: { paddingTop: 18, paddingBottom: 4 },
+  ungroupedHeader: { height: 4 },
 });

@@ -15,6 +15,7 @@ type IconSymbolName = keyof typeof MAPPING;
  */
 const MAPPING = {
   'chevron.right': 'chevron-right',
+  'info.circle': 'info-outline',
   calendar: 'today',
   'clock.arrow.circlepath': 'history',
   'rectangle.stack.fill': 'dynamic-feed',

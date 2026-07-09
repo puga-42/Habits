@@ -79,6 +79,7 @@ import {
   sumTimeBasesForHabits,
 } from '@/lib/time-entries';
 import { syncWidgetData } from '@/lib/widget-sync';
+import { relativeDayName } from '@/lib/relative-day';
 
 const SCHEDULE_INITIAL_HALF_WINDOW = 7; // days each direction
 const SCHEDULE_EXTEND_BY = 7;
@@ -658,7 +659,7 @@ export default function CalendarScreen() {
             band, distinct from the content scrolling on the base background. */}
         <ScreenHeader>
           <TabTopBar
-            title={headerLabel(view, anchorDate, weekStart)}
+            title={headerLabel(view, anchorDate, weekStart, today)}
             onMenuPress={openDrawer}
             rightSlot={
               !isOnToday ? (
@@ -784,10 +785,10 @@ export default function CalendarScreen() {
               onPress: () => router.push('/habit/new'),
             },
             {
-              key: 'new-group',
-              label: 'New group',
+              key: 'new-identity',
+              label: 'New identity',
               icon: <IconSymbol name="folder.badge.plus" size={20} color={Palette.periwinkle} />,
-              onPress: () => router.push('/groups'),
+              onPress: () => router.push('/group/new'),
             },
             {
               key: 'feedback',
@@ -820,14 +821,23 @@ export default function CalendarScreen() {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────
 
-function headerLabel(view: ViewMode, anchor: Date, weekStart: number): string {
+function headerLabel(
+  view: ViewMode,
+  anchor: Date,
+  weekStart: number,
+  today: Date,
+): string {
   switch (view) {
     case 'day':
-      return anchor.toLocaleDateString('en-US', {
-        weekday: 'short',
-        month: 'short',
-        day: 'numeric',
-      });
+      // Anchored on today or its neighbors, the title speaks relatively.
+      return (
+        relativeDayName(isoDate(anchor), isoDate(today)) ??
+        anchor.toLocaleDateString('en-US', {
+          weekday: 'short',
+          month: 'short',
+          day: 'numeric',
+        })
+      );
     case '3day': {
       const days = nDayRange(anchor, 3);
       const start = parseIsoLocal(days[0]);

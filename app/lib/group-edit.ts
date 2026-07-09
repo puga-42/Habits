@@ -2,11 +2,11 @@
 // the member checklist plus the thin detail-update mutation (the first writer
 // of habit_groups.description, added in 20260626000000). Membership writes
 // reuse group-mutations (addHabitToGroup / removeHabitFromGroupFuture) so the
-// one-active-group and time-window semantics stay in one place.
+// time-window semantics stay in one place (multi-identity is allowed).
 // Pure helpers are TDD'd in __tests__/group-edit.test.ts (no mocks).
 
 import { currentHabitByLineage } from './group-overview';
-import { activeGroupIdFor, type GroupMembership, type HabitGroup } from './groups';
+import { activeGroupIdsFor, type GroupMembership, type HabitGroup } from './groups';
 import type { Habit } from './habits';
 import { supabase } from './supabase';
 
@@ -18,8 +18,10 @@ export type GroupHabitChoice = {
   title: string;
   icon: string | null;
   color: string | null;
-  inGroup: boolean; // active member of the edited group today
-  otherGroupName: string | null; // named when actively in a DIFFERENT group
+  inGroup: boolean; // active member of the edited identity today
+  // First OTHER identity the habit is also in (multi-identity is allowed;
+  // shown as an informational "Also in …" hint).
+  otherGroupName: string | null;
 };
 
 // The checklist for editing `groupId`'s members: every current habit, members
@@ -36,16 +38,17 @@ export function buildGroupHabitChoices(
   const nameById = new Map(groups.map((g) => [g.id, g.name]));
   const choices: GroupHabitChoice[] = [];
   for (const habit of currentHabitByLineage(habits).values()) {
-    const gid = activeGroupIdFor(memberships, habit.lineage_id, todayIso);
-    const known = gid !== null && nameById.has(gid);
+    const gids = activeGroupIdsFor(memberships, habit.lineage_id, todayIso).filter(
+      (gid) => nameById.has(gid),
+    );
+    const firstOther = gids.find((gid) => gid !== groupId);
     choices.push({
       lineageId: habit.lineage_id,
       title: habit.title,
       icon: habit.icon,
       color: habit.color,
-      inGroup: gid === groupId,
-      otherGroupName:
-        known && gid !== groupId ? (nameById.get(gid as string) as string) : null,
+      inGroup: gids.includes(groupId),
+      otherGroupName: firstOther ? (nameById.get(firstOther) as string) : null,
     });
   }
   return choices.sort(

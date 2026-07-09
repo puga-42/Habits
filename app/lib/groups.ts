@@ -49,8 +49,28 @@ export function groupContainsOn(m: GroupMembership, dateIso: string): boolean {
   return true;
 }
 
-// The group a lineage belongs to on a given day, or null if none. Prefers the
-// still-open membership; among only-closed windows, the latest-starting one.
+// EVERY identity a lineage belongs to on a given day (multi-identity: a habit
+// may serve several identities at once). Deduped, in membership order.
+export function activeGroupIdsFor(
+  memberships: GroupMembership[],
+  lineageId: string,
+  onIso: string,
+): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const m of memberships) {
+    if (m.lineage_id !== lineageId) continue;
+    if (!groupContainsOn(m, onIso)) continue;
+    if (seen.has(m.group_id)) continue;
+    seen.add(m.group_id);
+    out.push(m.group_id);
+  }
+  return out;
+}
+
+// ONE group for a lineage on a given day, or null — the habit form's
+// single-select picker seed. Prefers the still-open membership; among
+// only-closed windows, the latest-starting one.
 export function activeGroupIdFor(
   memberships: GroupMembership[],
   lineageId: string,
@@ -73,11 +93,11 @@ export function nextGroupSortIndexFromList(indexes: number[]): number {
   return Math.max(...indexes) + 1;
 }
 
-// What the create/edit form must do to reconcile a habit's group after the user
-// changes the picker, given the previously-active group and the chosen one.
-// A switch (G1 → G2) is an 'add': addHabitToGroup closes the old membership.
-// Clearing the group ('remove') uses the "going forward" semantics so the group
-// keeps the habit's past completions (see group-mutations.removeHabitFromGroupFuture).
+// What the habit form must do to reconcile after the user changes its
+// single-select Identity picker. Multi-identity: an 'add' just joins the
+// picked identity (other memberships are untouched); clearing ('remove') uses
+// the "going forward" semantics so the identity keeps the habit's past
+// completions (see group-mutations.removeHabitFromGroupFuture).
 export type GroupChange =
   | { kind: 'none' }
   | { kind: 'add'; groupId: string }

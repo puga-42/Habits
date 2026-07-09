@@ -132,6 +132,19 @@ describe('buildGroupHabitChoices', () => {
   });
 });
 
+describe('buildGroupHabitChoices — multi-identity', () => {
+  it('a habit in this identity AND another is inGroup with the other named', () => {
+    const choices = buildGroupHabitChoices(
+      [habit('A')],
+      [member('A', 'G1'), member('A', 'G2')],
+      [group('G1'), group('G2', 'Become healthy')],
+      'G1',
+      TODAY,
+    );
+    expect(choices[0]).toMatchObject({ inGroup: true, otherGroupName: 'Become healthy' });
+  });
+});
+
 describe('planMemberEdits', () => {
   it('adds newly selected lineages', () => {
     expect(planMemberEdits(['A'], ['A', 'B'])).toEqual({
@@ -159,5 +172,22 @@ describe('planMemberEdits', () => {
       addLineageIds: [],
       removeLineageIds: [],
     });
+  });
+});
+
+describe('buildGroupHabitChoices — creation flow (sentinel id)', () => {
+  it('marks nothing inGroup for a not-yet-created identity, keeping the hints', () => {
+    // The creation page passes a sentinel id (no row exists yet): no habit can
+    // be a member, but habits in other identities still show the move hint.
+    const choices = buildGroupHabitChoices(
+      [habit('A'), habit('B')],
+      [member('A', 'G1')],
+      [group('G1', 'Become healthy')],
+      '__new',
+      TODAY,
+    );
+    expect(choices.every((c) => !c.inGroup)).toBe(true);
+    expect(choices.find((c) => c.lineageId === 'A')?.otherGroupName).toBe('Become healthy');
+    expect(choices.find((c) => c.lineageId === 'B')?.otherGroupName).toBeNull();
   });
 });

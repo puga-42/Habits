@@ -41,6 +41,7 @@ import {
 } from '@/lib/habits';
 import { checkStartDateMove } from '@/lib/start-date';
 import { syncWidgetData } from '@/lib/widget-sync';
+import { errorMessage } from '@/lib/error-message';
 
 type EditScope = 'this' | 'future' | 'all';
 
@@ -80,7 +81,7 @@ export default function EditHabitScreen() {
         }
       })
       .catch((err) => {
-        Alert.alert('Could not load habit', err instanceof Error ? err.message : String(err));
+        Alert.alert('Could not load habit', errorMessage(err));
       })
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -149,7 +150,7 @@ export default function EditHabitScreen() {
       reset();
       router.back();
     } catch (err) {
-      Alert.alert('Could not save', err instanceof Error ? err.message : String(err));
+      Alert.alert('Could not save', errorMessage(err));
     } finally {
       setSaving(false);
     }
@@ -196,7 +197,7 @@ export default function EditHabitScreen() {
       reset();
       navigation.getParent()?.dispatch(StackActions.pop());
     } catch (err) {
-      Alert.alert('Could not delete', err instanceof Error ? err.message : String(err));
+      Alert.alert('Could not delete', errorMessage(err));
     } finally {
       setDeleting(false);
     }

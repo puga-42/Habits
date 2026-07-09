@@ -36,6 +36,7 @@ import {
   type Habit,
 } from "@/lib/habits";
 import { syncWidgetData } from "@/lib/widget-sync";
+import { errorMessage } from './error-message';
 
 export type OwnerProfile = { handle: string; avatar_url: string | null };
 
@@ -182,7 +183,7 @@ export function useHabitOverview(
       .catch((err) => {
         Alert.alert(
           "Could not load habit",
-          err instanceof Error ? err.message : String(err),
+          errorMessage(err),
         );
       })
       .finally(() => setLoading(false));
@@ -223,7 +224,7 @@ export function useHabitOverview(
       loadStats(habit);
       syncWidgetData(userId);
     } catch (err) {
-      Alert.alert("Error", err instanceof Error ? err.message : String(err));
+      Alert.alert("Error", errorMessage(err));
     } finally {
       setBusy(false);
     }
@@ -238,7 +239,7 @@ export function useHabitOverview(
       loadStats(habit);
       syncWidgetData(userId);
     } catch (err) {
-      Alert.alert("Error", err instanceof Error ? err.message : String(err));
+      Alert.alert("Error", errorMessage(err));
     } finally {
       setBusy(false);
     }
@@ -280,7 +281,7 @@ export function useHabitOverview(
       } catch (err) {
         Alert.alert(
           "Upload failed",
-          err instanceof Error ? err.message : String(err),
+          errorMessage(err),
         );
       } finally {
         setBusy(false);

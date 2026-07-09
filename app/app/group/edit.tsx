@@ -1,23 +1,23 @@
-// Edit ONE group — rename, describe, and add/remove member habits. Reached
-// from the group overview's Edit button (the manage-all list stays at
-// /groups). Membership changes reconcile on Save via group-mutations, so the
+// Edit ONE identity — rename, describe, add/remove member habits, and delete
+// (the /groups list is a plain directory; this page is the single edit
+// surface). Membership changes reconcile on Save via group-mutations, so the
 // one-active-group and time-window semantics hold; derivations live in
 // lib/group-edit.ts.
 
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { StackActions } from '@react-navigation/native';
+import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Pressable,
-  ScrollView,
   StyleSheet,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { GroupEditDetails } from '@/components/group-edit-details';
-import { GroupEditHabitRow } from '@/components/group-edit-habit-row';
+import { FormPageHeader } from '@/components/form-page-header';
+import { IdentityForm } from '@/components/identity-form';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useTokens } from '@/hooks/use-tokens';
@@ -28,13 +28,19 @@ import {
   updateGroupDetails,
   type GroupHabitChoice,
 } from '@/lib/group-edit';
-import { addHabitToGroup, removeHabitFromGroupFuture } from '@/lib/group-mutations';
+import {
+  addHabitToGroup,
+  deleteGroup,
+  removeHabitFromGroupFuture,
+} from '@/lib/group-mutations';
 import { fetchGroup } from '@/lib/group-overview';
 import { fetchGroups, fetchMemberships } from '@/lib/groups';
 import { fetchHabits, isoDate } from '@/lib/habits';
+import { errorMessage } from '@/lib/error-message';
 
 export default function EditGroupScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
   const { session } = useAuth();
   const userId = session?.user.id;
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -42,6 +48,7 @@ export default function EditGroupScreen() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [missing, setMissing] = useState(false);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -71,7 +78,7 @@ export default function EditGroupScreen() {
       setSelected(new Set(members));
     })()
       .catch((err) => {
-        Alert.alert('Could not load group', err instanceof Error ? err.message : String(err));
+        Alert.alert('Could not load identity', errorMessage(err));
       })
       .finally(() => setLoading(false));
   }, [id, userId]);
@@ -89,7 +96,7 @@ export default function EditGroupScreen() {
     if (!id || !userId || saving) return;
     const trimmedName = name.trim();
     if (!trimmedName) {
-      Alert.alert('Name required', 'Give your group a name first.');
+      Alert.alert('Name required', 'Who does this identity help you become?');
       return;
     }
     setSaving(true);
@@ -109,60 +116,76 @@ export default function EditGroupScreen() {
       }
       router.back();
     } catch (err) {
-      Alert.alert('Could not save', err instanceof Error ? err.message : String(err));
+      Alert.alert('Could not save', errorMessage(err));
     } finally {
       setSaving(false);
     }
   }
 
+  function onDelete() {
+    if (!id) return;
+    Alert.alert(
+      `Delete "${name.trim() || 'this identity'}"?`,
+      'Its habits stay — they just stop being grouped under this identity. Past completions are kept.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setDeleting(true);
+            try {
+              await deleteGroup(id);
+              // Pop past the (now-gone) overview back to wherever we came from.
+              navigation.dispatch(StackActions.pop(2));
+            } catch (err) {
+              Alert.alert('Could not delete', errorMessage(err));
+              setDeleting(false);
+            }
+          },
+        },
+      ],
+    );
+  }
+
   return (
     <ThemedView style={styles.root}>
       <SafeAreaView edges={['top']} style={styles.content}>
-        <View style={[styles.header, { borderBottomColor: t.hairlineStrong }]}>
-          <Pressable onPress={() => router.back()} hitSlop={12}>
-            <ThemedText style={styles.headerButton}>Cancel</ThemedText>
-          </Pressable>
-          <ThemedText type="defaultSemiBold">Edit group</ThemedText>
-          <Pressable onPress={onSave} disabled={saving || loading || missing} hitSlop={12}>
-            <ThemedText
-              style={[styles.headerButton, styles.save, (saving || loading) && styles.disabled]}>
-              {saving ? 'Saving…' : 'Save'}
-            </ThemedText>
-          </Pressable>
-        </View>
+        <FormPageHeader
+          title="Edit identity"
+          actionLabel="Save"
+          busy={saving}
+          busyLabel="Saving…"
+          disabled={saving || deleting || loading || missing}
+          onCancel={() => router.back()}
+          onAction={onSave}
+        />
 
         {loading ? (
           <ActivityIndicator style={styles.loading} />
         ) : missing ? (
-          <ThemedText style={styles.empty}>This group no longer exists.</ThemedText>
+          <ThemedText style={styles.empty}>This identity no longer exists.</ThemedText>
         ) : (
-          <ScrollView
-            contentContainerStyle={styles.scroll}
-            keyboardShouldPersistTaps="handled"
-            keyboardDismissMode="interactive"
-            automaticallyAdjustKeyboardInsets>
-            <GroupEditDetails
-              name={name}
-              description={description}
-              textColor={t.ink}
-              onChangeName={setName}
-              onChangeDescription={setDescription}
-            />
-
-            <ThemedText style={styles.label}>Habits</ThemedText>
-            {choices.length === 0 ? (
-              <ThemedText style={styles.empty}>No habits yet — create one first.</ThemedText>
-            ) : (
-              choices.map((choice) => (
-                <GroupEditHabitRow
-                  key={choice.lineageId}
-                  choice={choice}
-                  selected={selected.has(choice.lineageId)}
-                  onToggle={() => toggle(choice.lineageId)}
-                />
-              ))
-            )}
-          </ScrollView>
+          <IdentityForm
+            name={name}
+            description={description}
+            choices={choices}
+            selected={selected}
+            emptyCopy="No habits yet — create one first."
+            onChangeName={setName}
+            onChangeDescription={setDescription}
+            onToggle={toggle}>
+            <Pressable
+              onPress={onDelete}
+              disabled={deleting || saving}
+              style={({ pressed }) => [styles.deleteBtn, pressed && styles.disabled]}
+              accessibilityRole="button"
+              accessibilityLabel="Delete identity">
+              <ThemedText style={[styles.deleteText, { color: t.danger }]}>
+                {deleting ? 'Deleting…' : 'Delete identity'}
+              </ThemedText>
+            </Pressable>
+          </IdentityForm>
         )}
       </SafeAreaView>
     </ThemedView>
@@ -172,26 +195,9 @@ export default function EditGroupScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   content: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  headerButton: { fontSize: 16 },
-  save: { fontWeight: '600' },
   disabled: { opacity: 0.4 },
   loading: { marginTop: 32 },
-  scroll: { paddingHorizontal: 16, paddingBottom: 48 },
-  label: {
-    fontSize: 12,
-    opacity: 0.55,
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-    marginTop: 20,
-    marginBottom: 6,
-  },
   empty: { opacity: 0.6, fontSize: 15, lineHeight: 21, paddingVertical: 8 },
+  deleteBtn: { marginTop: 36, alignItems: 'center', paddingVertical: 12 },
+  deleteText: { fontSize: 16, fontWeight: '600' },
 });

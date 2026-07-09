@@ -1,3 +1,4 @@
+import { dayItemKey } from '../day-item-key';
 import { buildDayItems, UNGROUPED } from '../day-items';
 import type { GroupMembership, HabitGroup } from '../groups';
 import type { Habit } from '../habits';
@@ -114,7 +115,7 @@ function build(
 }
 
 describe('buildDayItems — grouping', () => {
-  it('emits one group-header per non-empty group, in sort_index order, with its rows nested', () => {
+  it('emits one group card per non-empty group, in sort_index order: header, rows, footer', () => {
     const habits = [habit('A', 1), habit('B', 2)];
     const rows = [scheduledRow('A'), scheduledRow('B')];
     const groups = [group('G2', 2), group('G1', 1)];
@@ -125,12 +126,14 @@ describe('buildDayItems — grouping', () => {
     expect(items[0]).toMatchObject({ kind: 'group-header', groupId: 'G1' });
     expect(items[1]).toMatchObject({ kind: 'row', groupId: 'G1', section: 'notCompleted' });
     expect((items[1] as any).row.habitId).toBe('A');
-    expect(items[2]).toMatchObject({ kind: 'group-header', groupId: 'G2' });
-    expect(items[3]).toMatchObject({ kind: 'row', groupId: 'G2', section: 'notCompleted' });
-    expect((items[3] as any).row.habitId).toBe('B');
+    expect(items[2]).toMatchObject({ kind: 'group-footer', groupId: 'G1' });
+    expect(items[3]).toMatchObject({ kind: 'group-header', groupId: 'G2' });
+    expect(items[4]).toMatchObject({ kind: 'row', groupId: 'G2', section: 'notCompleted' });
+    expect((items[4] as any).row.habitId).toBe('B');
+    expect(items[5]).toMatchObject({ kind: 'group-footer', groupId: 'G2' });
   });
 
-  it('a collapsed group emits only its header, no rows', () => {
+  it('a collapsed group emits header + footer only — the card reads as one closed pill bar', () => {
     const habits = [habit('A', 1)];
     const rows = [scheduledRow('A')];
     const groups = [group('G1', 1, /* collapsed */ true)];
@@ -138,8 +141,24 @@ describe('buildDayItems — grouping', () => {
 
     const items = build(rows, habits, groups, members);
 
-    expect(items).toHaveLength(1);
+    expect(items).toHaveLength(2);
     expect(items[0]).toMatchObject({ kind: 'group-header', groupId: 'G1', collapsed: true });
+    expect(items[1]).toMatchObject({ kind: 'group-footer', groupId: 'G1' });
+  });
+
+  it('a habit in TWO identities appears inside both cards (multi-identity)', () => {
+    const habits = [habit('A', 1)];
+    const rows = [scheduledRow('A')];
+    const groups = [group('G1', 1), group('G2', 2)];
+    const members = [member('A', 'G1'), member('A', 'G2')];
+
+    const items = build(rows, habits, groups, members);
+
+    const rowItems = items.filter((i) => i.kind === 'row');
+    expect(rowItems).toHaveLength(2);
+    expect(rowItems.map((i) => (i as any).groupId).sort()).toEqual(['G1', 'G2']);
+    expect(items.some((i) => i.kind === 'group-header' && i.groupId === 'G1')).toBe(true);
+    expect(items.some((i) => i.kind === 'group-header' && i.groupId === 'G2')).toBe(true);
   });
 
   it('skips a group that has no rows for the day', () => {
@@ -244,5 +263,36 @@ describe('buildDayItems — sections within a group', () => {
     const items = build(rows, habits, groups, members);
 
     expect(items.some((i) => i.kind === 'completed-header' && i.groupId === UNGROUPED)).toBe(true);
+  });
+});
+
+describe('buildDayItems — key stability across expand/collapse', () => {
+  it('expanding a card never changes the keys of items that were already visible', () => {
+    // Regression (pill animation): 3 collapsed identities + an ungrouped pile
+    // of 2 incomplete habits and 1 completion. Expanding the top identity must
+    // only ADD keys — any changed key would remount a row and fade instead of
+    // slide during the layout transition.
+    const habits = [
+      habit('g1a', 1), habit('g2a', 2), habit('g3a', 3),
+      habit('u1', 4), habit('u2', 5), habit('u3', 6),
+    ];
+    const rows = [
+      scheduledRow('g1a'), scheduledRow('g2a'), scheduledRow('g3a'),
+      scheduledRow('u1'), scheduledRow('u2'), completionRow('u3'),
+    ];
+    const groups = [group('G1', 1, true), group('G2', 2, true), group('G3', 3, true)];
+    const members = [member('g1a', 'G1'), member('g2a', 'G2'), member('g3a', 'G3')];
+
+    const collapsedKeys = build(rows, habits, groups, members).map(dayItemKey);
+    const expandedGroups = [group('G1', 1, false), group('G2', 2, true), group('G3', 3, true)];
+    const expandedKeys = build(rows, habits, expandedGroups, members).map(dayItemKey);
+
+    // No duplicates in either state.
+    expect(new Set(collapsedKeys).size).toBe(collapsedKeys.length);
+    expect(new Set(expandedKeys).size).toBe(expandedKeys.length);
+    // Every pre-expand key survives, unchanged.
+    for (const k of collapsedKeys) {
+      expect(expandedKeys).toContain(k);
+    }
   });
 });

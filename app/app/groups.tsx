@@ -1,28 +1,24 @@
-// Groups management — create, rename, and delete identity groups. Reached from
-// the FAB ("New group") and the menu drawer ("Manage groups"). Deleting a group
-// ungroups its habits (deleteGroup ends the open memberships explicitly — the
-// group row is only soft-deleted, so no FK cascade fires); the habits
-// themselves are untouched.
+// Identities list — every identity the user is building (Atomic Habits:
+// habits serve who you're becoming). Reached from the FAB and the menu
+// drawer. This is a plain directory: tap a row → that identity's overview
+// (/group/[id]) where editing (and deleting, via Edit) lives; "New identity"
+// → the creation page. Reloads on focus so edits/creates show on return.
 
-import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
-  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { GroupManageRow } from '@/components/group-manage-row';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useTokens } from '@/hooks/use-tokens';
 import { useAuth } from '@/lib/auth';
-import { createGroup, deleteGroup, renameGroup } from '@/lib/group-mutations';
 import { fetchGroups, fetchMemberships, type HabitGroup } from '@/lib/groups';
 
 export default function GroupsScreen() {
@@ -34,10 +30,6 @@ export default function GroupsScreen() {
   const [groups, setGroups] = useState<HabitGroup[]>([]);
   const [memberCount, setMemberCount] = useState<Map<string, number>>(new Map());
   const [loading, setLoading] = useState(true);
-  const [newName, setNewName] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editName, setEditName] = useState('');
 
   const load = useCallback(async () => {
     if (!userId) return;
@@ -53,119 +45,70 @@ export default function GroupsScreen() {
     setMemberCount(counts);
   }, [userId]);
 
-  useEffect(() => {
-    load().finally(() => setLoading(false));
-  }, [load]);
-
-  async function onCreate() {
-    const name = newName.trim();
-    if (!name || !userId || busy) return;
-    setBusy(true);
-    try {
-      await createGroup(userId, { name });
-      setNewName('');
-      await load();
-    } catch (err) {
-      Alert.alert('Could not create group', err instanceof Error ? err.message : String(err));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function onSaveRename(id: string) {
-    const name = editName.trim();
-    setEditingId(null);
-    if (!name) return;
-    try {
-      await renameGroup(id, name);
-      await load();
-    } catch (err) {
-      Alert.alert('Could not rename', err instanceof Error ? err.message : String(err));
-    }
-  }
-
-  function onDelete(group: HabitGroup) {
-    const n = memberCount.get(group.id) ?? 0;
-    Alert.alert(
-      `Delete "${group.name}"?`,
-      n > 0
-        ? `Its ${n} habit${n === 1 ? '' : 's'} stay, just ungrouped. Past completions are kept.`
-        : 'This group has no habits.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteGroup(group.id);
-              await load();
-            } catch (err) {
-              Alert.alert('Could not delete', err instanceof Error ? err.message : String(err));
-            }
-          },
-        },
-      ],
-    );
-  }
+  useFocusEffect(
+    useCallback(() => {
+      load().finally(() => setLoading(false));
+    }, [load]),
+  );
 
   return (
     <ThemedView style={styles.root}>
       <SafeAreaView edges={['top']} style={styles.content}>
         <View style={[styles.header, { borderBottomColor: t.hairlineStrong }]}>
-          <View style={styles.side} />
-          <ThemedText type="defaultSemiBold">Groups</ThemedText>
-          <Pressable onPress={() => router.back()} hitSlop={12} style={styles.sideRight}>
-            <ThemedText style={styles.done}>Done</ThemedText>
+          <Pressable onPress={() => router.back()} hitSlop={12} style={styles.side}>
+            <ThemedText style={[styles.back, { color: t.accent }]}>‹ Back</ThemedText>
           </Pressable>
+          <ThemedText type="displaySemiBold">Identities</ThemedText>
+          <View style={styles.sideRight} />
         </View>
 
-        <View style={[styles.createRow, { borderBottomColor: t.hairlineStrong }]}>
-          <TextInput
-            value={newName}
-            onChangeText={setNewName}
-            placeholder="New group (e.g. Become healthy)"
-            placeholderTextColor={t.ink45}
-            style={[styles.createInput, { color: t.ink }]}
-            returnKeyType="done"
-            onSubmitEditing={onCreate}
-            maxLength={100}
-          />
-          <Pressable onPress={onCreate} disabled={!newName.trim() || busy} hitSlop={8}>
-            <ThemedText
-              style={[styles.add, { color: t.accent }, (!newName.trim() || busy) && styles.disabled]}>
-              Add
-            </ThemedText>
-          </Pressable>
-        </View>
+        <Pressable
+          onPress={() => router.push('/group/new')}
+          style={({ pressed }) => [
+            styles.newRow,
+            { borderBottomColor: t.hairlineStrong },
+            pressed && styles.pressed,
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel="New identity">
+          <ThemedText style={[styles.newText, { color: t.accent }]}>+ New identity</ThemedText>
+        </Pressable>
 
         {loading ? (
           <ActivityIndicator style={styles.loading} />
         ) : groups.length === 0 ? (
           <ThemedText style={styles.empty}>
-            No groups yet. Create one above to group habits by the identity they build.
+            No identities yet. Create one for who you&apos;re becoming — like &ldquo;I am
+            fluent in Spanish&rdquo; — and group the habits that get you there.
           </ThemedText>
         ) : (
-          <ScrollView contentContainerStyle={styles.list} keyboardShouldPersistTaps="handled">
-            {groups.map((g) => (
-              <GroupManageRow
-                key={g.id}
-                name={g.name}
-                color={g.color}
-                count={memberCount.get(g.id) ?? 0}
-                editing={editingId === g.id}
-                editName={editName}
-                textColor={t.ink}
-                onChangeEditName={setEditName}
-                onStartEdit={() => {
-                  setEditingId(g.id);
-                  setEditName(g.name);
-                }}
-                onCommitEdit={() => onSaveRename(g.id)}
-                onDelete={() => onDelete(g)}
-                onOpen={() => router.push(`/group/${g.id}`)}
-              />
-            ))}
+          <ScrollView contentContainerStyle={styles.list}>
+            {groups.map((g) => {
+              const n = memberCount.get(g.id) ?? 0;
+              return (
+                <Pressable
+                  key={g.id}
+                  onPress={() => router.push(`/group/${g.id}`)}
+                  style={({ pressed }) => [
+                    styles.row,
+                    { borderBottomColor: t.hairlineStrong },
+                    pressed && styles.pressed,
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Open ${g.name}`}>
+                  <View style={[styles.dot, { backgroundColor: g.color ?? t.ink45 }]} />
+                  <View style={styles.rowBody}>
+                    <ThemedText style={styles.name} numberOfLines={1}>
+                      {g.name}
+                    </ThemedText>
+                    <ThemedText style={[styles.count, { color: t.ink52 }]}>
+                      {n} habit{n === 1 ? '' : 's'}
+                    </ThemedText>
+                  </View>
+                  <ThemedText style={[styles.chevron, { color: t.ink45 }]}>›</ThemedText>
+                </Pressable>
+              );
+            })}
           </ScrollView>
         )}
       </SafeAreaView>
@@ -184,21 +127,30 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  side: { width: 48 },
-  sideRight: { width: 48, alignItems: 'flex-end' },
-  done: { fontSize: 16, fontWeight: '600' },
-  createRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
+  side: { width: 64 },
+  sideRight: { width: 64 },
+  back: { fontSize: 16 },
+  newRow: {
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  createInput: { flex: 1, fontSize: 16, padding: 0 },
-  add: { fontSize: 16, fontWeight: '600' },
-  disabled: { opacity: 0.4 },
+  newText: { fontSize: 16, fontWeight: '600' },
+  pressed: { opacity: 0.5 },
   loading: { marginTop: 32 },
   empty: { padding: 24, opacity: 0.6, fontSize: 15, lineHeight: 21 },
-  list: { paddingVertical: 8 },
+  list: { paddingVertical: 4 },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  dot: { width: 10, height: 10, borderRadius: 5 },
+  rowBody: { flex: 1 },
+  name: { fontSize: 16, fontWeight: '600' },
+  count: { fontSize: 13, marginTop: 2 },
+  chevron: { fontSize: 22 },
 });

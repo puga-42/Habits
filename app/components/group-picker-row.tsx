@@ -1,6 +1,6 @@
-// "Group" disclosure row for the habit form. Lets the user file a habit under an
-// identity group (Atomic Habits) or leave it ungrouped, and create a new group
-// inline. Writes the chosen group id to the shared draft (draft.groupId); the
+// "Identity" disclosure row for the habit form. Lets the user file a habit
+// under an identity (Atomic Habits — who the habit helps them become) or
+// leave it unassigned, and create a new identity inline. Writes the chosen group id to the shared draft (draft.groupId); the
 // create/edit screen reconciles that into a membership write on save.
 
 import { useEffect, useState } from 'react';
@@ -35,7 +35,7 @@ export function GroupPickerRow() {
   }, [open, userId]);
 
   const selected = groups.find((g) => g.id === draft.groupId);
-  const summary = selected?.name ?? (draft.groupId ? 'Group' : 'None');
+  const summary = selected?.name ?? (draft.groupId ? 'Identity' : 'None');
 
   async function onCreate() {
     const name = newName.trim();
@@ -55,7 +55,7 @@ export function GroupPickerRow() {
   return (
     <View>
       <Pressable style={styles.row} onPress={() => setOpen((s) => !s)}>
-        <ThemedText style={styles.rowLabel}>Group</ThemedText>
+        <ThemedText style={styles.rowLabel}>Identity</ThemedText>
         <View style={styles.rowRight}>
           <ThemedText style={styles.value} numberOfLines={1}>
             {summary}
@@ -89,7 +89,7 @@ export function GroupPickerRow() {
             <TextInput
               value={newName}
               onChangeText={setNewName}
-              placeholder="New group…"
+              placeholder="New identity…"
               placeholderTextColor={t.ink45}
               style={[styles.createInput, { color: t.ink }]}
               returnKeyType="done"

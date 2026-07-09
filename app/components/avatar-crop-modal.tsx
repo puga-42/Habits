@@ -11,6 +11,7 @@ import Animated, {
 
 import { ThemedText } from '@/components/themed-text';
 import type { CropParams } from '@/lib/profile';
+import { errorMessage } from '@/lib/error-message';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 const CROP_SIZE = 280;
@@ -126,7 +127,7 @@ export function AvatarCropModal({ visible, imageUri, initialCropParams, onSave, 
       );
       onSave(result.uri, { scale: s, translateX: tx, translateY: ty });
     } catch (err) {
-      Alert.alert('Could not save', err instanceof Error ? err.message : String(err));
+      Alert.alert('Could not save', errorMessage(err));
       setSaving(false);
     }
   };

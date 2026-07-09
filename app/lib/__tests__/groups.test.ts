@@ -1,6 +1,7 @@
 import { dayBefore } from '../group-mutations';
 import {
   activeGroupIdFor,
+  activeGroupIdsFor,
   groupContainsOn,
   nextGroupSortIndexFromList,
   planGroupChange,
@@ -93,6 +94,40 @@ describe('activeGroupIdFor', () => {
   });
 });
 
+describe('activeGroupIdsFor (multi-identity)', () => {
+  it('returns every identity whose window covers the day', () => {
+    const memberships = [
+      m({ lineage_id: 'L1', group_id: 'G1', effective_from: '2026-03-01' }),
+      m({ lineage_id: 'L1', group_id: 'G2', effective_from: '2026-03-10' }),
+      m({ lineage_id: 'L2', group_id: 'G3', effective_from: '2026-03-01' }),
+    ];
+    expect(activeGroupIdsFor(memberships, 'L1', '2026-03-15')).toEqual(['G1', 'G2']);
+  });
+
+  it('excludes closed windows and dedupes multiple windows of one identity', () => {
+    const memberships = [
+      m({
+        lineage_id: 'L1',
+        group_id: 'G1',
+        effective_from: '2026-03-01',
+        effective_until: '2026-03-05',
+      }),
+      m({ lineage_id: 'L1', group_id: 'G1', effective_from: '2026-03-08' }),
+      m({
+        lineage_id: 'L1',
+        group_id: 'G2',
+        effective_from: '2026-03-01',
+        effective_until: '2026-03-09',
+      }),
+    ];
+    expect(activeGroupIdsFor(memberships, 'L1', '2026-03-15')).toEqual(['G1']);
+  });
+
+  it('returns empty for a lineage with no covering membership', () => {
+    expect(activeGroupIdsFor([], 'L1', '2026-03-15')).toEqual([]);
+  });
+});
+
 describe('nextGroupSortIndexFromList', () => {
   it('starts at 1 when there are no groups', () => {
     expect(nextGroupSortIndexFromList([])).toBe(1);
@@ -116,7 +151,7 @@ describe('planGroupChange', () => {
     expect(planGroupChange(null, 'G1')).toEqual({ kind: 'add', groupId: 'G1' });
   });
 
-  it('switching groups is an add to the new group (close-old is handled by addHabitToGroup)', () => {
+  it('picking a different identity is an add (other memberships are untouched)', () => {
     expect(planGroupChange('G1', 'G2')).toEqual({ kind: 'add', groupId: 'G2' });
   });
 

@@ -117,7 +117,7 @@ export function CalendarMenuDrawer({
                     }}
                     style={({ pressed }) => [styles.row, pressed && rowPressed]}>
                     <View style={bullet} />
-                    <ThemedText style={styles.rowText}>Manage groups</ThemedText>
+                    <ThemedText style={styles.rowText}>Identities</ThemedText>
                   </Pressable>
                   <Pressable
                     onPress={() => {

@@ -1,7 +1,7 @@
-// One row in the group editor's habit checklist: color dot, icon + title, an
-// "In {other group}" hint when selecting would move the habit (one active
-// group per habit), and a selection check. Presentational — the screen owns
-// the selection state and the membership mutations.
+// One row in the identity editor's habit checklist: color dot, icon + title,
+// an "Also in {identity}" hint when the habit serves other identities too
+// (multi-identity is allowed), and a selection check. Presentational — the
+// screen owns the selection state and the membership mutations.
 
 import { Pressable, StyleSheet, View } from 'react-native';
 
@@ -30,13 +30,9 @@ export function GroupEditHabitRow({ choice, selected, onToggle }: Props) {
           {choice.icon ? `${choice.icon}  ` : ''}
           {choice.title}
         </ThemedText>
-        {choice.otherGroupName && !selected ? (
+        {choice.otherGroupName ? (
           <ThemedText style={styles.meta} numberOfLines={1}>
-            In {choice.otherGroupName}
-          </ThemedText>
-        ) : choice.otherGroupName && selected ? (
-          <ThemedText style={styles.meta} numberOfLines={1}>
-            Moves here from {choice.otherGroupName}
+            Also in {choice.otherGroupName}
           </ThemedText>
         ) : null}
       </View>

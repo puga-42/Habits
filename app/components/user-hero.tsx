@@ -19,6 +19,7 @@ import type { CropParams } from '@/lib/profile';
 import { fetchAvatarOriginal, uploadAvatar, uploadCroppedAvatar } from '@/lib/profile';
 import type { FriendshipStatus, UserProfileData } from '@/lib/user-profile';
 import { friendshipActionLabel } from '@/lib/user-profile';
+import { errorMessage } from '@/lib/error-message';
 
 type Props = {
   profile: UserProfileData;
@@ -95,7 +96,7 @@ export function UserHero({ profile, viewerId, targetId, onReload, onBack }: Prop
       });
       onReload();
     } catch (err) {
-      Alert.alert('Upload failed', err instanceof Error ? err.message : String(err));
+      Alert.alert('Upload failed', errorMessage(err));
     } finally {
       setUploading(false);
     }
@@ -108,7 +109,7 @@ export function UserHero({ profile, viewerId, targetId, onReload, onBack }: Prop
       await uploadCroppedAvatar(viewerId, { uri: croppedUri, mimeType: 'image/jpeg' }, params);
       onReload();
     } catch (err) {
-      Alert.alert('Upload failed', err instanceof Error ? err.message : String(err));
+      Alert.alert('Upload failed', errorMessage(err));
     } finally {
       setUploading(false);
     }

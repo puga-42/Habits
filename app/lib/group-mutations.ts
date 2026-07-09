@@ -15,6 +15,7 @@ export { dayBefore } from './groups';
 
 export type GroupInsert = {
   name: string;
+  description?: string | null;
   color?: string | null;
   icon?: string | null;
 };
@@ -102,10 +103,10 @@ async function nextGroupSortIndex(ownerId: string): Promise<number> {
 
 // ─── Membership mutations ─────────────────────────────────────────────────
 
-// Put a habit (lineage) into a group as of `fromIso`. Enforces one-active-group:
-// any currently-open membership for this lineage is first ended as of `fromIso`
-// (its past completions stay with the old group). Then a new open membership is
-// inserted. A no-op if the lineage is already actively in `groupId`.
+// Put a habit (lineage) into an identity as of `fromIso`. Multi-identity: a
+// habit may belong to several identities at once, so joining one NEVER ends
+// memberships in others (guarded by the per-(lineage, group) open-membership
+// unique index — see 20260709000000). A no-op if already actively in `groupId`.
 export async function addHabitToGroup(
   ownerId: string,
   lineageId: string,
@@ -114,15 +115,12 @@ export async function addHabitToGroup(
 ): Promise<void> {
   const { data: open, error: fErr } = await supabase
     .from('habit_group_members')
-    .select('id, group_id, effective_from')
+    .select('id')
     .eq('lineage_id', lineageId)
+    .eq('group_id', groupId)
     .is('effective_until', null);
   if (fErr) throw fErr;
-
-  const existing = (open ?? []) as (OpenMembershipRow & { group_id: string })[];
-  if (existing.some((e) => e.group_id === groupId)) return; // already a member
-
-  await endOpenMemberships(existing, fromIso);
+  if ((open ?? []).length > 0) return; // already a member
 
   const { error } = await supabase.from('habit_group_members').insert({
     id: Crypto.randomUUID(),

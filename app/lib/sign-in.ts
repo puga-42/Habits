@@ -2,6 +2,7 @@ import * as AppleAuthentication from 'expo-apple-authentication';
 import * as Crypto from 'expo-crypto';
 
 import { supabase } from './supabase';
+import { errorMessage } from './error-message';
 
 export function keyboardAvoidingBehavior(
   os: string,
@@ -56,7 +57,7 @@ export async function signInWithApple(): Promise<SignInResult> {
     return {
       ok: false,
       cancelled: false,
-      message: err instanceof Error ? err.message : String(err),
+      message: errorMessage(err),
     };
   }
 }

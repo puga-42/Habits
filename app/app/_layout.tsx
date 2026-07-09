@@ -51,7 +51,7 @@ function AuthGate() {
       <Stack.Screen name="likers" />
       <Stack.Screen name="user" />
       <Stack.Screen name="settings" />
-      <Stack.Screen name="groups" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="groups" />
       <Stack.Screen name="feedback" options={{ presentation: 'modal' }} />
     </Stack>
   );

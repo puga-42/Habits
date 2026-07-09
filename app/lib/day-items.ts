@@ -5,7 +5,7 @@
 // logic is testable and that component stays presentational.)
 
 import type { DayItem, Section } from './day-item-key';
-import { activeGroupIdFor, type GroupMembership, type HabitGroup } from './groups';
+import { activeGroupIdsFor, type GroupMembership, type HabitGroup } from './groups';
 import type { Habit } from './habits';
 import { partitionRows, type AgendaRow } from './history';
 
@@ -40,22 +40,26 @@ export function buildDayItems({
   collapsedById,
   streakByGroupId,
 }: Params): DayItem[] {
-  // Bucket each row under the group it belonged to on this day (membership
-  // window-covering), or UNGROUPED. A membership can outlive its group
-  // (deleteGroup soft-deletes and fetchGroups filters deleted rows), so any
-  // group id not in `groups` falls back to UNGROUPED — a group must never
-  // hide a habit.
+  // Bucket each row under EVERY identity it belonged to on this day (multi-
+  // identity: the same habit renders inside each of its cards; list keys stay
+  // unique because they include the group id). A membership can outlive its
+  // group (deleteGroup soft-deletes and fetchGroups filters deleted rows), so
+  // group ids not in `groups` are dropped — and a row with no surviving
+  // identity falls back to UNGROUPED. A group must never hide a habit.
   const knownGroupIds = new Set(groups.map((g) => g.id));
   const byGroup = new Map<string, AgendaRow[]>();
-  for (const row of rows) {
-    const lineageId = habitMap.get(rowHabitId(row))?.lineage_id;
-    const gid = lineageId
-      ? activeGroupIdFor(memberships, lineageId, dateIso)
-      : null;
-    const key = gid && knownGroupIds.has(gid) ? gid : UNGROUPED;
+  const push = (key: string, row: AgendaRow) => {
     const bucket = byGroup.get(key);
     if (bucket) bucket.push(row);
     else byGroup.set(key, [row]);
+  };
+  for (const row of rows) {
+    const lineageId = habitMap.get(rowHabitId(row))?.lineage_id;
+    const gids = (
+      lineageId ? activeGroupIdsFor(memberships, lineageId, dateIso) : []
+    ).filter((gid) => knownGroupIds.has(gid));
+    if (gids.length === 0) push(UNGROUPED, row);
+    else for (const gid of gids) push(gid, row);
   }
 
   const out: DayItem[] = [];
@@ -83,6 +87,8 @@ export function buildDayItems({
       // habits simply sink to the bottom of the card, keeping the order tidy.
       pushSections(out, g.id, groupRows, habitMap, restingExpanded.has(g.id), false);
     }
+    // Cap the card — even collapsed, so header + footer read as one pill bar.
+    out.push({ kind: 'group-footer', groupId: g.id });
   }
 
   // Ungrouped habits trail at the bottom. When at least one group card was

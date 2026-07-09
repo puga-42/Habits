@@ -17,6 +17,7 @@ import {
   weekdayName,
   type Profile,
 } from '@/lib/profile';
+import { errorMessage } from '@/lib/error-message';
 import {
   applyThemePreference,
   loadThemePreference,
@@ -61,7 +62,7 @@ export default function SettingsScreen() {
       await updateHandle(session.user.id, newHandle);
     } catch (err) {
       setProfile(prev);
-      Alert.alert('Could not save', err instanceof Error ? err.message : String(err));
+      Alert.alert('Could not save', errorMessage(err));
     }
   }
 
@@ -72,7 +73,7 @@ export default function SettingsScreen() {
       await updateWeekStart(session.user.id, value);
     } catch (err) {
       setProfile(profile);
-      Alert.alert('Could not save', err instanceof Error ? err.message : String(err));
+      Alert.alert('Could not save', errorMessage(err));
     }
   }
 
@@ -87,7 +88,7 @@ export default function SettingsScreen() {
       });
     } catch (err) {
       setProfile(prev);
-      Alert.alert('Could not save', err instanceof Error ? err.message : String(err));
+      Alert.alert('Could not save', errorMessage(err));
     }
   }
 

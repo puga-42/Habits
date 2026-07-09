@@ -14,6 +14,7 @@ import { addHabitToGroup } from '@/lib/group-mutations';
 import { draftToInsert, useHabitForm } from '@/lib/habit-form';
 import { createHabit, isoDate } from '@/lib/habits';
 import { syncWidgetData } from '@/lib/widget-sync';
+import { errorMessage } from '@/lib/error-message';
 
 export default function NewHabitScreen() {
   const router = useRouter();
@@ -48,7 +49,7 @@ export default function NewHabitScreen() {
       router.back();
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : (err as any)?.message ?? JSON.stringify(err);
+        errorMessage(err);
       Alert.alert('Could not save', message);
     } finally {
       setSaving(false);
