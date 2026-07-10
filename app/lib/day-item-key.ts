@@ -17,7 +17,7 @@ export type DayItem =
     }
   // Bottom cap of a group card — closes the surface the header opened, so a
   // collapsed card (header + footer) still reads as one pill bar.
-  | { kind: 'group-footer'; groupId: string }
+  | { kind: 'group-footer'; groupId: string; color: string | null; collapsed: boolean }
   | { kind: 'ungrouped-header'; groupId: string }
   | { kind: 'completed-header'; groupId: string }
   | { kind: 'resting-header'; groupId: string }

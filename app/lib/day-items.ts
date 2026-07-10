@@ -88,7 +88,7 @@ export function buildDayItems({
       pushSections(out, g.id, groupRows, habitMap, restingExpanded.has(g.id), false);
     }
     // Cap the card — even collapsed, so header + footer read as one pill bar.
-    out.push({ kind: 'group-footer', groupId: g.id });
+    out.push({ kind: 'group-footer', groupId: g.id, color: g.color, collapsed });
   }
 
   // Ungrouped habits trail at the bottom. When at least one group card was

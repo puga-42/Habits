@@ -1,12 +1,12 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View, useColorScheme } from 'react-native';
 import DraggableFlatList, {
   type RenderItemParams,
 } from 'react-native-draggable-flatlist';
 import Animated, { FadeOut, LinearTransition } from 'react-native-reanimated';
 
 import { AnimatedHabitRow } from '@/components/animated-habit-row';
-import { GroupCardHeader } from '@/components/group-card-header';
+import { GroupCardHeader, groupCardSurface } from '@/components/group-card-header';
 import { HabitRowSwipeable } from '@/components/habit-row-swipeable';
 import type { TimerStatus } from '@/components/time-trailing-icon';
 import { ThemedText } from '@/components/themed-text';
@@ -71,6 +71,14 @@ export function DayContent({
   const iso = isoDate(date);
   const rows = group?.rows ?? [];
   const t = useTokens();
+  const isDark = useColorScheme() !== 'light';
+  // Identity color per group id — tints the card surface (header handles its
+  // own bg; rows and footer read from here).
+  const colorByGroupId = useMemo(() => {
+    const m = new Map<string, string | null>();
+    for (const g of groups) m.set(g.id, g.color);
+    return m;
+  }, [groups]);
 
   // Per-section (group-scoped) Resting expand state, keyed by group id / UNGROUPED.
   const [restingExpanded, setRestingExpanded] = useState<Set<string>>(new Set());
@@ -165,15 +173,32 @@ export function DayContent({
       );
     }
     if (item.kind === 'group-footer') {
-      // Bottom cap of the card: closes the surface the header opened and
-      // provides the gap to whatever follows.
+      // Collapsed: the header renders as a full pill, so the footer is pure
+      // spacing between cards — no band, no dead zone.
+      if (item.collapsed) {
+        return <Animated.View style={styles.groupGap} />;
+      }
+      // Expanded: the bottom cap of the card. Height ≥ the corner radius —
+      // iOS clamps a radius to its edge, so a short cap renders visibly
+      // tighter corners than the header (the mismatched-radii bug). Tapping
+      // the cap collapses the card, so the card's own chrome is never a dead
+      // zone.
       return (
-        <Animated.View
-          style={[
-            styles.groupFooter,
-            { backgroundColor: t.surface, borderBottomLeftRadius: Radii.card, borderBottomRightRadius: Radii.card },
-          ]}
-        />
+        <Animated.View>
+          <Pressable
+            onPress={() => onToggleGroup(item.groupId, true)}
+            accessibilityRole="button"
+            accessibilityLabel="Collapse"
+            style={[
+              styles.groupFooter,
+              {
+                backgroundColor: groupCardSurface(item.color, isDark, t.surface),
+                borderBottomLeftRadius: Radii.card,
+                borderBottomRightRadius: Radii.card,
+              },
+            ]}
+          />
+        </Animated.View>
       );
     }
     if (item.kind === 'ungrouped-header') {
@@ -202,10 +227,11 @@ export function DayContent({
     if (item.kind === 'resting-header') {
       const expanded = restingExpanded.has(item.groupId);
       const inCard = item.groupId !== UNGROUPED;
+      const restingBg = groupCardSurface(colorByGroupId.get(item.groupId), isDark, t.surface);
       return (
         <Pressable
           onPress={() => toggleResting(item.groupId)}
-          style={[styles.sectionHeader, inCard && [styles.cardInset, { backgroundColor: t.surface }]]}
+          style={[styles.sectionHeader, inCard && [styles.cardInset, { backgroundColor: restingBg }]]}
           accessibilityRole="button"
           accessibilityLabel={expanded ? 'Collapse resting' : 'Expand resting'}>
           <View style={[styles.rule, { backgroundColor: t.hairlineStrong }]} />
@@ -228,6 +254,7 @@ export function DayContent({
             : 'idle'
         : undefined;
     const fromExpand = item.groupId === justExpandedGroup.current;
+    const cardBg = groupCardSurface(colorByGroupId.get(item.groupId), isDark, t.surface);
     const isEntering = enteringIds.current.has(habitId) || fromExpand;
     // Cascade: rows of a just-expanded card start almost with the layout
     // transition and stagger downward, so the card rolls open instead of
@@ -245,9 +272,7 @@ export function DayContent({
     return (
       <View
         style={
-          inCard
-            ? [styles.cardRow, { backgroundColor: t.surface }]
-            : styles.looseRow
+          inCard ? [styles.cardRow, { backgroundColor: cardBg }] : styles.looseRow
         }>
       <AnimatedHabitRow entering={isEntering} enterDelay={enterDelay}>
         <HabitRowSwipeable
@@ -364,7 +389,8 @@ const styles = StyleSheet.create({
   cardRow: { paddingHorizontal: 10, paddingBottom: 10 },
   cardInset: { paddingHorizontal: 14, marginHorizontal: 0 },
   looseRow: { marginBottom: 10 },
-  groupFooter: { height: 6, marginBottom: 14 },
+  groupFooter: { height: Radii.card, marginBottom: 14 },
+  groupGap: { height: 14 },
   emptyState: {
     flex: 1,
     alignItems: 'center',

@@ -12,6 +12,7 @@ import { FeedAvatar } from '@/components/feed-avatar';
 import { FeedCardStats } from '@/components/feed-card-stats';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { ExpandableText } from '@/components/expandable-text';
 import type { FeedItem } from '@/lib/feed';
 import { feedItemSortKey, formatRelativeTime } from '@/lib/feed';
 import { useTokens } from '@/hooks/use-tokens';
@@ -95,13 +96,10 @@ export const FeedCard = memo(function FeedCard({
       <View style={styles.body}>
         <View style={styles.bodyMain}>
           <View style={styles.habitLine}>
-            <ThemedText style={styles.habitVerb}>
-              {item.feed_kind === 'rest' ? 'is resting ' : 'completed '}
+            <ThemedText style={styles.habitTitle}>
+              {item.feed_kind === 'rest' ? 'Is resting ' : 'Completed '}
+              {item.habit_title}
             </ThemedText>
-            <ThemedText style={styles.habitTitle}>{item.habit_title}</ThemedText>
-            {item.habit_icon ? (
-              <ThemedText style={styles.habitIcon}> {item.habit_icon}</ThemedText>
-            ) : null}
             {item.flex_position != null && item.flex_target != null && (
               <ThemedText style={styles.flexProgress}>
                 {' '}{item.flex_position}/{item.flex_target}
@@ -109,9 +107,7 @@ export const FeedCard = memo(function FeedCard({
             )}
           </View>
           {item.habit_description ? (
-            <ThemedText style={styles.description} numberOfLines={5}>
-              {item.habit_description}
-            </ThemedText>
+            <ExpandableText text={item.habit_description} style={styles.description} />
           ) : null}
         </View>
         <FeedCardStats streak={item.streak} />
@@ -147,7 +143,7 @@ export const FeedCard = memo(function FeedCard({
 });
 
 const styles = StyleSheet.create({
-  card: { paddingTop: 12, paddingBottom: 18 },
+  card: { paddingTop: 12, paddingBottom: 2 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -174,9 +170,7 @@ const styles = StyleSheet.create({
     alignItems: 'baseline',
     flexWrap: 'wrap',
   },
-  habitVerb: { fontSize: 14, opacity: 0.7 },
   habitTitle: { fontSize: 15, fontWeight: '600' },
-  habitIcon: { fontSize: 16 },
   flexProgress: { fontSize: 13, opacity: 0.5, fontWeight: '500' },
   description: { fontSize: 14, lineHeight: 19, opacity: 0.7, marginTop: 4 },
   attachmentWrap: { marginBottom: 4 },

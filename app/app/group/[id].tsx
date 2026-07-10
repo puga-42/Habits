@@ -65,8 +65,6 @@ export default function GroupOverviewScreen() {
           <ScrollView contentContainerStyle={styles.scroll}>
             <GroupOverviewHeader
               name={group.name}
-              color={group.color}
-              icon={group.icon}
               description={group.description}
               streak={streak}
               memberCount={memberCount}

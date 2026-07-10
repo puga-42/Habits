@@ -89,13 +89,10 @@ export const FeedActivityCard = memo(function FeedActivityCard({
       </View>
 
       <View style={styles.habitLine}>
-        <ThemedText style={styles.habitVerb}>
-          {item.event_type === 'adopted' ? 'adopted ' : 'started '}
+        <ThemedText style={styles.habitTitle}>
+          {item.event_type === 'adopted' ? 'Adopted ' : 'Started '}
+          {item.habit_title}
         </ThemedText>
-        <ThemedText style={styles.habitTitle}>{item.habit_title}</ThemedText>
-        {item.habit_icon ? (
-          <ThemedText style={styles.habitIcon}> {item.habit_icon}</ThemedText>
-        ) : null}
         {item.event_type === 'adopted' && item.adopted_from_handle ? (
           <ThemedText style={styles.adoptedFrom}>
             {' '}from @{item.adopted_from_handle}
@@ -138,9 +135,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     flexWrap: 'wrap',
   },
-  habitVerb: { fontSize: 14, opacity: 0.7 },
   habitTitle: { fontSize: 15, fontWeight: '600' },
-  habitIcon: { fontSize: 16 },
   adoptedFrom: { fontSize: 13, opacity: 0.5 },
   actionWrap: { paddingHorizontal: 14, marginTop: 6 },
 });

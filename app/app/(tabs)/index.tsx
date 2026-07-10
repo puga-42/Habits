@@ -11,7 +11,7 @@ import { useTokens } from '@/hooks/use-tokens';
 import { Calendar3DayView } from '@/components/calendar-3day-view';
 import { CalendarDayView } from '@/components/calendar-day-view';
 import type { ViewMode } from '@/components/calendar-menu-drawer';
-import { CompletionToast } from '@/components/completion-toast';
+import { CompletionSheet, type CompletionSheetTarget } from '@/components/completion-sheet';
 import { useDrawer } from '@/components/drawer-provider';
 import { FabSpeedDial } from '@/components/fab-speed-dial';
 import { ScreenHeader } from '@/components/screen-header';
@@ -137,8 +137,7 @@ export default function CalendarScreen() {
   // returns. Keyed by habit + day so different rows stay independent.
   const trailingInFlightRef = useRef<Set<string>>(new Set());
 
-  const [toastVisible, setToastVisible] = useState(false);
-  const [toastCompletionId, setToastCompletionId] = useState<string | null>(null);
+  const [sheetTarget, setSheetTarget] = useState<CompletionSheetTarget | null>(null);
   const [restTarget, setRestTarget] = useState<{ habit: Habit; dateIso: string } | null>(null);
   const [activeTimerHabitId, setActiveTimerHabitId] = useState<string | null>(null);
   const [activeTimerDateIso, setActiveTimerDateIso] = useState<string | null>(null);
@@ -450,8 +449,7 @@ export default function CalendarScreen() {
         } else if (!row.completed) {
           const completionId = await markScheduledCompleted(row.habitId, userId, dateIso);
           if (completionId) {
-            setToastCompletionId(completionId);
-            setToastVisible(true);
+            setSheetTarget({ completionId, habitTitle: row.habit.title, userId });
           }
         }
         await loadDynamic();
@@ -477,8 +475,7 @@ export default function CalendarScreen() {
         );
       }
       if (completionId) {
-        setToastCompletionId(completionId);
-        setToastVisible(true);
+        setSheetTarget({ completionId, habitTitle: row.habit.title, userId });
       }
       await loadDynamic();
     } finally {
@@ -800,12 +797,12 @@ export default function CalendarScreen() {
         />
       </View>
 
-      <CompletionToast
-        visible={toastVisible}
-        onPress={() => {
-          if (toastCompletionId) router.push(`/completion/${toastCompletionId}`);
+      <CompletionSheet
+        target={sheetTarget}
+        onClose={() => {
+          setSheetTarget(null);
+          loadDynamic(); // pull the fresh note/attachments into the day data
         }}
-        onDismiss={() => setToastVisible(false)}
       />
 
       <RestUntilModal

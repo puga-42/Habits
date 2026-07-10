@@ -11,6 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { FormPageHeader } from '@/components/form-page-header';
 import { IdentityForm } from '@/components/identity-form';
+import { IdentityPillPreview } from '@/components/identity-pill-preview';
 import { ThemedView } from '@/components/themed-view';
 import { useTokens } from '@/hooks/use-tokens';
 import { useAuth } from '@/lib/auth';
@@ -34,6 +35,7 @@ export default function NewGroupScreen() {
   const [saving, setSaving] = useState(false);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [color, setColor] = useState<string | null>(null);
   const [choices, setChoices] = useState<GroupHabitChoice[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
@@ -75,6 +77,7 @@ export default function NewGroupScreen() {
       const id = await createGroup(userId, {
         name: trimmedName,
         description: trimmedDescription ? trimmedDescription : null,
+        color,
       });
       const todayIso = isoDate(new Date());
       for (const lineageId of selected) {
@@ -101,17 +104,21 @@ export default function NewGroupScreen() {
           onAction={onCreate}
         />
 
+        <IdentityPillPreview name={name} description={description} color={color} />
+
         {loading ? (
           <ActivityIndicator style={styles.loading} />
         ) : (
           <IdentityForm
             name={name}
             description={description}
+            color={color}
             choices={choices}
             selected={selected}
             emptyCopy="No habits yet — you can add them here later."
             onChangeName={setName}
             onChangeDescription={setDescription}
+            onChangeColor={setColor}
             onToggle={toggle}
           />
         )}

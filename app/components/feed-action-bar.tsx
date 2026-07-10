@@ -59,11 +59,11 @@ export function FeedActionBar({
           <IconSymbol
             name={viewerLiked ? 'heart.fill' : 'heart'}
             color={viewerLiked ? t.danger : t.ink70}
-            size={26}
+            size={20}
           />
         </Pressable>
         <Pressable onPress={onOpenComments} hitSlop={8} style={styles.commentButton}>
-          <IconSymbol name="bubble.right" color={t.ink70} size={24} />
+          <IconSymbol name="bubble.right" color={t.ink70} size={19} />
           {commentCount > 0 ? (
             <ThemedText style={styles.commentCount}>{commentCount}</ThemedText>
           ) : null}

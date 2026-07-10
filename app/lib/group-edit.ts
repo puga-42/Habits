@@ -78,17 +78,19 @@ export function planMemberEdits(
 
 // ─── Mutation ───────────────────────────────────────────────────────────────
 
-// Update the group's identity fields. Name is required (1–100, DB check);
-// description is free-form ≤1000, blank saves as null.
+// Update the identity's fields. Name is required (1–100, DB check);
+// description is free-form ≤1000, blank saves as null; color tints the
+// day-view card (null = plain surface).
 export async function updateGroupDetails(
   groupId: string,
-  details: { name: string; description: string | null },
+  details: { name: string; description: string | null; color: string | null },
 ): Promise<void> {
   const { error } = await supabase
     .from('habit_groups')
     .update({
       name: details.name,
       description: details.description,
+      color: details.color,
     })
     .eq('id', groupId);
   if (error) throw error;

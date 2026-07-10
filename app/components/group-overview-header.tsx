@@ -1,5 +1,5 @@
 // Presentational header for the group overview screen: the group's identity
-// (icon + name + streak), a stat row (members / completions), the description,
+// (name + streak), a stat row (members / completions), the description,
 // and the photo mosaic ("vision board") built from recent member-completion
 // media. The screen owns all data (the Edit affordance lives in the screen's
 // top bar, in line with Back).
@@ -13,8 +13,6 @@ import { useTokens } from '@/hooks/use-tokens';
 
 type Props = {
   name: string;
-  color: string | null;
-  icon: string | null;
   description: string | null;
   streak: number;
   memberCount: number;
@@ -24,8 +22,6 @@ type Props = {
 
 export function GroupOverviewHeader({
   name,
-  color,
-  icon,
   description,
   streak,
   memberCount,
@@ -33,13 +29,9 @@ export function GroupOverviewHeader({
   photoUrls,
 }: Props) {
   const t = useTokens();
-  const tint = color ?? t.ink45;
   return (
     <View style={styles.root}>
       <View style={styles.identity}>
-        <View style={[styles.iconCircle, { backgroundColor: tint }]}>
-          <ThemedText style={styles.iconText}>{icon || '◎'}</ThemedText>
-        </View>
         <View style={styles.titleWrap}>
           <ThemedText style={styles.name} numberOfLines={2}>
             {name}
@@ -95,14 +87,6 @@ const TILE = Math.floor(
 const styles = StyleSheet.create({
   root: { paddingHorizontal: 16, paddingTop: 8, gap: 16 },
   identity: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  iconCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  iconText: { fontSize: 24 },
   titleWrap: { flex: 1 },
   name: { fontSize: 24, fontWeight: '700' },
   stats: { flexDirection: 'row', gap: 28 },

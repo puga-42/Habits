@@ -1,4 +1,3 @@
-import * as ImagePicker from 'expo-image-picker';
 import { Alert } from 'react-native';
 
 import {
@@ -8,6 +7,7 @@ import {
   validateAttachment,
 } from '@/lib/completions';
 import { signedUrlsForPaths } from '@/lib/feed';
+import { pickMediaAsset } from '@/lib/media-picker';
 import { validationMessage, type OverviewCompletion } from '@/lib/habit-overview';
 
 export type CompletionsSetter = React.Dispatch<
@@ -27,34 +27,21 @@ export async function pickAndUpload(
   const comp = completions.find((c) => c.id === completionId);
   if (!comp) return;
 
-  const result = await ImagePicker.launchImageLibraryAsync({
-    mediaTypes: ImagePicker.MediaTypeOptions.All,
-    quality: 0.8,
-    videoMaxDuration: 30,
-  });
-  if (result.canceled || result.assets.length === 0) return;
+  const picked = await pickMediaAsset();
+  if (!picked) return;
 
-  const asset = result.assets[0];
-  const mimeType =
-    asset.mimeType ?? (asset.type === 'video' ? 'video/mp4' : 'image/jpeg');
-  const byteSize = asset.fileSize ?? 0;
-  const durationSeconds = asset.duration ? asset.duration / 1000 : undefined;
-
-  const error = validateAttachment(
-    { mimeType, byteSize, durationSeconds },
-    comp.attachments.length,
-  );
+  const error = validateAttachment(picked, comp.attachments.length);
   if (error) {
     Alert.alert('Cannot add attachment', validationMessage(error));
     return;
   }
 
   const attachment = await uploadAttachment(completionId, userId, {
-    uri: asset.uri,
-    mimeType,
-    width: asset.width,
-    height: asset.height,
-    duration: durationSeconds,
+    uri: picked.uri,
+    mimeType: picked.mimeType,
+    width: picked.width,
+    height: picked.height,
+    duration: picked.durationSeconds,
   });
 
   setCompletions((prev) =>

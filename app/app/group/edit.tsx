@@ -18,6 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { FormPageHeader } from '@/components/form-page-header';
 import { IdentityForm } from '@/components/identity-form';
+import { IdentityPillPreview } from '@/components/identity-pill-preview';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useTokens } from '@/hooks/use-tokens';
@@ -52,6 +53,7 @@ export default function EditGroupScreen() {
   const [missing, setMissing] = useState(false);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [color, setColor] = useState<string | null>(null);
   const [choices, setChoices] = useState<GroupHabitChoice[]>([]);
   const [initialMembers, setInitialMembers] = useState<string[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -71,6 +73,7 @@ export default function EditGroupScreen() {
       }
       setName(group.name);
       setDescription(group.description ?? '');
+      setColor(group.color ?? null);
       const rows = buildGroupHabitChoices(habits, memberships, groups, id, isoDate(new Date()));
       setChoices(rows);
       const members = rows.filter((r) => r.inGroup).map((r) => r.lineageId);
@@ -105,6 +108,7 @@ export default function EditGroupScreen() {
       await updateGroupDetails(id, {
         name: trimmedName,
         description: trimmedDescription ? trimmedDescription : null,
+        color,
       });
       const plan = planMemberEdits(initialMembers, [...selected]);
       const todayIso = isoDate(new Date());
@@ -161,6 +165,8 @@ export default function EditGroupScreen() {
           onAction={onSave}
         />
 
+        <IdentityPillPreview name={name} description={description} color={color} />
+
         {loading ? (
           <ActivityIndicator style={styles.loading} />
         ) : missing ? (
@@ -169,11 +175,13 @@ export default function EditGroupScreen() {
           <IdentityForm
             name={name}
             description={description}
+            color={color}
             choices={choices}
             selected={selected}
             emptyCopy="No habits yet — create one first."
             onChangeName={setName}
             onChangeDescription={setDescription}
+            onChangeColor={setColor}
             onToggle={toggle}>
             <Pressable
               onPress={onDelete}

@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
-import * as ImagePicker from 'expo-image-picker';
 import { Alert } from 'react-native';
 
 import { validateAttachment, type AttachmentDetail } from '@/lib/attachments';
 import { signedUrlsForPaths } from '@/lib/feed';
+import { errorMessage } from '@/lib/error-message';
+import { pickMediaAsset } from '@/lib/media-picker';
 import { validationMessage } from '@/lib/habit-overview';
 import {
   deleteRestAttachment,
@@ -45,39 +46,31 @@ export function useRestMedia(restId: string | null, userId: string) {
 
   const add = useCallback(async () => {
     if (!restId) return;
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.All,
-      quality: 0.8,
-      videoMaxDuration: 30,
-    });
-    if (result.canceled || result.assets.length === 0) return;
-    const asset = result.assets[0];
-    const mimeType =
-      asset.mimeType ?? (asset.type === 'video' ? 'video/mp4' : 'image/jpeg');
-    const byteSize = asset.fileSize ?? 0;
-    const durationSeconds = asset.duration ? asset.duration / 1000 : undefined;
-    const err = validateAttachment(
-      { mimeType, byteSize, durationSeconds },
-      attachments.length,
-    );
-    if (err) {
-      Alert.alert('Cannot add attachment', validationMessage(err));
-      return;
+    try {
+      const picked = await pickMediaAsset();
+      if (!picked) return;
+      const err = validateAttachment(picked, attachments.length);
+      if (err) {
+        Alert.alert('Cannot add attachment', validationMessage(err));
+        return;
+      }
+      const attachment = await uploadRestAttachment(restId, userId, {
+        uri: picked.uri,
+        mimeType: picked.mimeType,
+        width: picked.width,
+        height: picked.height,
+        duration: picked.durationSeconds,
+      });
+      setAttachments((prev) => [...prev, attachment]);
+      const urls = await signedUrlsForPaths([attachment.storage_path]);
+      setSignedUrls((prev) => {
+        const next = new Map(prev);
+        for (const [k, v] of urls) next.set(k, v);
+        return next;
+      });
+    } catch (err) {
+      Alert.alert('Upload failed', errorMessage(err));
     }
-    const attachment = await uploadRestAttachment(restId, userId, {
-      uri: asset.uri,
-      mimeType,
-      width: asset.width,
-      height: asset.height,
-      duration: durationSeconds,
-    });
-    setAttachments((prev) => [...prev, attachment]);
-    const urls = await signedUrlsForPaths([attachment.storage_path]);
-    setSignedUrls((prev) => {
-      const next = new Map(prev);
-      for (const [k, v] of urls) next.set(k, v);
-      return next;
-    });
   }, [restId, userId, attachments.length]);
 
   const remove = useCallback((attachmentId: string) => {

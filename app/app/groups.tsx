@@ -96,7 +96,6 @@ export default function GroupsScreen() {
                   ]}
                   accessibilityRole="button"
                   accessibilityLabel={`Open ${g.name}`}>
-                  <View style={[styles.dot, { backgroundColor: g.color ?? t.ink45 }]} />
                   <View style={styles.rowBody}>
                     <ThemedText style={styles.name} numberOfLines={1}>
                       {g.name}
@@ -148,7 +147,6 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  dot: { width: 10, height: 10, borderRadius: 5 },
   rowBody: { flex: 1 },
   name: { fontSize: 16, fontWeight: '600' },
   count: { fontSize: 13, marginTop: 2 },

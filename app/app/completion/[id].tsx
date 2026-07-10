@@ -1,4 +1,3 @@
-import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
@@ -33,6 +32,7 @@ import { signedUrlsForPaths } from '@/lib/feed';
 import { Palette } from '@/constants/colors';
 import type { Visibility } from '@/lib/habits';
 import { errorMessage } from '@/lib/error-message';
+import { pickMediaAsset } from '@/lib/media-picker';
 
 export default function CompletionDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -112,38 +112,26 @@ export default function CompletionDetailScreen() {
   const handleAdd = useCallback(async () => {
     if (!completion || !viewerId) return;
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.All,
-      quality: 0.8,
-      videoMaxDuration: 30,
-    });
-
-    if (result.canceled || result.assets.length === 0) return;
-
-    const asset = result.assets[0];
-    const mimeType = asset.mimeType ?? (asset.type === 'video' ? 'video/mp4' : 'image/jpeg');
-    const byteSize = asset.fileSize ?? 0;
-    const durationSeconds = asset.duration ? asset.duration / 1000 : undefined;
-
-    const error = validateAttachment(
-      { mimeType, byteSize, durationSeconds },
-      completion.attachments.length,
-    );
-
-    if (error) {
-      const message = validationMessage(error);
-      Alert.alert('Cannot add attachment', message);
-      return;
-    }
-
+    // Picker INSIDE the try: the iCloud fetch/export can reject (this was the
+    // uncaught PHPhotosErrorDomain rejection). Shared picker: no permission
+    // prompt, no transcode — see lib/media-picker.ts.
     setUploading(true);
     try {
+      const picked = await pickMediaAsset();
+      if (!picked) return;
+
+      const error = validateAttachment(picked, completion.attachments.length);
+      if (error) {
+        Alert.alert('Cannot add attachment', validationMessage(error));
+        return;
+      }
+
       const attachment = await uploadAttachment(completion.id, viewerId, {
-        uri: asset.uri,
-        mimeType,
-        width: asset.width,
-        height: asset.height,
-        duration: durationSeconds,
+        uri: picked.uri,
+        mimeType: picked.mimeType,
+        width: picked.width,
+        height: picked.height,
+        duration: picked.durationSeconds,
       });
       setCompletion((c) =>
         c ? { ...c, attachments: [...c.attachments, attachment] } : c,

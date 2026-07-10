@@ -67,12 +67,17 @@ function completionRow(habitId: string, id = `c-${habitId}`): AgendaRow {
   };
 }
 
-function group(id: string, sort_index: number, collapsed = false): HabitGroup {
+function group(
+  id: string,
+  sort_index: number,
+  collapsed = false,
+  color: string | null = null,
+): HabitGroup {
   return {
     id,
     owner_id: 'u1',
     name: id,
-    color: null,
+    color,
     icon: null,
     sort_index,
     collapsed,
@@ -126,7 +131,7 @@ describe('buildDayItems — grouping', () => {
     expect(items[0]).toMatchObject({ kind: 'group-header', groupId: 'G1' });
     expect(items[1]).toMatchObject({ kind: 'row', groupId: 'G1', section: 'notCompleted' });
     expect((items[1] as any).row.habitId).toBe('A');
-    expect(items[2]).toMatchObject({ kind: 'group-footer', groupId: 'G1' });
+    expect(items[2]).toMatchObject({ kind: 'group-footer', groupId: 'G1', color: null, collapsed: false });
     expect(items[3]).toMatchObject({ kind: 'group-header', groupId: 'G2' });
     expect(items[4]).toMatchObject({ kind: 'row', groupId: 'G2', section: 'notCompleted' });
     expect((items[4] as any).row.habitId).toBe('B');
@@ -143,7 +148,9 @@ describe('buildDayItems — grouping', () => {
 
     expect(items).toHaveLength(2);
     expect(items[0]).toMatchObject({ kind: 'group-header', groupId: 'G1', collapsed: true });
-    expect(items[1]).toMatchObject({ kind: 'group-footer', groupId: 'G1' });
+    // Collapsed cards render the header as a full pill; the footer only
+    // carries spacing — it must know it's collapsed.
+    expect(items[1]).toMatchObject({ kind: 'group-footer', groupId: 'G1', collapsed: true });
   });
 
   it('a habit in TWO identities appears inside both cards (multi-identity)', () => {
@@ -294,5 +301,19 @@ describe('buildDayItems — key stability across expand/collapse', () => {
     for (const k of collapsedKeys) {
       expect(expandedKeys).toContain(k);
     }
+  });
+});
+
+describe('buildDayItems — identity card color', () => {
+  it('header and footer both carry the identity color (they tint the card surface)', () => {
+    const habits = [habit('A', 1)];
+    const rows = [scheduledRow('A')];
+    const groups = [group('G1', 1, false, '#FF8E62')];
+    const members = [member('A', 'G1')];
+
+    const items = build(rows, habits, groups, members);
+
+    expect(items[0]).toMatchObject({ kind: 'group-header', color: '#FF8E62' });
+    expect(items[2]).toMatchObject({ kind: 'group-footer', color: '#FF8E62' });
   });
 });
