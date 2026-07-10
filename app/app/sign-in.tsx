@@ -1,3 +1,9 @@
+// Signed-out landing — the first interactive screen (AuthGate routes here).
+// Welcome-first: placeholder brand + tagline + value props (WelcomeHero),
+// with Sign in with Apple as the always-visible primary CTA and the email
+// form tucked behind "Continue with email". Brand is a placeholder — see
+// components/brand-mark.tsx for the single point of replacement.
+
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { useState } from 'react';
 import {
@@ -7,44 +13,22 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 
+import { EmailAuthForm } from '@/components/email-auth-form';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { WelcomeHero } from '@/components/welcome-hero';
 import { useTokens } from '@/hooks/use-tokens';
-import {
-  keyboardAvoidingBehavior,
-  signInWithApple,
-  signInWithEmail,
-  signUpWithEmail,
-} from '@/lib/sign-in';
+import { keyboardAvoidingBehavior, signInWithApple } from '@/lib/sign-in';
 
 export default function SignInScreen() {
   const t = useTokens();
   const [busy, setBusy] = useState(false);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [isSignUp, setIsSignUp] = useState(false);
-
-  async function handleEmailAuth() {
-    if (busy) return;
-    const trimmed = email.trim();
-    if (!trimmed || !password) {
-      Alert.alert('Missing fields', 'Please enter both email and password.');
-      return;
-    }
-    setBusy(true);
-    const result = isSignUp
-      ? await signUpWithEmail(trimmed, password)
-      : await signInWithEmail(trimmed, password);
-    if (!result.ok && !result.cancelled) {
-      Alert.alert(isSignUp ? 'Sign-up failed' : 'Sign-in failed', result.message);
-    }
-    setBusy(false);
-  }
+  const [stage, setStage] = useState<'landing' | 'email'>('landing');
 
   async function handleApple() {
     if (busy) return;
@@ -58,79 +42,63 @@ export default function SignInScreen() {
 
   return (
     <ThemedView style={styles.root}>
-      <KeyboardAvoidingView
-        style={styles.root}
-        behavior={keyboardAvoidingBehavior(Platform.OS)}
-      >
+      <KeyboardAvoidingView style={styles.root} behavior={keyboardAvoidingBehavior(Platform.OS)}>
         <SafeAreaView edges={['top', 'bottom']} style={styles.root}>
-          <ScrollView
-            contentContainerStyle={styles.scroll}
-            keyboardShouldPersistTaps="handled"
-          >
+          <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
             <View style={styles.hero}>
-              <ThemedText type="title" style={styles.title}>
-                Habits
-              </ThemedText>
-              <ThemedText style={styles.subtitle}>
-                A calmer habit tracker, with friends.
-              </ThemedText>
+              <WelcomeHero />
             </View>
-            <View style={styles.buttonContainer}>
-              <TextInput
-                style={[
-                  styles.input,
-                  { color: t.ink, backgroundColor: t.surface, borderColor: t.hairlineStrong },
-                ]}
-                placeholder="Email"
-                placeholderTextColor="#999"
-                autoCapitalize="none"
-                autoComplete="email"
-                keyboardType="email-address"
-                value={email}
-                onChangeText={setEmail}
-              />
-              <TextInput
-                style={[
-                  styles.input,
-                  { color: t.ink, backgroundColor: t.surface, borderColor: t.hairlineStrong },
-                ]}
-                placeholder="Password"
-                placeholderTextColor="#999"
-                autoCapitalize="none"
-                autoComplete={isSignUp ? 'new-password' : 'current-password'}
-                secureTextEntry
-                value={password}
-                onChangeText={setPassword}
-              />
-              <Pressable
-                style={[styles.emailButton, { backgroundColor: t.accent }]}
-                onPress={handleEmailAuth}
-                disabled={busy}
-              >
-                <ThemedText style={[styles.emailButtonText, { color: t.onAccent }]}>
-                  {isSignUp ? 'Create account' : 'Sign in'}
-                </ThemedText>
-              </Pressable>
-              <Pressable onPress={() => setIsSignUp((v) => !v)}>
-                <ThemedText style={styles.toggleText}>
-                  {isSignUp
-                    ? 'Already have an account? Sign in'
-                    : "Don't have an account? Create one"}
-                </ThemedText>
-              </Pressable>
+
+            <View style={styles.actions}>
+              {stage === 'email' ? (
+                <Animated.View entering={FadeInDown.duration(250)} style={styles.emailForm}>
+                  <EmailAuthForm busy={busy} onBusyChange={setBusy} />
+                </Animated.View>
+              ) : null}
+
               {Platform.OS === 'ios' && (
                 <AppleAuthentication.AppleAuthenticationButton
-                  buttonType={
-                    AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN
-                  }
-                  buttonStyle={
-                    AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
-                  }
-                  cornerRadius={8}
+                  buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+                  buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+                  cornerRadius={12}
                   style={styles.appleButton}
                   onPress={handleApple}
                 />
               )}
+
+              {stage === 'landing' ? (
+                // On iOS the Apple button is primary and this is a quiet
+                // secondary link; on Android (no Apple auth) email IS the
+                // primary path, so it gets the filled-CTA treatment.
+                Platform.OS === 'ios' ? (
+                  <Pressable onPress={() => setStage('email')} hitSlop={8} accessibilityRole="button">
+                    <ThemedText style={[styles.stageLink, { color: t.accent }]}>
+                      Continue with email
+                    </ThemedText>
+                  </Pressable>
+                ) : (
+                  <Pressable
+                    onPress={() => setStage('email')}
+                    style={[styles.primaryButton, { backgroundColor: t.accent }]}
+                    accessibilityRole="button">
+                    <ThemedText style={[styles.primaryButtonText, { color: t.onAccent }]}>
+                      Continue with email
+                    </ThemedText>
+                  </Pressable>
+                )
+              ) : (
+                <Pressable onPress={() => setStage('landing')} hitSlop={8} accessibilityRole="button">
+                  <ThemedText style={[styles.stageLink, { color: t.ink52 }]}>
+                    ‹ Back to welcome
+                  </ThemedText>
+                </Pressable>
+              )}
+
+              {/* Placeholder until the real documents exist (App Store needs a
+                  privacy policy URL at submission). */}
+              <ThemedText style={[styles.footnote, { color: t.ink45 }]}>
+                By continuing you agree to the Terms &amp; Privacy Policy.
+              </ThemedText>
             </View>
           </ScrollView>
         </SafeAreaView>
@@ -146,31 +114,17 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 24,
   },
-  hero: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', gap: 8 },
-  title: { fontSize: 48, lineHeight: 56, marginBottom: 4 },
-  subtitle: { opacity: 0.6, textAlign: 'center' },
-  buttonContainer: { paddingBottom: 16, gap: 12 },
-  input: {
+  hero: { flexGrow: 1, justifyContent: 'center', paddingTop: 24 },
+  actions: { paddingBottom: 8, gap: 12 },
+  emailForm: { gap: 12 },
+  appleButton: { width: '100%', height: 50 },
+  primaryButton: {
     height: 50,
-    borderRadius: 8,
-    borderWidth: 1,
-    paddingHorizontal: 16,
-    fontSize: 16,
-  },
-  emailButton: {
-    height: 50,
-    borderRadius: 8,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  emailButtonText: {
-    fontSize: 17,
-    fontWeight: '600',
-  },
-  toggleText: {
-    textAlign: 'center',
-    opacity: 0.6,
-    fontSize: 14,
-  },
-  appleButton: { width: '100%', height: 50 },
+  primaryButtonText: { fontSize: 17, fontWeight: '600' },
+  stageLink: { textAlign: 'center', fontSize: 15, fontWeight: '600', paddingVertical: 4 },
+  footnote: { textAlign: 'center', fontSize: 12, lineHeight: 16, paddingTop: 4 },
 });
