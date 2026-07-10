@@ -2,6 +2,7 @@
 // Pure helpers are TDD'd; see __tests__/friends.test.ts.
 
 import { supabase } from './supabase';
+import { uniqueChannelName } from './realtime-channel-name';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -189,7 +190,7 @@ export function subscribeToFriendEvents(
   channelName = 'friends',
 ): () => void {
   const channel = supabase
-    .channel(channelName)
+    .channel(uniqueChannelName(channelName))
     .on(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       'postgres_changes' as any,

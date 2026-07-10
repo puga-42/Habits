@@ -1,6 +1,7 @@
 // Feed realtime — postgres_changes subscriptions for live updates.
 
 import { supabase } from "./supabase";
+import { uniqueChannelName } from "./realtime-channel-name";
 
 // ─── Realtime ──────────────────────────────────────────────────────────────
 
@@ -31,7 +32,7 @@ export function subscribeToFeed(
   channelName = "feed",
 ): () => void {
   const channel = supabase
-    .channel(channelName)
+    .channel(uniqueChannelName(channelName))
     .on(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       "postgres_changes" as any,

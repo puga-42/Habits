@@ -10,6 +10,7 @@ import {
 
 import { fetchPendingRequestCount } from '@/lib/friends';
 import { supabase } from '@/lib/supabase';
+import { uniqueChannelName } from '@/lib/realtime-channel-name';
 
 type PendingCountContextValue = {
   pendingCount: number;
@@ -37,7 +38,7 @@ export function PendingCountProvider({
     if (!userId) return;
     refresh();
     const channel = supabase
-      .channel(`pending-requests:${userId}`)
+      .channel(uniqueChannelName(`pending-requests:${userId}`))
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'friend_requests', filter: `to_user=eq.${userId}` },

@@ -10,6 +10,7 @@ import {
 
 import { fetchUnreadCount } from '@/lib/notifications';
 import { supabase } from '@/lib/supabase';
+import { uniqueChannelName } from '@/lib/realtime-channel-name';
 
 type UnreadCountContextValue = {
   unreadCount: number;
@@ -38,7 +39,7 @@ export function UnreadCountProvider({
     if (!userId) return;
     refresh();
     const channel = supabase
-      .channel(`unread-notifications:${userId}`)
+      .channel(uniqueChannelName(`unread-notifications:${userId}`))
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` },
